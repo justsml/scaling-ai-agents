@@ -11,9 +11,11 @@ export const investigationRequestSchema = z.object({
   model: z.literal("openai/gpt-5.6-luna"), reasoningEffort: z.literal("none"),
 });
 export type InvestigationRequest = z.infer<typeof investigationRequestSchema>;
+const claimScalarSchema = z.union([z.string(), z.number(), z.boolean()]);
+const claimValueSchema = z.union([claimScalarSchema, z.array(claimScalarSchema)]);
 export const answerSchema = z.object({
   summary: z.string(),
-  claims: z.array(z.object({ path: z.string().min(1), value: z.unknown(), requestIds: z.array(z.string()).min(1) })),
+  claims: z.array(z.object({ path: z.string().min(1), value: claimValueSchema, requestIds: z.array(z.string()).min(1) })),
 });
 export type InvestigationAnswer = z.infer<typeof answerSchema>;
 
