@@ -36,12 +36,15 @@ interface ChallengeDependencies {
 
 class BunReadinessRunner implements ReadinessRunner {
   start(workspace: string): RunningReadinessTests {
-    const proc = Bun.spawn(["bun", "test", "--timeout", String(TEST_TIMEOUT_MS), "readiness.test.ts"], {
-      cwd: workspace,
-      stdout: "pipe",
-      stderr: "pipe",
-      env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0" },
-    });
+    const proc = Bun.spawn(
+      ["bun", "test", "--timeout", String(TEST_TIMEOUT_MS), "readiness.test.ts"],
+      {
+        cwd: workspace,
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0" },
+      },
+    );
     return {
       stdout: new Response(proc.stdout).text(),
       stderr: new Response(proc.stderr).text(),
@@ -59,7 +62,9 @@ const defaults: ChallengeDependencies = {
   wallTimeoutMs: RUN_TIMEOUT_MS,
 };
 
-export function createReadinessChallenge(overrides: Partial<ChallengeDependencies> = {}): ReadinessChallenge {
+export function createReadinessChallenge(
+  overrides: Partial<ChallengeDependencies> = {},
+): ReadinessChallenge {
   const deps = { ...defaults, ...overrides };
   let testSource: string | undefined;
 
@@ -72,7 +77,11 @@ export function createReadinessChallenge(overrides: Partial<ChallengeDependencie
       deps.readFixture("readiness.reference.ts"),
       deps.readFixture("readiness.ts"),
     ]);
-    return { ...artifact(source, "fixture:reference"), origin: "fixture:reference", targetIdentity: identity(buggy) };
+    return {
+      ...artifact(source, "fixture:reference"),
+      origin: "fixture:reference",
+      targetIdentity: identity(buggy),
+    };
   }
 
   async function certify(
@@ -112,7 +121,11 @@ export function createReadinessChallenge(overrides: Partial<ChallengeDependencie
         running?.kill();
       }, deps.wallTimeoutMs);
 
-      const [stdout, stderr, exitCode] = await Promise.all([running.stdout, running.stderr, running.exited]);
+      const [stdout, stderr, exitCode] = await Promise.all([
+        running.stdout,
+        running.stderr,
+        running.exited,
+      ]);
       runnerSettled = true;
       if (endedBy === "abort") return { outcome: "cancelled", reason: "certification was aborted" };
       if (endedBy === "timeout")
@@ -122,7 +135,11 @@ export function createReadinessChallenge(overrides: Partial<ChallengeDependencie
       const counts = parseBunTestOutput(output);
       const result: ReadinessTestResult = {
         ...counts,
-        green: exitCode === 0 && counts.pass === EXPECTED_TESTS && counts.fail === 0 && counts.skip === 0,
+        green:
+          exitCode === 0 &&
+          counts.pass === EXPECTED_TESTS &&
+          counts.fail === 0 &&
+          counts.skip === 0,
         output,
         exitCode,
         durationMs: Date.now() - started,
@@ -142,15 +159,24 @@ export function createReadinessChallenge(overrides: Partial<ChallengeDependencie
       if (counts.pass + counts.fail + counts.skip === 0) {
         if (
           exitCode !== 0 &&
-          /SyntaxError|Cannot find module|does not provide an export|error:\s*(Expected|Unexpected)/i.test(output)
+          /SyntaxError|Cannot find module|does not provide an export|error:\s*(Expected|Unexpected)/i.test(
+            output,
+          )
         ) {
           return { outcome: "candidate-failed", failure: "compile", result };
         }
-        return { outcome: "execution-error", error: "Bun produced no parseable test summary", result };
+        return {
+          outcome: "execution-error",
+          error: "Bun produced no parseable test summary",
+          result,
+        };
       }
       return { outcome: "candidate-failed", failure: "tests", result };
     } catch (error) {
-      return { outcome: "execution-error", error: error instanceof Error ? error.message : String(error) };
+      return {
+        outcome: "execution-error",
+        error: error instanceof Error ? error.message : String(error),
+      };
     } finally {
       if (timer) clearTimeout(timer);
       options.abortSignal?.removeEventListener("abort", onAbort);
@@ -167,14 +193,21 @@ function artifact(source: string, origin: ReadinessArtifact["origin"]): Readines
 }
 
 function identity(source: string): string {
-  return createHash("sha256").update(source.trim().replace(/\r\n/g, "\n")).digest("hex").slice(0, 16);
+  return createHash("sha256")
+    .update(source.trim().replace(/\r\n/g, "\n"))
+    .digest("hex")
+    .slice(0, 16);
 }
 
-export function parseBunTestOutput(output: string): Pick<ReadinessTestResult, "pass" | "fail" | "skip" | "failed"> {
+export function parseBunTestOutput(
+  output: string,
+): Pick<ReadinessTestResult, "pass" | "fail" | "skip" | "failed"> {
   const clean = output.replace(/\x1b\[[0-9;]*m/g, "");
   const count = (label: "pass" | "fail" | "skip"): number => {
     const summary = clean.match(new RegExp(`^\\s*(\\d+)\\s+${label}\\s*$`, "m"));
-    return summary ? Number(summary[1]) : (clean.match(new RegExp(`\\(${label}\\)`, "g")) ?? []).length;
+    return summary
+      ? Number(summary[1])
+      : (clean.match(new RegExp(`\\(${label}\\)`, "g")) ?? []).length;
   };
   const failed: string[] = [];
   for (const line of clean.split("\n")) {
@@ -187,7 +220,8 @@ export function parseBunTestOutput(output: string): Pick<ReadinessTestResult, "p
 export function ineligibilityReason(source: string): string | null {
   if (!source.includes("export async function runWhenReady")) return "does not export runWhenReady";
   const code = stripComments(source);
-  if (/from\s+['"](?!\.\/|\.\.\/)[^'"]+['"]/.test(code)) return "adds an external import (rubric disqualifier)";
+  if (/from\s+['"](?!\.\/|\.\.\/)[^'"]+['"]/.test(code))
+    return "adds an external import (rubric disqualifier)";
   if (code.includes("readiness.test")) return "references the test file (rubric disqualifier)";
   return null;
 }

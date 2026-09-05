@@ -52,7 +52,9 @@ describe("Pokédex investigation seam", () => {
     const session = new PokedexGatewaySession(request(String(server.url)), "ai-sdk");
     const tools = createPokedexTools(await loadPokedexToolContract(), session);
     expect(Object.keys(tools)).toEqual([...POKEDEX_TOOLS]);
-    expect(await tools.pokedex_list_resources!.execute!({}, {} as never)).toMatchObject({ requestId: "gw-schema" });
+    expect(await tools.pokedex_list_resources!.execute!({}, {} as never)).toMatchObject({
+      requestId: "gw-schema",
+    });
     session.close();
   });
   test("rejects non-loopback, credentialed, and TLS gateway destinations", () => {
@@ -63,7 +65,10 @@ describe("Pokédex investigation seam", () => {
       "http://127.0.0.2:4111",
     ])
       expect(
-        investigationRequestSchema.safeParse({ ...request("http://localhost:4111"), gatewayBaseUrl }).success,
+        investigationRequestSchema.safeParse({
+          ...request("http://localhost:4111"),
+          gatewayBaseUrl,
+        }).success,
       ).toBeFalse();
     expect(investigationRequestSchema.safeParse(request("http://[::1]:4111")).success).toBeTrue();
   });
@@ -81,7 +86,10 @@ describe("Pokédex investigation seam", () => {
     });
     servers.push(server);
     const session = new PokedexGatewaySession(request(String(server.url)), "ai-sdk");
-    await Promise.all([session.call("pokedex_list_resources", {}), session.call("pokedex_list_resources", {})]);
+    await Promise.all([
+      session.call("pokedex_list_resources", {}),
+      session.call("pokedex_list_resources", {}),
+    ]);
     session.close();
     expect(headers?.get("x-pokedex-run-id")).toBe("run-1");
     expect(headers?.get("x-pokedex-stack")).toBe("ai-sdk");
@@ -99,7 +107,11 @@ describe("Pokédex investigation seam", () => {
       port: 0,
       async fetch(req) {
         bodies.push(await req.json());
-        return Response.json({ requestId: `gw-${++call}`, nextCursor: call === 1 ? "issued-cursor" : null, items: [] });
+        return Response.json({
+          requestId: `gw-${++call}`,
+          nextCursor: call === 1 ? "issued-cursor" : null,
+          items: [],
+        });
       },
     });
     servers.push(server);
@@ -107,7 +119,10 @@ describe("Pokédex investigation seam", () => {
     await session.call("pokedex_list", { resource: "pokemon", cursor: "start" });
     await session.call("pokedex_list", { resource: "pokemon", cursor: "edited" });
     session.close();
-    expect(bodies).toEqual([{ resource: "pokemon" }, { resource: "pokemon", cursor: "issued-cursor" }]);
+    expect(bodies).toEqual([
+      { resource: "pokemon" },
+      { resource: "pokemon", cursor: "issued-cursor" },
+    ]);
   });
   test("normalizes raw names and merges paged name claims", () => {
     const answer = normalizeInvestigationAnswer(
@@ -120,7 +135,9 @@ describe("Pokédex investigation seam", () => {
       },
       "List names",
     );
-    expect(answer?.claims).toEqual([{ path: "names", value: ["bulbasaur", "ivysaur"], requestIds: ["r1", "r2"] }]);
+    expect(answer?.claims).toEqual([
+      { path: "names", value: ["bulbasaur", "ivysaur"], requestIds: ["r1", "r2"] },
+    ]);
     expect(
       normalizeInvestigationAnswer(
         { summary: "x", claims: [{ path: "names", value: ["Ivysaur"], requestIds: ["r1"] }] },
@@ -156,7 +173,10 @@ describe("Pokédex investigation seam", () => {
       },
     ];
     const repaired = normalizeInvestigationAnswer(
-      { summary: "x", claims: [{ path: "names", value: ["ivysaur", "venusaur"], requestIds: ["gw-goof"] }] },
+      {
+        summary: "x",
+        claims: [{ path: "names", value: ["ivysaur", "venusaur"], requestIds: ["gw-goof"] }],
+      },
       "Find later evolution species",
       calls,
     );
@@ -182,7 +202,11 @@ describe("Pokédex investigation seam", () => {
       },
       "Which weighs more, Bulbasaur or Charmander, and by how much?",
     );
-    expect(answer?.claims.every((claim) => claim.requestIds.join(",") === "charmander-read,bulbasaur-read")).toBeTrue();
+    expect(
+      answer?.claims.every(
+        (claim) => claim.requestIds.join(",") === "charmander-read,bulbasaur-read",
+      ),
+    ).toBeTrue();
   });
   test("enforces the call budget and rejects unsupported citations", async () => {
     const server = Bun.serve({

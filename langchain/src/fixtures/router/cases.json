@@ -47,7 +47,11 @@
   {
     "id": "route-general-extract",
     "input": "Extract the renewal date and contract value from this short paragraph.",
-    "groundTruth": { "route": "general", "forbidden": ["code", "long-context"], "source": "article" }
+    "groundTruth": {
+      "route": "general",
+      "forbidden": ["code", "long-context"],
+      "source": "article"
+    }
   },
   {
     "id": "ambiguous-deploy-logs",

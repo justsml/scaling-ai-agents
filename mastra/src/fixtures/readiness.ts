@@ -5,7 +5,9 @@
 //   3. Retries have no backoff.
 // The contract is in readiness.test.ts. Do not edit the test file.
 
-export type ProbeResult = { ok: true } | { ok: false; code: "ECONNREFUSED" | "EACCES" | "ETIMEDOUT" };
+export type ProbeResult =
+  | { ok: true }
+  | { ok: false; code: "ECONNREFUSED" | "EACCES" | "ETIMEDOUT" };
 
 export type Probe = () => Promise<ProbeResult>;
 

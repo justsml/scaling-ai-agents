@@ -48,7 +48,10 @@ export class NodeProcessSpawner implements ProcessSpawner {
   }
 }
 
-export async function collectUtf8(stream: AsyncIterable<Uint8Array>, maximumBytes: number): Promise<string> {
+export async function collectUtf8(
+  stream: AsyncIterable<Uint8Array>,
+  maximumBytes: number,
+): Promise<string> {
   const decoder = new TextDecoder("utf-8", { fatal: true });
   let bytes = 0;
   let text = "";

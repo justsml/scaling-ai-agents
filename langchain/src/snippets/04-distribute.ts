@@ -105,7 +105,10 @@ async function main() {
   // a router actually needs to make a decision.
   // -------------------------------------------------------------------------
   section("provider pool");
-  table(["provider", "kind", "regions", "may see", "status", "why it exists"], describePool(localUp));
+  table(
+    ["provider", "kind", "regions", "may see", "status", "why it exists"],
+    describePool(localUp),
+  );
   if (!localUp) {
     const slot = localSlot();
     note(
@@ -118,13 +121,18 @@ async function main() {
   // -------------------------------------------------------------------------
   // DISTRIBUTE / the filter. This runs BEFORE any model is constructed.
   // -------------------------------------------------------------------------
-  const requests = JSON.parse(await readFile(join(FIXTURES, "requests.json"), "utf8")) as RequestRow[];
+  const requests = JSON.parse(
+    await readFile(join(FIXTURES, "requests.json"), "utf8"),
+  ) as RequestRow[];
 
   section("routing every request through the filter (no calls made yet)");
   table(
     ["id", "region", "dataClass", "chosen", "dropped, and why"],
     requests.map((r) => {
-      const d = selectProvider({ region: r.region, dataClass: r.dataClass }, { localAvailable: localUp });
+      const d = selectProvider(
+        { region: r.region, dataClass: r.dataClass },
+        { localAvailable: localUp },
+      );
       const dropped = d.considered
         .filter((c) => !c.kept)
         .map((c) => `${c.id}: ${c.why}`)
@@ -226,7 +234,10 @@ async function main() {
 
   const ctx: AttemptContext = { caps, ledger, callbacks: tracing.callbacks };
 
-  const distributedAttempt = async (profileName: string, buggySource: string): Promise<AttemptResult> => {
+  const distributedAttempt = async (
+    profileName: string,
+    buggySource: string,
+  ): Promise<AttemptResult> => {
     // The remote competitor is a different KIND of worker, so it is handled first.
     if (profileName === "remote-worker") {
       if (!remote) {
@@ -282,13 +293,21 @@ async function main() {
           });
           ledger.charge(costUsd);
           caps.charge(costUsd);
-          return { value: result, costUsd, note: "cost is an estimate: remote usage is not visible" };
+          return {
+            value: result,
+            costUsd,
+            note: "cost is an estimate: remote usage is not visible",
+          };
         },
       );
 
       const patch = value?.patch ?? "";
       if (!patch) {
-        return { kind: "skipped", profile: profileName, reason: span.note ?? "remote returned no patch" };
+        return {
+          kind: "skipped",
+          profile: profileName,
+          reason: span.note ?? "remote returned no patch",
+        };
       }
       const candidate: Candidate = {
         profile: profileName,
@@ -313,7 +332,8 @@ async function main() {
         localAvailable: localUp,
         // The frontier competitor is the point of having a frontier provider; everyone else
         // should be excluded from it so the tournament keeps its price spread.
-        exclude: profileName === "frontier" ? ["openai-primary", "openai-nano"] : ["openai-frontier"],
+        exclude:
+          profileName === "frontier" ? ["openai-primary", "openai-nano"] : ["openai-frontier"],
       },
     );
 
@@ -362,7 +382,10 @@ async function main() {
     placements.map((p) => [p.profile, p.providerId, p.kind, p.modelId, p.reason]),
   );
   console.log("");
-  table(["profile", "tests", "rubric", "cost", "ms", "note"], candidateRows(result.candidates, result.winner));
+  table(
+    ["profile", "tests", "rubric", "cost", "ms", "note"],
+    candidateRows(result.candidates, result.winner),
+  );
   if (result.skipped.length > 0) {
     console.log("");
     table(

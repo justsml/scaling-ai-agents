@@ -26,7 +26,10 @@ async function diagnostics(): Promise<void> {
   console.error("\nCompose status:");
   await compose(["ps"], true);
   console.error("\nRecent bounded logs:");
-  await compose(["logs", "--no-color", "--tail", "80", "db", "cache", "seed", "pokeapi", "gateway"], true);
+  await compose(
+    ["logs", "--no-color", "--tail", "80", "db", "cache", "seed", "pokeapi", "gateway"],
+    true,
+  );
 }
 
 async function waitForGateway(): Promise<void> {
@@ -34,7 +37,9 @@ async function waitForGateway(): Promise<void> {
   let lastMessage = "gateway not ready";
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(`${gatewayBaseUrl}/healthz`, { signal: AbortSignal.timeout(3_000) });
+      const response = await fetch(`${gatewayBaseUrl}/healthz`, {
+        signal: AbortSignal.timeout(3_000),
+      });
       const body = (await response.json()) as { ok?: boolean; upstream?: string; message?: string };
       if (response.ok && body.ok && body.upstream === "bulbasaur") return;
       lastMessage = body.message ?? `health returned ${response.status}`;
@@ -49,7 +54,10 @@ async function waitForGateway(): Promise<void> {
 async function resetRuns(): Promise<void> {
   const response = await fetch(`${gatewayBaseUrl}/control/reset`, {
     method: "POST",
-    headers: { "x-pokedex-control-secret": process.env.POKEDEX_CONTROL_SECRET ?? "local-conformance-control-v1" },
+    headers: {
+      "x-pokedex-control-secret":
+        process.env.POKEDEX_CONTROL_SECRET ?? "local-conformance-control-v1",
+    },
   });
   if (!response.ok) throw new Error(`Could not reset gateway run state (${response.status})`);
 }
@@ -57,7 +65,8 @@ async function resetRuns(): Promise<void> {
 try {
   if (action === "up" || action === "ci-up") {
     if (action === "ci-up") {
-      if (!process.env.COMPOSE_PROJECT_NAME) throw new Error("ci-up requires a unique COMPOSE_PROJECT_NAME");
+      if (!process.env.COMPOSE_PROJECT_NAME)
+        throw new Error("ci-up requires a unique COMPOSE_PROJECT_NAME");
       const cleaned = await compose(["down", "--volumes", "--remove-orphans"]);
       if (cleaned !== 0) throw new Error(`docker compose clean exited ${cleaned}`);
     }

@@ -40,7 +40,15 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import * as z from "zod";
-import { Command, END, MemorySaver, START, StateGraph, StateSchema, interrupt } from "@langchain/langgraph";
+import {
+  Command,
+  END,
+  MemorySaver,
+  START,
+  StateGraph,
+  StateSchema,
+  interrupt,
+} from "@langchain/langgraph";
 import type { BaseCheckpointSaver } from "@langchain/langgraph";
 import { createAgent, tool } from "langchain";
 import { HumanMessage } from "@langchain/core/messages";
@@ -112,7 +120,8 @@ export interface RequestRow {
 // disagreement is visible rather than hidden.
 // ---------------------------------------------------------------------------
 
-const CONSEQUENTIAL_VERBS = /\b(apply|push|deploy|merge|delete|drop|revoke|rotate|refund|charge|email|send)\b/i;
+const CONSEQUENTIAL_VERBS =
+  /\b(apply|push|deploy|merge|delete|drop|revoke|rotate|refund|charge|email|send)\b/i;
 const LOOKUP_SHAPE = /^(what is|what's|who is|status of|current status|show|list|get)\b/i;
 const ROUTINE_SHAPE = /\b(summari[sz]e|list the last|report on|count|format|extract)\b/i;
 
@@ -190,10 +199,14 @@ export function validateContract(
 ): { ok: boolean; violations: string[] } {
   const violations: string[] = [];
   if (actual.costUsd > contract.maxCostUsd + 1e-9) {
-    violations.push(`cost ${usd(actual.costUsd)} exceeded contract cap ${usd(contract.maxCostUsd)}`);
+    violations.push(
+      `cost ${usd(actual.costUsd)} exceeded contract cap ${usd(contract.maxCostUsd)}`,
+    );
   }
   if (actual.latencyMs > contract.maxLatencyMs) {
-    violations.push(`latency ${actual.latencyMs}ms exceeded contract cap ${contract.maxLatencyMs}ms`);
+    violations.push(
+      `latency ${actual.latencyMs}ms exceeded contract cap ${contract.maxLatencyMs}ms`,
+    );
   }
   return { ok: violations.length === 0, violations };
 }
@@ -227,11 +240,14 @@ const SERVICE_STATUS: Record<string, string> = {
 };
 
 function buildRouterGraph(deps: RouterDeps, checkpointer: BaseCheckpointSaver) {
-  const serviceStatus = tool(({ service }) => SERVICE_STATUS[service] ?? `unknown service '${service}'`, {
-    name: "service_status",
-    description: "Current status of a named service.",
-    schema: z.object({ service: z.string() }),
-  });
+  const serviceStatus = tool(
+    ({ service }) => SERVICE_STATUS[service] ?? `unknown service '${service}'`,
+    {
+      name: "service_status",
+      description: "Current status of a named service.",
+      schema: z.object({ service: z.string() }),
+    },
+  );
 
   const recentEvents = tool(
     async ({ user }) => {
@@ -252,7 +268,8 @@ function buildRouterGraph(deps: RouterDeps, checkpointer: BaseCheckpointSaver) {
   const routine = createAgent({
     model: WORKER_MODEL,
     tools: [recentEvents],
-    systemPrompt: "Answer using only the recent_events tool. Be specific and brief. Cite the timestamps.",
+    systemPrompt:
+      "Answer using only the recent_events tool. Be specific and brief. Cite the timestamps.",
   });
 
   const applyPatch = tool(() => "pushed", {
@@ -273,12 +290,19 @@ function buildRouterGraph(deps: RouterDeps, checkpointer: BaseCheckpointSaver) {
       // to send the majority of traffic.
       // -----------------------------------------------------------------------
       .addNode("lookupTool", async (state) => {
-        const service = Object.keys(SERVICE_STATUS).find((s) => state.request.text.includes(s)) ?? "ws-app";
+        const service =
+          Object.keys(SERVICE_STATUS).find((s) => state.request.text.includes(s)) ?? "ws-app";
         const answer = (await serviceStatus.invoke(
           { service },
           { callbacks: deps.callbacks as never, runName: "lookup:service_status" },
         )) as string;
-        return { answer, pathTaken: "lookupTool", costUsd: 0, modelCalls: 0, detail: "table lookup" };
+        return {
+          answer,
+          pathTaken: "lookupTool",
+          costUsd: 0,
+          modelCalls: 0,
+          detail: "table lookup",
+        };
       })
 
       // -----------------------------------------------------------------------
@@ -311,7 +335,8 @@ function buildRouterGraph(deps: RouterDeps, checkpointer: BaseCheckpointSaver) {
           answer: String(messages.at(-1)?.content ?? ""),
           pathTaken: "routineAgent",
           costUsd,
-          modelCalls: messages.filter((m) => (m as { getType?: () => string }).getType?.() === "ai").length,
+          modelCalls: messages.filter((m) => (m as { getType?: () => string }).getType?.() === "ai")
+            .length,
           detail: "one agent, recursionLimit 6",
         };
       })
@@ -428,7 +453,9 @@ async function main() {
     `caps: ${caps.describe()}   checkpointer: ${checkpointerName}   tracing: ${tracing.destination}`,
   );
 
-  const requests = JSON.parse(await readFile(join(FIXTURES, "requests.json"), "utf8")) as RequestRow[];
+  const requests = JSON.parse(
+    await readFile(join(FIXTURES, "requests.json"), "utf8"),
+  ) as RequestRow[];
 
   const only = typeof caps.flags.request === "string" ? caps.flags.request : null;
   const selected = only ? requests.filter((r) => r.id === only) : requests;
@@ -455,7 +482,10 @@ async function main() {
   );
   note("the fixture's own tag is shown only for comparison; the classifier never reads it");
 
-  const graph = buildRouterGraph({ caps, ledger, callbacks: tracing.callbacks, runTournamentPath }, checkpointer);
+  const graph = buildRouterGraph(
+    { caps, ledger, callbacks: tracing.callbacks, runTournamentPath },
+    checkpointer,
+  );
 
   const rows: (string | number)[][] = [];
 
@@ -495,14 +525,19 @@ async function main() {
         if (interrupts && interrupts.length > 0) {
           console.log("");
           section(`human gate — ${request.id}`);
-          console.log(`  interrupt payload: ${JSON.stringify(interrupts[0]!.value, null, 2).split("\n").join("\n  ")}`);
-          note("this pause is not conditional on budget: there is budget left, and it paused anyway");
+          console.log(
+            `  interrupt payload: ${JSON.stringify(interrupts[0]!.value, null, 2).split("\n").join("\n  ")}`,
+          );
+          note(
+            "this pause is not conditional on budget: there is budget left, and it paused anyway",
+          );
 
           final = await graph.invoke(
             new Command({
               resume: {
                 approved: false,
-                reason: "this repository requires a reviewed pull request; direct pushes to main are not permitted",
+                reason:
+                  "this repository requires a reviewed pull request; direct pushes to main are not permitted",
               },
             }),
             config,
@@ -528,7 +563,10 @@ async function main() {
 
     section(`${request.id} — ${contract.path}`);
     kv("request", request.text);
-    kv("contract", `≤${usd(contract.maxCostUsd)} / ≤${contract.maxLatencyMs}ms / human=${contract.requiresHuman}`);
+    kv(
+      "contract",
+      `≤${usd(contract.maxCostUsd)} / ≤${contract.maxLatencyMs}ms / human=${contract.requiresHuman}`,
+    );
     kv("allowed tools", contract.allowedTools.join(", ") || "(none)");
     kv("answer", String(final?.answer ?? run.error?.message ?? "").slice(0, 400));
     kv("detail", String(final?.detail ?? ""));

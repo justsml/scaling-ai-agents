@@ -61,15 +61,21 @@ export class DriverTools {
     return { stacks, gatewayHealthy };
   }
 
-  async runScenario(stack: StackName, scenarioId: string, signal?: AbortSignal): Promise<ScenarioRunSummary> {
-    if (!this.dependencies.requestedStacks.includes(stack)) throw new Error(`Stack is not requested: ${stack}`);
+  async runScenario(
+    stack: StackName,
+    scenarioId: string,
+    signal?: AbortSignal,
+  ): Promise<ScenarioRunSummary> {
+    if (!this.dependencies.requestedStacks.includes(stack))
+      throw new Error(`Stack is not requested: ${stack}`);
     if (scenarioId !== this.dependencies.scenarioId) {
       throw new Error(`Scenario is not requested: ${scenarioId}`);
     }
     const scenario = this.dependencies.catalog.get(scenarioId);
     if (!scenario) throw new Error(`Unknown scenario: ${scenarioId}`);
     const dispatchKey = `${scenario.id}\0${stack}`;
-    if (this.#dispatched.has(dispatchKey)) throw new Error(`Duplicate dispatch rejected for ${scenario.id}/${stack}`);
+    if (this.#dispatched.has(dispatchKey))
+      throw new Error(`Duplicate dispatch rejected for ${scenario.id}/${stack}`);
     this.#dispatched.add(dispatchKey);
 
     // Dots and hyphens survive URL path encoding and are accepted by the gateway's
@@ -79,7 +85,12 @@ export class DriverTools {
     let gatewayEvents: unknown[] = [];
     let error: string | undefined;
     try {
-      await this.dependencies.gateway.configureRun(stackRunId, scenario.id, scenario.faults, signal);
+      await this.dependencies.gateway.configureRun(
+        stackRunId,
+        scenario.id,
+        scenario.faults,
+        signal,
+      );
       stackRun = await this.dependencies.stackRunner.run(
         stack,
         {
@@ -119,7 +130,10 @@ export class DriverTools {
     const evidenceId = await this.dependencies.evidence.put(record);
     this.#evidenceIds.add(evidenceId);
     try {
-      await this.dependencies.gateway.deleteRun(stackRunId, cleanupSignal(this.dependencies.cleanupTimeoutMs));
+      await this.dependencies.gateway.deleteRun(
+        stackRunId,
+        cleanupSignal(this.dependencies.cleanupTimeoutMs),
+      );
     } catch (cause) {
       error ??= cause instanceof Error ? cause.message : String(cause);
     }
@@ -129,7 +143,8 @@ export class DriverTools {
       stack,
       scenarioId,
       ok: error === undefined && stackRun?.protocolError === undefined && agentEvidence !== null,
-      stopReason: error ?? stackRun?.protocolError ?? agentEvidence?.stopReason ?? "missing-evidence",
+      stopReason:
+        error ?? stackRun?.protocolError ?? agentEvidence?.stopReason ?? "missing-evidence",
       toolCallCount: agentEvidence?.toolCalls.length ?? 0,
       latencyMs: agentEvidence?.latencyMs ?? 0,
     };

@@ -56,7 +56,9 @@ describe("fixture identity and ordered rules", () => {
       if (result.outcome.action !== "route") throw new Error(`expected route for ${item.id}`);
       expect(result.outcome.route).toBe(item.groundTruth.route as Route);
       expect(result.outcome.source).toBe("rule");
-      expect(scoreForbiddenRoute(result.outcome, (item.groundTruth.forbidden ?? []) as Route[])).toBe(1);
+      expect(
+        scoreForbiddenRoute(result.outcome, (item.groundTruth.forbidden ?? []) as Route[]),
+      ).toBe(1);
       expect(result.ruleId).toBeTruthy();
     }
   });
@@ -69,7 +71,11 @@ describe("fixture identity and ordered rules", () => {
     }
     const diagnostic = casesFixture.find((item) => item.id === "ambiguous-deploy-logs")!;
     const model: ModelDecisionAgent = async () => ({
-      decision: { route: "long-context", confidence: 0.8, reason: "logs and failed deploy evidence" },
+      decision: {
+        route: "long-context",
+        confidence: 0.8,
+        reason: "logs and failed deploy evidence",
+      },
       metrics,
     });
     const result = await routeRequest(diagnostic.input, model);
@@ -100,8 +106,14 @@ describe("confidence boundaries and escalation", () => {
       metrics,
     });
     const base = await routeRequest("uncategorized task", model, { rulesEnabled: false });
-    const hard = await routeRequest("uncategorized task", model, { rulesEnabled: false, hard: true });
-    const retried = await routeRequest("uncategorized task", model, { rulesEnabled: false, failedFirstAttempt: true });
+    const hard = await routeRequest("uncategorized task", model, {
+      rulesEnabled: false,
+      hard: true,
+    });
+    const retried = await routeRequest("uncategorized task", model, {
+      rulesEnabled: false,
+      failedFirstAttempt: true,
+    });
     expect(base.specialist?.modelClass).toBe("mini");
     expect(hard.specialist?.modelClass).toBe("frontier");
     expect(retried.specialist?.modelClass).toBe("frontier");
@@ -129,7 +141,9 @@ describe("discriminated outcomes and live scoring", () => {
         source: "policy",
       }).success,
     ).toBe(false);
-    expect(routerOutcomeSchema.safeParse({ action: "approval", reason: "", source: "rule" }).success).toBe(false);
+    expect(
+      routerOutcomeSchema.safeParse({ action: "approval", reason: "", source: "rule" }).success,
+    ).toBe(false);
   });
 
   test("uses an injected decision seam and fires schema scoring", async () => {
@@ -154,7 +168,9 @@ describe("data-driven fallback", () => {
     [{ status: 429 }, "rate-limit"],
     [{ status: 503 }, "server-error"],
     [new Error("invalid structured output"), null],
-  ] as const)("classifies fallback eligibility", (error, expected) => expect(fallbackReason(error)).toBe(expected));
+  ] as const)("classifies fallback eligibility", (error, expected) =>
+    expect(fallbackReason(error)).toBe(expected),
+  );
 
   test("falls back on provider failures and records the provider slots", async () => {
     const primary: ModelDecisionAgent = async () => {
@@ -199,9 +215,9 @@ describe("scoring and reporting", () => {
     expect(scoreCostClass(outcome, "mini")).toBe(0);
     expect(labelFailure({ httpError: true, usageTokens: 0 })).toBe("provider/harness failure");
     expect(labelFailure({ routeCorrect: false, usageTokens: 2 })).toBe("route error");
-    expect(labelFailure({ routeCorrect: true, specialistContractPassed: false, usageTokens: 2 })).toBe(
-      "specialist failure",
-    );
+    expect(
+      labelFailure({ routeCorrect: true, specialistContractPassed: false, usageTokens: 2 }),
+    ).toBe("specialist failure");
     expect(labelFailure({ budgetStopped: true })).toBe("budget stop");
   });
 
@@ -212,10 +228,18 @@ describe("scoring and reporting", () => {
       return { score: 1, rationale: "accepted and supported" };
     };
     expect(
-      await scoreAmbiguousRoute({ input: "x", groundTruth: { acceptedRoutes: ["general"] } }, outcome, judge),
+      await scoreAmbiguousRoute(
+        { input: "x", groundTruth: { acceptedRoutes: ["general"] } },
+        outcome,
+        judge,
+      ),
     ).toMatchObject({ score: 1 });
     expect(
-      await scoreAmbiguousRoute({ input: "x", groundTruth: { acceptedRoutes: ["code"] } }, outcome, judge),
+      await scoreAmbiguousRoute(
+        { input: "x", groundTruth: { acceptedRoutes: ["code"] } },
+        outcome,
+        judge,
+      ),
     ).toMatchObject({ score: 0 });
     expect(calls).toBe(1);
   });
@@ -230,7 +254,14 @@ describe("scoring and reporting", () => {
       guardrail: "nano",
     };
     const rows: RouteObservation[] = [
-      { caseId: "route-general-status", expected: "general", outcome, specialist, latencyMs: 10, costUsd: 0.01 },
+      {
+        caseId: "route-general-status",
+        expected: "general",
+        outcome,
+        specialist,
+        latencyMs: 10,
+        costUsd: 0.01,
+      },
     ];
     expect(reportByRoute(rows).find((row) => row.route === "general")).toMatchObject({
       cases: 1,
@@ -248,6 +279,8 @@ describe("fixture copies", () => {
     const local = resolve(import.meta.dir, "../src/fixtures/router");
     expect((await readdir(local)).sort()).toEqual((await readdir(shared)).sort());
     for (const file of await readdir(shared))
-      expect(await Bun.file(resolve(local, file)).text()).toBe(await Bun.file(resolve(shared, file)).text());
+      expect(await Bun.file(resolve(local, file)).text()).toBe(
+        await Bun.file(resolve(shared, file)).text(),
+      );
   });
 });

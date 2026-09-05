@@ -30,7 +30,10 @@ export interface CompiledRule {
 
 export function hashSource(source: string): string {
   // Normalise whitespace so trailing-newline noise does not create a new key.
-  return createHash("sha256").update(source.trim().replace(/\r\n/g, "\n")).digest("hex").slice(0, 16);
+  return createHash("sha256")
+    .update(source.trim().replace(/\r\n/g, "\n"))
+    .digest("hex")
+    .slice(0, 16);
 }
 
 function loadRegistry(): Record<string, CompiledRule> {

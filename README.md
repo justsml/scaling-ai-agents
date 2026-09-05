@@ -21,7 +21,7 @@ Every directory is a self-contained Bun project: its own `package.json`, lockfil
 - Only Mastra ships first-party A2A. The AI SDK package hand-rolls an A2A JSON-RPC client and server. LangGraph's local dev server does not serve A2A at all (measured against `@langchain/langgraph-cli` 1.4.5); it lives in the hosted Agent Server, so the LangChain package falls back to Agent Protocol and takes the A2A branch automatically when `A2A_BASE_URL` is set.
 - An aborted call does not always throw. Mastra's `generate` resolves on abort, and LangGraph resolves before cancelled workers unwind. Both packages check the signal explicitly so cancelled workers are not reported as passing.
 - `billedAnyway` is real accounting but usually zero: providers report no usage on an aborted stream.
-- None of the three exposes a `models` fallback array outside a gateway; each package implements try-next fallback in code.
+- All three now ship provider fallback, and all three ship it as data, not as an agent decision. Mastra 1.64 accepts `model: [{ model, maxRetries }, ...]` on the `Agent` (docs: fails over on 5xx, rate limit, and per-step timeout; a whole-run `totalMs` timeout ends the run without trying fallbacks). LangChain 1.5 does it with `modelFallbackMiddleware(...)` on `createAgent` (the older `.withFallbacks()` wrapper is no longer accepted as the model). The AI SDK 7 has no in-SDK fallback; `maxRetries` retries the same model and cross-model failover lives in AI Gateway via `providerOptions.gateway.models`, which also returns a `modelAttempts` trail. The Mastra package still walks its own chain in `lib/pool.ts` so the attempt trail is printed; that predates the native array and should be replaced or shown side by side.
 
 ## Running
 

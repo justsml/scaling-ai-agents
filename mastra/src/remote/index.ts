@@ -20,7 +20,10 @@ import { WORKER_MODEL } from "../lib/models.js";
 const backoffAdviceTool = createTool({
   id: "backoff-advice",
   description: "Return the recommended backoff shape for a readiness loop.",
-  inputSchema: z.object({ baseDelayMs: z.number().default(50), deadlineMs: z.number().default(5000) }),
+  inputSchema: z.object({
+    baseDelayMs: z.number().default(50),
+    deadlineMs: z.number().default(5000),
+  }),
   outputSchema: z.object({ shape: z.string(), capNote: z.string() }),
   execute: async ({ baseDelayMs, deadlineMs }) => ({
     shape: `exponential from ${baseDelayMs}ms, doubling, capped at 5000ms`,
@@ -31,7 +34,8 @@ const backoffAdviceTool = createTool({
 export const competitorRemote = new Agent({
   id: "competitor-remote",
   name: "Remote Competitor",
-  description: "Proposes a corrected readiness.ts. Runs on separate infrastructure; its prompt and tools are private.",
+  description:
+    "Proposes a corrected readiness.ts. Runs on separate infrastructure; its prompt and tools are private.",
   instructions: `You are a remote patch competitor for a TypeScript module named readiness.ts.
 
 Return the COMPLETE new file contents. No diff, no markdown fences, no prose.

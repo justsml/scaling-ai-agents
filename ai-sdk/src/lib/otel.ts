@@ -40,7 +40,10 @@ export function initTelemetry(): {
     registerTelemetry(new OpenTelemetry({ tracer, usage: true }));
     initialized = true;
   }
-  return { tracer: tracerProvider!.getTracer("agentic-parallelism-ai-sdk"), exporter: memoryExporter! };
+  return {
+    tracer: tracerProvider!.getTracer("agentic-parallelism-ai-sdk"),
+    exporter: memoryExporter!,
+  };
 }
 
 export interface WorkerSpanMeta {

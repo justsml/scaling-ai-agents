@@ -69,7 +69,10 @@ async function main() {
   const ledger = new Ledger(caps.budgetUsd);
   const tracing = startTracing();
 
-  header("06 REMOTE — a worker in another process", `caps: ${caps.describe()}   tracing: ${tracing.destination}`);
+  header(
+    "06 REMOTE — a worker in another process",
+    `caps: ${caps.describe()}   tracing: ${tracing.destination}`,
+  );
 
   // -------------------------------------------------------------------------
   // REMOTE / start the server.
@@ -133,7 +136,11 @@ async function main() {
 
       section("A2A: message/stream (status events)");
       let events = 0;
-      for await (const event of client.streamMessage("What evidence do you own?", undefined, caps.signal)) {
+      for await (const event of client.streamMessage(
+        "What evidence do you own?",
+        undefined,
+        caps.signal,
+      )) {
         events++;
         const e = event as { result?: { status?: { state?: string } }; kind?: string };
         console.log(`  event ${events}: ${e.kind ?? ""} ${e.result?.status?.state ?? ""}`);
@@ -280,7 +287,11 @@ async function main() {
         ["A2A JSON-RPC", "NO (404)", "cross-vendor agent interop; needs a LangSmith deployment"],
         ["agent card", "NO (404)", "capability discovery; part of A2A"],
         ["Agent Protocol /threads", "yes", "durable conversation state on the server"],
-        ["Agent Protocol /runs/stream", "yes", "token and event streaming; A2A message/stream's peer"],
+        [
+          "Agent Protocol /runs/stream",
+          "yes",
+          "token and event streaming; A2A message/stream's peer",
+        ],
         ["Agent Protocol /runs/cancel", "yes", "cancellation; A2A tasks/cancel's peer"],
         ["RemoteGraph", "yes", "the remote graph as a Runnable, composable into any graph"],
       ],
@@ -295,7 +306,10 @@ async function main() {
     );
 
     ledgerTable(ledger, caps);
-    stopLine(caps, "completed: server started, A2A probed and found absent, Agent Protocol exercised");
+    stopLine(
+      caps,
+      "completed: server started, A2A probed and found absent, Agent Protocol exercised",
+    );
   } finally {
     if (caps.flags["keep-alive"]) {
       console.log(`  server left running at ${server.baseUrl} (--keep-alive)`);

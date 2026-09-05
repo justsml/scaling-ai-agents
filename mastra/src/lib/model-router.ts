@@ -24,7 +24,9 @@ export const Outcome = z.discriminatedUnion("action", [
       source: z.literal("policy"),
     })
     .strict(),
-  z.object({ action: z.literal("approval"), reason: z.string().min(1), source: z.literal("rule") }).strict(),
+  z
+    .object({ action: z.literal("approval"), reason: z.string().min(1), source: z.literal("rule") })
+    .strict(),
 ]);
 export type RouterOutcome = z.infer<typeof Outcome>;
 export type RouterCase = {
@@ -40,9 +42,17 @@ export type RouterCase = {
     hard?: boolean;
   };
 };
-export type ModelDecision = { route: "code" | "long-context" | "general"; confidence: number; reason: string };
+export type ModelDecision = {
+  route: "code" | "long-context" | "general";
+  confidence: number;
+  reason: string;
+};
 export type DecisionModel = (input: string) => Promise<ModelDecision>;
-const DecisionSchema = z.object({ route: Route, confidence: z.number().min(0).max(1), reason: z.string().min(1) });
+const DecisionSchema = z.object({
+  route: Route,
+  confidence: z.number().min(0).max(1),
+  reason: z.string().min(1),
+});
 export function mastraDecision(
   model = JUDGE_MODEL,
   instructions = "Select the best specialist route without answering the request.",
@@ -57,7 +67,8 @@ export function mastraDecision(
     ).object as ModelDecision;
 }
 
-const fixture = (name: string) => fileURLToPath(new URL(`../fixtures/router/${name}`, import.meta.url));
+const fixture = (name: string) =>
+  fileURLToPath(new URL(`../fixtures/router/${name}`, import.meta.url));
 export async function loadRouterCases(): Promise<RouterCase[]> {
   return JSON.parse(await readFile(fixture("cases.json"), "utf8"));
 }
@@ -72,8 +83,15 @@ export function deterministic(input: string, rules: any[]): RouterOutcome | unde
   const text = input.trim();
   for (const rule of [...rules].sort((a, b) => b.priority - a.priority)) {
     if (new RegExp(rule.pattern, rule.flags ?? "i").test(text)) {
-      if (rule.action === "approval") return { action: "approval", reason: `rule ${rule.id}`, source: "rule" };
-      return { action: "route", route: rule.route, confidence: 1, reason: `rule ${rule.id}`, source: "rule" };
+      if (rule.action === "approval")
+        return { action: "approval", reason: `rule ${rule.id}`, source: "rule" };
+      return {
+        action: "route",
+        route: rule.route,
+        confidence: 1,
+        reason: `rule ${rule.id}`,
+        source: "rule",
+      };
     }
   }
 }

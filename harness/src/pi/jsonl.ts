@@ -57,7 +57,9 @@ export class JsonlDecoder<T = unknown> {
       try {
         frames.push(JSON.parse(line) as T);
       } catch (error) {
-        throw new Error(`Invalid JSONL frame: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Invalid JSONL frame: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
   }

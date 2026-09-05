@@ -9,12 +9,18 @@ import { readinessChallenge } from "../src/lib/readiness-challenge.js";
 
 describe("Readiness challenge output parsing", () => {
   test("reads pass, fail, and skip counts from the summary block", () => {
-    const output = ["(pass) ready", "(fail) denied", "", " 1 pass", " 2 skip", " 1 fail"].join("\n");
+    const output = ["(pass) ready", "(fail) denied", "", " 1 pass", " 2 skip", " 1 fail"].join(
+      "\n",
+    );
     expect(parseBunTestOutput(output)).toEqual({ pass: 1, fail: 1, skip: 2, failed: ["denied"] });
   });
 
   test("falls back to per-test markers", () => {
-    expect(parseBunTestOutput("(pass) a\n(pass) b\n(fail) c")).toMatchObject({ pass: 2, fail: 1, skip: 0 });
+    expect(parseBunTestOutput("(pass) a\n(pass) b\n(fail) c")).toMatchObject({
+      pass: 2,
+      fail: 1,
+      skip: 0,
+    });
   });
 });
 
@@ -55,7 +61,9 @@ describe("Readiness challenge contract", () => {
   });
 
   test("reports compile failure separately from runner failure", async () => {
-    const compile = createReadinessChallenge({ runner: runner(() => completed("", "SyntaxError: nope", 1)) });
+    const compile = createReadinessChallenge({
+      runner: runner(() => completed("", "SyntaxError: nope", 1)),
+    });
     const compileResult = await compile.certify("export async function runWhenReady() {");
     expect(compileResult).toMatchObject({ outcome: "candidate-failed", failure: "compile" });
 
@@ -69,7 +77,9 @@ describe("Readiness challenge contract", () => {
   });
 
   test("treats unparseable successful output as an execution error", async () => {
-    const challenge = createReadinessChallenge({ runner: runner(() => completed("not bun output", "", 0)) });
+    const challenge = createReadinessChallenge({
+      runner: runner(() => completed("not bun output", "", 0)),
+    });
     expect(await challenge.certify("export async function runWhenReady() {}")).toMatchObject({
       outcome: "execution-error",
       error: "Bun produced no parseable test summary",
@@ -89,7 +99,9 @@ describe("Readiness challenge contract", () => {
       }),
     });
     expect(
-      await challenge.certify("export async function runWhenReady() {}", { abortSignal: controller.signal }),
+      await challenge.certify("export async function runWhenReady() {}", {
+        abortSignal: controller.signal,
+      }),
     ).toMatchObject({
       outcome: "cancelled",
     });
@@ -107,7 +119,9 @@ describe("Readiness challenge contract", () => {
         return deferredRun(() => killed++);
       }),
     });
-    expect(await challenge.certify("export async function runWhenReady() {}")).toMatchObject({ outcome: "timed-out" });
+    expect(await challenge.certify("export async function runWhenReady() {}")).toMatchObject({
+      outcome: "timed-out",
+    });
     expect(killed).toBeGreaterThan(0);
     expect(await exists(workspace)).toBe(false);
   });

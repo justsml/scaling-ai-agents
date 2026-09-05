@@ -28,8 +28,11 @@ export function table(rows: Row[], columns?: string[]): void {
     return;
   }
   const cols = columns ?? [...new Set(rows.flatMap((r) => Object.keys(r)))];
-  const widths = cols.map((c) => Math.min(MAX_CELL, Math.max(c.length, ...rows.map((r) => cell(r[c]).length))));
-  const fmt = (values: string[]) => "  " + values.map((v, i) => pad(v, widths[i] ?? v.length)).join("  ");
+  const widths = cols.map((c) =>
+    Math.min(MAX_CELL, Math.max(c.length, ...rows.map((r) => cell(r[c]).length))),
+  );
+  const fmt = (values: string[]) =>
+    "  " + values.map((v, i) => pad(v, widths[i] ?? v.length)).join("  ");
 
   console.log(fmt(cols));
   console.log("  " + widths.map((w) => "-".repeat(w)).join("  "));

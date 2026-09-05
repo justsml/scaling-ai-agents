@@ -30,7 +30,9 @@ export function createPokedexTools(
   );
 }
 
-export async function investigatePokedex(input: InvestigationRequest): Promise<InvestigationEvidence> {
+export async function investigatePokedex(
+  input: InvestigationRequest,
+): Promise<InvestigationEvidence> {
   const request = investigationRequestSchema.parse(input);
   const session = new PokedexGatewaySession(request);
   const started = Date.now();
@@ -51,8 +53,16 @@ export async function investigatePokedex(input: InvestigationRequest): Promise<I
       structuredOutput: { schema: answerSchema },
       providerOptions: { openai: { reasoningEffort: "none", store: false } },
     });
-    const answer = normalizeInvestigationAnswer(result.object ?? null, request.prompt, session.evidence);
-    const usage = result.usage as unknown as { inputTokens?: number; outputTokens?: number; reasoningTokens?: number };
+    const answer = normalizeInvestigationAnswer(
+      result.object ?? null,
+      request.prompt,
+      session.evidence,
+    );
+    const usage = result.usage as unknown as {
+      inputTokens?: number;
+      outputTokens?: number;
+      reasoningTokens?: number;
+    };
     const finishReason = String((result as { finishReason?: string }).finishReason ?? "completed");
     return {
       stack: "mastra",
@@ -82,7 +92,11 @@ export async function investigatePokedex(input: InvestigationRequest): Promise<I
       toolCalls: session.evidence,
       usage: usageFromError(error),
       latencyMs: Date.now() - started,
-      stopReason: session.signal.aborted ? "deadline" : session.limitExceeded ? "max-tool-calls" : `error:${message}`,
+      stopReason: session.signal.aborted
+        ? "deadline"
+        : session.limitExceeded
+          ? "max-tool-calls"
+          : `error:${message}`,
       stopMetadata: {
         error: message,
         toolCallAttempts: session.evidence.length,
@@ -98,7 +112,11 @@ if (import.meta.main) {
   const request = investigationRequestSchema.parse(JSON.parse(await Bun.stdin.text()));
   console.log(JSON.stringify(await investigatePokedex(request)));
 }
-function normalizeUsage(usage: { inputTokens?: number; outputTokens?: number; reasoningTokens?: number }) {
+function normalizeUsage(usage: {
+  inputTokens?: number;
+  outputTokens?: number;
+  reasoningTokens?: number;
+}) {
   return {
     inputTokens: usage.inputTokens ?? 0,
     outputTokens: usage.outputTokens ?? 0,

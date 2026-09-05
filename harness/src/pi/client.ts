@@ -77,7 +77,10 @@ interface RpcResponse {
   error?: string;
 }
 
-export async function runPiDriver(request: PiDriverRequest, options: PiClientOptions = {}): Promise<PiRunEvidence> {
+export async function runPiDriver(
+  request: PiDriverRequest,
+  options: PiClientOptions = {},
+): Promise<PiRunEvidence> {
   if (!/^[A-Za-z0-9._-]{1,64}$/.test(request.driverRunId)) {
     throw new Error("driverRunId must be 1-64 URL-safe identifier characters");
   }
@@ -131,10 +134,12 @@ export async function runPiDriver(request: PiDriverRequest, options: PiClientOpt
   let closing = false;
   let stdinOpen = true;
 
-  const stderrPromise = collectUtf8(child.stderr, options.maximumStderrBytes ?? 1024 * 1024).catch((error) => {
-    protocolErrors.push(errorMessage(error));
-    return "";
-  });
+  const stderrPromise = collectUtf8(child.stderr, options.maximumStderrBytes ?? 1024 * 1024).catch(
+    (error) => {
+      protocolErrors.push(errorMessage(error));
+      return "";
+    },
+  );
   const decoder = new JsonlDecoder<Record<string, unknown>>({
     maximumFrameBytes: 2 * 1024 * 1024,
     maximumTotalBytes: options.maximumStdoutBytes ?? 16 * 1024 * 1024,
@@ -171,9 +176,14 @@ export async function runPiDriver(request: PiDriverRequest, options: PiClientOpt
 
     const accepted = await sendAndWait("prompt", {
       type: "prompt",
-      message: buildDriverPrompt(request.scenarioId, request.scenarioPrompt, request.requestedStacks),
+      message: buildDriverPrompt(
+        request.scenarioId,
+        request.scenarioPrompt,
+        request.requestedStacks,
+      ),
     });
-    if (!accepted.success) throw new Error(`Pi rejected Driver prompt: ${accepted.error ?? "unknown error"}`);
+    if (!accepted.success)
+      throw new Error(`Pi rejected Driver prompt: ${accepted.error ?? "unknown error"}`);
     await waitFor(settled.promise, lifecycleAbort.signal, streamFailed.promise);
 
     const [finalState, stats] = await Promise.all([
@@ -209,14 +219,23 @@ export async function runPiDriver(request: PiDriverRequest, options: PiClientOpt
         protocolErrors.push(`stdin close failed: ${errorMessage(error)}`);
       }
     }
-    exitCode = await Promise.race([child.exited, delay(options.exitGraceMs ?? 1_000).then(() => null)]);
+    exitCode = await Promise.race([
+      child.exited,
+      delay(options.exitGraceMs ?? 1_000).then(() => null),
+    ]);
     if (exitCode === null) {
       child.kill("SIGTERM");
-      exitCode = await Promise.race([child.exited, delay(options.abortGraceMs ?? 500).then(() => null)]);
+      exitCode = await Promise.race([
+        child.exited,
+        delay(options.abortGraceMs ?? 500).then(() => null),
+      ]);
     }
     if (exitCode === null) {
       child.kill("SIGKILL");
-      exitCode = await Promise.race([child.exited, delay(options.abortGraceMs ?? 500).then(() => null)]);
+      exitCode = await Promise.race([
+        child.exited,
+        delay(options.abortGraceMs ?? 500).then(() => null),
+      ]);
     }
     const stdoutDrained = await Promise.race([
       stdoutPromise.then(() => true),
@@ -235,7 +254,8 @@ export async function runPiDriver(request: PiDriverRequest, options: PiClientOpt
       return "";
     }),
   ]);
-  if (exitCode !== 0) protocolErrors.push(`Pi RPC process exited ${exitCode ?? "without a status"}`);
+  if (exitCode !== 0)
+    protocolErrors.push(`Pi RPC process exited ${exitCode ?? "without a status"}`);
   return {
     piVersion,
     argv,
@@ -275,7 +295,10 @@ export async function runPiDriver(request: PiDriverRequest, options: PiClientOpt
       const pending = responses.get(frame.id);
       if (pending) {
         if (response.success) pending.resolve(response);
-        else pending.reject(new Error(`Pi ${response.command} failed: ${response.error ?? "unknown error"}`));
+        else
+          pending.reject(
+            new Error(`Pi ${response.command} failed: ${response.error ?? "unknown error"}`),
+          );
       }
     }
     if (frame.type === "message_end") {
@@ -297,11 +320,13 @@ export function verifyDriverDispatch(
     ["list_stacks", "run_scenario", "read_evidence"].includes(call.toolName),
   );
   for (const call of relevant) {
-    if (!call.successful) details.push(`${call.toolName} ${call.toolCallId} did not complete successfully`);
+    if (!call.successful)
+      details.push(`${call.toolName} ${call.toolCallId} did not complete successfully`);
   }
 
   const listCalls = relevant.filter((call) => call.toolName === "list_stacks");
-  if (listCalls.length !== 1) details.push(`expected one list_stacks call; observed ${listCalls.length}`);
+  if (listCalls.length !== 1)
+    details.push(`expected one list_stacks call; observed ${listCalls.length}`);
   if (listCalls.filter((call) => call.successful).length !== 1) {
     details.push(
       `expected one successful list_stacks call; observed ${listCalls.filter((call) => call.successful).length}`,
@@ -318,7 +343,8 @@ export function verifyDriverDispatch(
       details.push(`run_scenario ${call.toolCallId} had malformed dispatch arguments`);
       continue;
     }
-    if (scenario !== scenarioId) details.push(`run_scenario dispatched unexpected scenario ${scenario}`);
+    if (scenario !== scenarioId)
+      details.push(`run_scenario dispatched unexpected scenario ${scenario}`);
     if (!requestedStacks.includes(stack as StackName))
       details.push(`run_scenario dispatched unrequested stack ${stack}`);
     const key = `${scenario}\0${stack}`;
@@ -336,7 +362,8 @@ export function verifyDriverDispatch(
   }
   for (const stack of requestedStacks) {
     const count = counts.get(`${scenarioId}\0${stack}`) ?? 0;
-    if (count !== 1) details.push(`expected one ${scenarioId}/${stack} dispatch; observed ${count}`);
+    if (count !== 1)
+      details.push(`expected one ${scenarioId}/${stack} dispatch; observed ${count}`);
   }
 
   const evidenceCounts = new Map<string, number>();
@@ -352,14 +379,18 @@ export function verifyDriverDispatch(
   }
   for (const evidenceId of returnedEvidenceIds) {
     const count = evidenceCounts.get(evidenceId) ?? 0;
-    if (count !== 1) details.push(`expected one read_evidence call for ${evidenceId}; observed ${count}`);
+    if (count !== 1)
+      details.push(`expected one read_evidence call for ${evidenceId}; observed ${count}`);
   }
 
   const observed = requestedStacks.filter((stack) => {
     const matching = relevant.filter((call) => {
       const args = asRecord(call.args);
       return (
-        call.toolName === "run_scenario" && call.successful && args.scenarioId === scenarioId && args.stack === stack
+        call.toolName === "run_scenario" &&
+        call.successful &&
+        args.scenarioId === scenarioId &&
+        args.stack === stack
       );
     });
     return matching.length > 0;
@@ -397,7 +428,8 @@ export function correlateToolExecutions(frames: readonly unknown[]): CorrelatedT
   }
   for (const id of ends.keys()) {
     if (!starts.has(id)) errors.push(`tool_execution_end for unknown ${id}`);
-    else if (endsBeforeStart.has(id)) errors.push(`tool_execution_end preceded tool_execution_start for ${id}`);
+    else if (endsBeforeStart.has(id))
+      errors.push(`tool_execution_end preceded tool_execution_start for ${id}`);
   }
   const executions = order.map((id): CorrelatedToolExecution => {
     const start = starts.get(id)!;
@@ -450,7 +482,11 @@ export function assertDriverState(state: Record<string, unknown>): void {
   }
 }
 
-export function buildDriverPrompt(scenarioId: string, scenarioPrompt: string, stacks: readonly StackName[]): string {
+export function buildDriverPrompt(
+  scenarioId: string,
+  scenarioPrompt: string,
+  stacks: readonly StackName[],
+): string {
   return [
     "You are a conformance dispatcher, not a Pokédex investigator.",
     `Scenario ID: ${scenarioId}`,
@@ -472,10 +508,16 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function waitFor<T>(promise: Promise<T>, signal: AbortSignal, streamFailed: Promise<never>): Promise<T> {
+async function waitFor<T>(
+  promise: Promise<T>,
+  signal: AbortSignal,
+  streamFailed: Promise<never>,
+): Promise<T> {
   if (signal.aborted) throw signal.reason;
   const aborted = new Promise<never>((_, reject) => {
-    signal.addEventListener("abort", () => reject(signal.reason ?? new Error("aborted")), { once: true });
+    signal.addEventListener("abort", () => reject(signal.reason ?? new Error("aborted")), {
+      once: true,
+    });
   });
   return Promise.race([promise, aborted, streamFailed]);
 }

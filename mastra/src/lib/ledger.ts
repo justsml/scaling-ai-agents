@@ -246,7 +246,11 @@ export class Ledger {
  * A rough pre-call estimate. We do not know the model's output length before
  * we call it, so we budget for a plausible worst case and reconcile after.
  */
-export function estimateWorkerCost(model: string, promptChars: number, expectedOutputTokens: number): number {
+export function estimateWorkerCost(
+  model: string,
+  promptChars: number,
+  expectedOutputTokens: number,
+): number {
   const inputTokens = Math.ceil(promptChars / 4);
   return estimateUsd(model, inputTokens, expectedOutputTokens);
 }

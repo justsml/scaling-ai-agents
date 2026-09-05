@@ -38,7 +38,9 @@ export function table(headers: string[], rows: Row[]): void {
     return;
   }
   const cells = rows.map((r) => r.map((c) => String(c)));
-  const widths = headers.map((h, i) => Math.max(h.length, ...cells.map((r) => (r[i] ?? "").length)));
+  const widths = headers.map((h, i) =>
+    Math.max(h.length, ...cells.map((r) => (r[i] ?? "").length)),
+  );
   // Squeeze the widest column until the whole table fits the screen.
   let total = widths.reduce((a, b) => a + b + 2, 0);
   while (total > WIDTH && Math.max(...widths) > 8) {
@@ -46,7 +48,8 @@ export function table(headers: string[], rows: Row[]): void {
     widths[widest]! -= 1;
     total -= 1;
   }
-  const line = (r: string[]) => r.map((c, i) => truncate(c, widths[i]!).padEnd(widths[i]!)).join("  ");
+  const line = (r: string[]) =>
+    r.map((c, i) => truncate(c, widths[i]!).padEnd(widths[i]!)).join("  ");
   console.log(`  ${line(headers)}`);
   console.log(`  ${widths.map((w) => "-".repeat(w)).join("  ")}`);
   for (const r of cells) console.log(`  ${line(r)}`);
@@ -106,7 +109,10 @@ export function ledgerTable(ledger: Ledger, caps: Caps): void {
   );
 }
 
-export function stopLine(caps: Caps, fallback = "completed: all work finished inside both caps"): void {
+export function stopLine(
+  caps: Caps,
+  fallback = "completed: all work finished inside both caps",
+): void {
   const stop = caps.stopReason();
   console.log("");
   console.log(stop ? `STOPPED (${stop.kind}): ${stop.detail}` : `STOPPED (none): ${fallback}`);

@@ -18,9 +18,10 @@
  *      on the Agent, so the routing decision is visible in the agent
  *      definition rather than buried in the call site.
  *
- *   3. Fallback in code. @mastra/core 1.64 exposes a `models` array on custom
- *      model gateways, not on Agent or generate(), so `withFallback` in
- *      lib/pool.ts walks the eligible list itself and records the trail.
+ *   3. Fallback in code, on purpose. @mastra/core 1.64 accepts
+ *      `model: [{ model, maxRetries }, ...]` on Agent natively; `withFallback`
+ *      in lib/pool.ts is used instead so the region/data-class filter runs
+ *      before every attempt and the trail is printed. TODO: show both.
  *
  *   4. One competitor that is not in this process at all: it runs on a second
  *      Mastra server over A2A, reached through MastraClient.getA2A(). Its task
@@ -35,10 +36,27 @@
  */
 import { Agent } from "@mastra/core/agent";
 import { RequestContext } from "@mastra/core/request-context";
-import { parseCaps, deadlineHit, deadlineSignal, describeCaps, hasOpenAiKey, remainingMs } from "../lib/caps.js";
+import {
+  parseCaps,
+  deadlineHit,
+  deadlineSignal,
+  describeCaps,
+  hasOpenAiKey,
+  remainingMs,
+} from "../lib/caps.js";
 import type { StopReason } from "../lib/caps.js";
 import { Ledger, estimateWorkerCost, usdFromUsage } from "../lib/ledger.js";
-import { bullet, header, json, ledgerTable, reportSpend, section, stopBanner, table, usd } from "../lib/print.js";
+import {
+  bullet,
+  header,
+  json,
+  ledgerTable,
+  reportSpend,
+  section,
+  stopBanner,
+  table,
+  usd,
+} from "../lib/print.js";
 import { POOL, type ProviderEntry, resolveProvider, withFallback } from "../lib/pool.js";
 import { buildTaskPrompt, cleanPatch, patchSchema } from "../lib/profiles.js";
 import { readinessChallenge } from "../lib/readiness-challenge.js";
@@ -106,7 +124,9 @@ async function main(): Promise<void> {
     })),
   );
   if (!localSlotAvailable()) {
-    bullet("LOCAL_OPENAI_BASE_URL is unset, so the on-premise slot is absent. Watch what that does to r6.");
+    bullet(
+      "LOCAL_OPENAI_BASE_URL is unset, so the on-premise slot is absent. Watch what that does to r6.",
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -177,7 +197,10 @@ async function main(): Promise<void> {
 
   section("dispatching two workers with different residency requirements");
   for (const w of localWorkers) {
-    const span = startWorkerSpan(snippetSpan, `worker:${w.id}`, { region: w.region, dataClass: w.dataClass });
+    const span = startWorkerSpan(snippetSpan, `worker:${w.id}`, {
+      region: w.region,
+      dataClass: w.dataClass,
+    });
     const started = Date.now();
     const resolution = resolveProvider({ region: w.region, dataClass: w.dataClass });
 
@@ -254,14 +277,21 @@ async function main(): Promise<void> {
             requestContextKeys: ["profile", "region", "dataClass"],
             tags: ["distribute"],
           },
-          modelSettings: { timeout: { totalMs: Math.max(1000, remainingMs(caps)) }, maxOutputTokens: 2500 },
+          modelSettings: {
+            timeout: { totalMs: Math.max(1000, remainingMs(caps)) },
+            maxOutputTokens: 2500,
+          },
         });
       },
     );
 
     const latencyMs = Date.now() - started;
     if (!attempt.value || !attempt.served) {
-      ledger.reconcile(w.id, { latencyMs, outcome: "failed", note: "every eligible provider failed" });
+      ledger.reconcile(w.id, {
+        latencyMs,
+        outcome: "failed",
+        note: "every eligible provider failed",
+      });
       served.push({
         worker: w.id,
         requestedRegion: w.region,
@@ -292,12 +322,20 @@ async function main(): Promise<void> {
       latencyMs,
       outcome: aborted ? "aborted" : "ok",
       model: attempt.served.priceKey,
-      note: attempt.trail.length > 1 ? `fell back after ${attempt.trail.length - 1} failure(s)` : undefined,
+      note:
+        attempt.trail.length > 1
+          ? `fell back after ${attempt.trail.length - 1} failure(s)`
+          : undefined,
     });
 
     const patch = cleanPatch(result.object?.patch ?? result.text ?? "");
-    const certification = patch && !aborted ? await readinessChallenge.certify(patch, { abortSignal: signal }) : null;
-    const dq = !patch ? "empty response" : certification?.outcome === "ineligible" ? certification.reason : null;
+    const certification =
+      patch && !aborted ? await readinessChallenge.certify(patch, { abortSignal: signal }) : null;
+    const dq = !patch
+      ? "empty response"
+      : certification?.outcome === "ineligible"
+        ? certification.reason
+        : null;
     const sandbox = certification && "result" in certification ? certification.result : null;
 
     served.push({
@@ -320,7 +358,9 @@ async function main(): Promise<void> {
       whyItExisted: w.why,
       provider: attempt.served.id,
     });
-    bullet(`${w.id}: served by ${attempt.served.id} (${attempt.served.model}) — ${attempt.served.why}`);
+    bullet(
+      `${w.id}: served by ${attempt.served.id} (${attempt.served.model}) — ${attempt.served.why}`,
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -329,11 +369,15 @@ async function main(): Promise<void> {
   section("remote competitor over A2A (a second Mastra server, own process)");
   const remoteSpan = startWorkerSpan(snippetSpan, "worker:remote-a2a", {});
   const remoteStarted = Date.now();
-  const remote = deadlineHit(caps) ? null : await startRemoteServer({ timeoutMs: Math.min(20_000, remainingMs(caps)) });
+  const remote = deadlineHit(caps)
+    ? null
+    : await startRemoteServer({ timeoutMs: Math.min(20_000, remainingMs(caps)) });
 
   if (!remote) {
     ledger.skip("remote-a2a", "unknown", "the remote server did not come up inside the deadline");
-    bullet("skipped: the remote A2A server did not start. See snippet 06 for the standalone version.");
+    bullet(
+      "skipped: the remote A2A server did not start. See snippet 06 for the standalone version.",
+    );
     if (stopReason === "completed") {
       stopReason = "dependency-missing";
       stopDetail = "the A2A worker process was unavailable";
@@ -367,7 +411,9 @@ async function main(): Promise<void> {
       const assembler = new ArtifactAssembler();
 
       const stream = a2a.sendMessageStream({
-        message: userMessage(`${prompt}\n\nReturn ONLY the complete file contents of readiness.ts, with no fences.`),
+        message: userMessage(
+          `${prompt}\n\nReturn ONLY the complete file contents of readiness.ts, with no fences.`,
+        ),
       });
 
       for await (const raw of stream as AsyncIterable<unknown>) {
@@ -381,12 +427,21 @@ async function main(): Promise<void> {
       const latencyMs = Date.now() - remoteStarted;
       const text = assembler.value;
       const patch = cleanPatch(text);
-      const certification = patch ? await readinessChallenge.certify(patch, { abortSignal: signal }) : null;
-      const dq = !patch ? "no text returned" : certification?.outcome === "ineligible" ? certification.reason : null;
+      const certification = patch
+        ? await readinessChallenge.certify(patch, { abortSignal: signal })
+        : null;
+      const dq = !patch
+        ? "no text returned"
+        : certification?.outcome === "ineligible"
+          ? certification.reason
+          : null;
       const sandbox = certification && "result" in certification ? certification.result : null;
 
       ledger.reconcile("remote-a2a", {
-        usage: { inputTokens: Math.ceil(prompt.length / 4), outputTokens: Math.ceil(text.length / 4) },
+        usage: {
+          inputTokens: Math.ceil(prompt.length / 4),
+          outputTokens: Math.ceil(text.length / 4),
+        },
         latencyMs,
         outcome: "ok",
         note: "cost estimated locally; the remote process owns the real usage",
@@ -394,9 +449,18 @@ async function main(): Promise<void> {
 
       section("remote task events");
       table(
-        events.slice(0, 12).map((e, i) => ({ "#": i, kind: e.kind, state: e.state ?? "-", taskId: e.taskId ?? "-" })),
+        events
+          .slice(0, 12)
+          .map((e, i) => ({
+            "#": i,
+            kind: e.kind,
+            state: e.state ?? "-",
+            taskId: e.taskId ?? "-",
+          })),
       );
-      bullet(`task id: ${taskId ?? "(not surfaced by this event shape)"} · ${events.length} events`);
+      bullet(
+        `task id: ${taskId ?? "(not surfaced by this event shape)"} · ${events.length} events`,
+      );
 
       served.push({
         worker: "remote-a2a",

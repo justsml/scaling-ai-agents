@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { DriverTools, type DriverEvidenceRecord, type EvidenceRepository } from "../src/pi/driver-tools";
+import {
+  DriverTools,
+  type DriverEvidenceRecord,
+  type EvidenceRepository,
+} from "../src/pi/driver-tools";
 import type { GatewayControl } from "../src/pi/gateway-control";
 import type { ScenarioCatalog } from "../src/pi/catalog";
 import type { StackRunResult, StackRunner } from "../src/pi/stack-runner";
@@ -21,7 +25,12 @@ describe("Pi Driver tools", () => {
     });
     const summary = await tools.runScenario("ai-sdk", "case-1");
     expect(configured[0]?.slice(1)).toEqual(["case-1", [{ type: "429" }]]);
-    expect(summary).toMatchObject({ evidenceId: "evidence-1", stack: "ai-sdk", ok: true, toolCallCount: 1 });
+    expect(summary).toMatchObject({
+      evidenceId: "evidence-1",
+      stack: "ai-sdk",
+      ok: true,
+      toolCallCount: 1,
+    });
     expect(actions).toEqual(["events", "put", "delete"]);
     expect((await tools.readEvidence(summary.evidenceId)) as object).toMatchObject({
       stack: "ai-sdk",
@@ -30,9 +39,15 @@ describe("Pi Driver tools", () => {
     });
     const listed = await tools.listStacks();
     expect(listed.stacks.map((item) => item.stack)).toEqual(["ai-sdk", "mastra", "langchain"]);
-    expect(listed.stacks.filter((item) => item.requested).map((item) => item.stack)).toEqual(["ai-sdk"]);
-    await expect(tools.readEvidence("not-returned-by-run-scenario")).rejects.toThrow("Unknown evidence id");
-    await expect(tools.runScenario("ai-sdk", "different-case")).rejects.toThrow("Scenario is not requested");
+    expect(listed.stacks.filter((item) => item.requested).map((item) => item.stack)).toEqual([
+      "ai-sdk",
+    ]);
+    await expect(tools.readEvidence("not-returned-by-run-scenario")).rejects.toThrow(
+      "Unknown evidence id",
+    );
+    await expect(tools.runScenario("ai-sdk", "different-case")).rejects.toThrow(
+      "Scenario is not requested",
+    );
     await expect(tools.runScenario("ai-sdk", "case-1")).rejects.toThrow("Duplicate dispatch");
   });
 
@@ -82,8 +97,17 @@ describe("Pi Driver tools", () => {
   });
 });
 
-const scenario = { id: "case-1", prompt: "prompt", deadlineMs: 100, maxToolCalls: 2, faults: [{ type: "429" }] };
-const catalog: ScenarioCatalog = { get: (id) => (id === scenario.id ? scenario : undefined), list: () => [scenario] };
+const scenario = {
+  id: "case-1",
+  prompt: "prompt",
+  deadlineMs: 100,
+  maxToolCalls: 2,
+  faults: [{ type: "429" }],
+};
+const catalog: ScenarioCatalog = {
+  get: (id) => (id === scenario.id ? scenario : undefined),
+  list: () => [scenario],
+};
 const stackRun: StackRunResult = {
   evidence: {
     stack: "ai-sdk",
@@ -100,7 +124,12 @@ const stackRun: StackRunResult = {
   timedOut: false,
 };
 const stackRunner: Pick<StackRunner, "health" | "run"> = {
-  health: async (stack) => ({ stack, entrypoint: "entry", entrypointExists: true, bunAvailable: true }),
+  health: async (stack) => ({
+    stack,
+    entrypoint: "entry",
+    entrypointExists: true,
+    bunAvailable: true,
+  }),
   run: async () => stackRun,
 };
 

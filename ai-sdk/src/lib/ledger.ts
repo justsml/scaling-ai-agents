@@ -58,14 +58,23 @@ export class Ledger {
   }
 
   /** Reconcile a worker's actual token usage against its reservation. Aborts remaining work if this tips the ledger over budget. */
-  settle(worker: string, modelId: string, usage: { inputTokens?: number; outputTokens?: number }): number {
+  settle(
+    worker: string,
+    modelId: string,
+    usage: { inputTokens?: number; outputTokens?: number },
+  ): number {
     const actual = costUsd(modelId, usage);
     const entry = this.entries.get(worker);
     if (entry) {
       entry.actualUsd = actual;
       entry.status = "settled";
     } else {
-      this.entries.set(worker, { worker, reservedUsd: actual, actualUsd: actual, status: "settled" });
+      this.entries.set(worker, {
+        worker,
+        reservedUsd: actual,
+        actualUsd: actual,
+        status: "settled",
+      });
     }
     if (this.spentUsd > this.budgetUsd && this.exceededAt === undefined) {
       this.exceededAt = Date.now();

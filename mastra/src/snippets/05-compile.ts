@@ -35,7 +35,17 @@ import { z } from "zod";
 import { parseCaps, deadlineHit, describeCaps, hasOpenAiKey } from "../lib/caps.js";
 import type { StopReason } from "../lib/caps.js";
 import { Ledger } from "../lib/ledger.js";
-import { bullet, header, json, ledgerTable, reportSpend, section, stopBanner, table, usd } from "../lib/print.js";
+import {
+  bullet,
+  header,
+  json,
+  ledgerTable,
+  reportSpend,
+  section,
+  stopBanner,
+  table,
+  usd,
+} from "../lib/print.js";
 import { COMPETITORS } from "../lib/profiles.js";
 import { runTournament } from "./01-compete.js";
 import { fixtureScorer } from "../lib/judge.js";
@@ -160,7 +170,9 @@ async function main(): Promise<void> {
       detail: "unexpected hit",
     });
   } else if (!hasOpenAiKey()) {
-    bullet("OPENAI_API_KEY is not set, so the tournament cannot run and there is nothing to compile.");
+    bullet(
+      "OPENAI_API_KEY is not set, so the tournament cannot run and there is nothing to compile.",
+    );
     stopReason = "no-api-key";
   } else {
     bullet("miss → escalate to the tournament. This is the expensive path, entered on purpose.");
@@ -188,7 +200,9 @@ async function main(): Promise<void> {
       registerCompiled(compiled);
       bullet(`compiled: "${winner.id}" won 5/5 and is now the rule for ${buggyHash}`);
     } else {
-      bullet("nothing went green, so nothing was compiled. A 4/5 winner is still a search problem.");
+      bullet(
+        "nothing went green, so nothing was compiled. A 4/5 winner is still a search problem.",
+      );
       stopReason = out.stopReason === "completed" ? "error" : out.stopReason;
       stopDetail = "the tournament produced no fully green patch to freeze";
     }
@@ -240,7 +254,9 @@ async function main(): Promise<void> {
     );
   } catch (err) {
     bullet(`addDynamicWorkflow failed: ${short(err)}`);
-    bullet("the in-process tool path below still works; only the persisted registration is missing.");
+    bullet(
+      "the in-process tool path below still works; only the persisted registration is missing.",
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -270,7 +286,9 @@ async function main(): Promise<void> {
       reason: viaTool.reason,
       modelCalls: viaTool.modelCalls,
       patchLines: viaTool.patch.split("\n").length,
-      viaDynamicWorkflow: viaWorkflow ? { status: viaWorkflow.status, matched: viaWorkflow.matched } : "not registered",
+      viaDynamicWorkflow: viaWorkflow
+        ? { status: viaWorkflow.status, matched: viaWorkflow.matched }
+        : "not registered",
       testsAgainstTheSameContract: `${sandbox.pass}/${sandbox.pass + sandbox.fail}`,
     });
     records.push({
@@ -356,15 +374,28 @@ async function main(): Promise<void> {
       const gateWorkflow = createWorkflow({
         id: "compiled-gate",
         inputSchema: z.object({ source: z.string() }),
-        outputSchema: z.object({ green: z.boolean(), pass: z.number(), fail: z.number(), matched: z.boolean() }),
+        outputSchema: z.object({
+          green: z.boolean(),
+          pass: z.number(),
+          fail: z.number(),
+          matched: z.boolean(),
+        }),
       })
         .then(
           createStep({
             id: "apply-and-test",
             inputSchema: z.object({ source: z.string() }),
-            outputSchema: z.object({ green: z.boolean(), pass: z.number(), fail: z.number(), matched: z.boolean() }),
+            outputSchema: z.object({
+              green: z.boolean(),
+              pass: z.number(),
+              fail: z.number(),
+              matched: z.boolean(),
+            }),
             execute: async ({ inputData }) => {
-              const out = (await compiledReadinessTool.execute!({ source: inputData.source }, {} as never)) as {
+              const out = (await compiledReadinessTool.execute!(
+                { source: inputData.source },
+                {} as never,
+              )) as {
                 matched: boolean;
                 patch: string;
               };
@@ -394,7 +425,10 @@ async function main(): Promise<void> {
       table([
         {
           verdict: evalResult.verdict,
-          gates: (evalResult.gateResults ?? []).map((g) => `${g.id}: ${g.passed ? "pass" : "FAIL"}`).join(", ") || "-",
+          gates:
+            (evalResult.gateResults ?? [])
+              .map((g) => `${g.id}: ${g.passed ? "pass" : "FAIL"}`)
+              .join(", ") || "-",
           items: evalResult.summary?.totalItems ?? 1,
         },
       ]);
@@ -440,7 +474,8 @@ async function main(): Promise<void> {
     costUsd: ledger.spentUsd,
     latencyMs: Date.now() - caps.startedAt,
     outcome: stopReason,
-    whyItExisted: "stops paying for a search whose answer is already known, without loosening the contract",
+    whyItExisted:
+      "stops paying for a search whose answer is already known, without loosening the contract",
   });
   reportSpend(SNIPPET, ledger.spentUsd);
   await shutdownTracing();
@@ -452,7 +487,9 @@ async function certifiedResult(source: string): Promise<ReadinessTestResult> {
   throw new Error(`readiness certification did not execute: ${certification.outcome}`);
 }
 
-async function runViaDynamicWorkflow(source: string): Promise<{ status: string; matched: boolean } | null> {
+async function runViaDynamicWorkflow(
+  source: string,
+): Promise<{ status: string; matched: boolean } | null> {
   try {
     const wf = mastra.getWorkflow("compiled-readiness-workflow");
     const run = await wf.createRun();

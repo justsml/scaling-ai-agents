@@ -121,7 +121,12 @@ function capsFor(cls: RequestClass, budgetUsd: number, deadlineMs: number): Plan
     case "lookup":
       return { budgetUsd: 0, deadlineMs: Math.min(deadlineMs, 2_000), maxWorkers: 0, maxSteps: 0 };
     case "routine":
-      return { budgetUsd: budgetUsd * 0.15, deadlineMs: Math.min(deadlineMs, 20_000), maxWorkers: 1, maxSteps: 3 };
+      return {
+        budgetUsd: budgetUsd * 0.15,
+        deadlineMs: Math.min(deadlineMs, 20_000),
+        maxWorkers: 1,
+        maxSteps: 3,
+      };
     case "novel":
       return { budgetUsd: budgetUsd * 0.7, deadlineMs, maxWorkers: 4, maxSteps: 2 };
     case "consequential":
@@ -174,10 +179,12 @@ export class ContractRejected extends Error {
  */
 export function validateContract(candidate: unknown, req: FixtureRequest): PlanContract {
   const parsed = planContractSchema.safeParse(candidate);
-  if (!parsed.success) throw new ContractRejected(parsed.error.issues.map((i) => i.message).join("; "));
+  if (!parsed.success)
+    throw new ContractRejected(parsed.error.issues.map((i) => i.message).join("; "));
 
   const contract = parsed.data;
-  if (contract.requestId !== req.id) throw new ContractRejected("contract is for a different request id");
+  if (contract.requestId !== req.id)
+    throw new ContractRejected("contract is for a different request id");
 
   const recomputed = classify(req.text);
   if (recomputed.class !== contract.class) {
@@ -186,7 +193,9 @@ export function validateContract(candidate: unknown, req: FixtureRequest): PlanC
     );
   }
   if (contract.strategy !== STRATEGY_FOR[contract.class]) {
-    throw new ContractRejected(`strategy "${contract.strategy}" is not the strategy for class "${contract.class}"`);
+    throw new ContractRejected(
+      `strategy "${contract.strategy}" is not the strategy for class "${contract.class}"`,
+    );
   }
   if (contract.class === "consequential" && contract.scopes.includes("model:call")) {
     throw new ContractRejected("a consequential request may not carry model:call scope");

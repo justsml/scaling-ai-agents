@@ -75,7 +75,13 @@ one line as the results arrive. Do not invent findings.`,
   model: WORKER_MODEL,
   tools: { slowAuditTool },
   memory: new Memory({
-    storage: new LibSQLStore({ id: "lab-memory", url: process.env.MASTRA_DB_URL ?? "file:./mastra.db" }),
+    storage: new LibSQLStore({
+      id: "lab-memory",
+      url: process.env.MASTRA_DB_URL ?? "file:./mastra.db",
+    }),
   }),
-  backgroundTasks: { tools: { slowAuditTool: { enabled: true, timeoutMs: 45_000 } } },
+  backgroundTasks: {
+    tools: { slowAuditTool: { enabled: true, timeoutMs: 45_000 } },
+    
+  },
 });

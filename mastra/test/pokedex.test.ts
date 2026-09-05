@@ -63,9 +63,14 @@ describe("Pokédex investigation seam", () => {
       "http://example.com:4111",
     ])
       expect(
-        investigationRequestSchema.safeParse({ ...request("http://localhost:4111"), gatewayBaseUrl }).success,
+        investigationRequestSchema.safeParse({
+          ...request("http://localhost:4111"),
+          gatewayBaseUrl,
+        }).success,
       ).toBeFalse();
-    expect(investigationRequestSchema.safeParse(request("http://127.0.0.1:4111")).success).toBeTrue();
+    expect(
+      investigationRequestSchema.safeParse(request("http://127.0.0.1:4111")).success,
+    ).toBeTrue();
   });
   test("records successful results with monotonic sequence and timestamps", async () => {
     let headers: Headers | undefined;
@@ -81,7 +86,10 @@ describe("Pokédex investigation seam", () => {
     });
     servers.push(server);
     const session = new PokedexGatewaySession(request(String(server.url)));
-    await Promise.all([session.call("pokedex_list_resources", {}), session.call("pokedex_list_resources", {})]);
+    await Promise.all([
+      session.call("pokedex_list_resources", {}),
+      session.call("pokedex_list_resources", {}),
+    ]);
     session.close();
     expect(headers?.get("x-pokedex-stack")).toBe("mastra");
     expect(session.evidence.map((e) => e.sequence)).toEqual([1, 2]);
@@ -101,7 +109,9 @@ describe("Pokédex investigation seam", () => {
     servers.push(server);
     const session = new PokedexGatewaySession(request(String(server.url), 1));
     await session.call("pokedex_list_resources", {});
-    expect(await session.call("pokedex_list_resources", {})).toMatchObject({ code: "MAX_TOOL_CALLS" });
+    expect(await session.call("pokedex_list_resources", {})).toMatchObject({
+      code: "MAX_TOOL_CALLS",
+    });
     session.close();
     expect(session.evidence).toHaveLength(2);
     expect(session.evidence[1]).toMatchObject({ disposition: "blocked" });

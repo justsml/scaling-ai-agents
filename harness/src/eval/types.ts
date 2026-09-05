@@ -1,6 +1,10 @@
 export const STACKS = ["ai-sdk", "mastra", "langchain"] as const;
 export type StackName = (typeof STACKS)[number];
-export type PokedexToolName = "pokedex_list_resources" | "pokedex_list" | "pokedex_search" | "pokedex_get";
+export type PokedexToolName =
+  | "pokedex_list_resources"
+  | "pokedex_list"
+  | "pokedex_search"
+  | "pokedex_get";
 
 export interface Claim {
   path: string;
@@ -32,7 +36,12 @@ export interface InvestigationEvidence {
   usage: { inputTokens: number; outputTokens: number; reasoningTokens?: number };
   latencyMs: number;
   stopReason: string;
-  stopMetadata?: { toolCallAttempts?: number; maxToolCalls?: number; deadlineMs?: number; [key: string]: unknown };
+  stopMetadata?: {
+    toolCallAttempts?: number;
+    maxToolCalls?: number;
+    deadlineMs?: number;
+    [key: string]: unknown;
+  };
 }
 
 export type ClaimOperator = "equals" | "contains" | "set-equals";
@@ -127,7 +136,13 @@ export interface EvalReport {
     toolLatencyMs: { p50: number | null; p95: number | null };
     driver: {
       runs: number;
-      tokens: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number } | null;
+      tokens: {
+        input: number;
+        output: number;
+        cacheRead: number;
+        cacheWrite: number;
+        total: number;
+      } | null;
       reportedCostUsd: number | null;
       costStatus: "reported" | "unavailable";
       latencyMs: { p50: number | null; p95: number | null };

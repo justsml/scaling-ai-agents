@@ -26,7 +26,8 @@ export async function loadCatalog(
     ids.add(scenario.id);
     if (!expected[scenario.id]) throw new Error(`Missing expectation: ${scenario.id}`);
   }
-  for (const id of Object.keys(expected)) if (!ids.has(id)) throw new Error(`Expectation has no scenario: ${id}`);
+  for (const id of Object.keys(expected))
+    if (!ids.has(id)) throw new Error(`Expectation has no scenario: ${id}`);
   return { contractVersion: toolFile.contractVersion, tools, scenarios, expected };
 }
 

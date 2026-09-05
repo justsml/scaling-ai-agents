@@ -75,10 +75,18 @@ export async function runLiveEvaluation(
 ): Promise<LiveEvalResult> {
   validateOptions(options);
   const repoRoot = resolve(options.repoRoot ?? resolve(import.meta.dir, "../../.."));
-  const fixturesDirectory = resolve(options.fixturesDirectory ?? resolve(repoRoot, "shared/fixtures"));
-  const artifactsDirectory = resolve(options.artifactsDirectory ?? resolve(repoRoot, "harness/artifacts/runs"));
-  const runId = options.runId ?? dependencies.createRunId?.() ?? defaultRunId(dependencies.now?.() ?? new Date());
-  if (!/^[A-Za-z0-9._-]{1,128}$/.test(runId)) throw new Error("runId must contain only URL-safe identifier characters");
+  const fixturesDirectory = resolve(
+    options.fixturesDirectory ?? resolve(repoRoot, "shared/fixtures"),
+  );
+  const artifactsDirectory = resolve(
+    options.artifactsDirectory ?? resolve(repoRoot, "harness/artifacts/runs"),
+  );
+  const runId =
+    options.runId ??
+    dependencies.createRunId?.() ??
+    defaultRunId(dependencies.now?.() ?? new Date());
+  if (!/^[A-Za-z0-9._-]{1,128}$/.test(runId))
+    throw new Error("runId must contain only URL-safe identifier characters");
   const artifactDirectory = resolve(artifactsDirectory, runId);
   const catalog = await (dependencies.loadCatalog ?? loadCatalog)(fixturesDirectory);
   const now = dependencies.now ?? (() => new Date());
@@ -119,7 +127,8 @@ export async function runLiveEvaluation(
           scenarioId: scenario.id,
           scenarioPrompt: scenario.prompt,
           requestedStacks: STACKS,
-          gatewayBaseUrl: options.gatewayBaseUrl ?? process.env.POKEDEX_GATEWAY_URL ?? "http://127.0.0.1:3210",
+          gatewayBaseUrl:
+            options.gatewayBaseUrl ?? process.env.POKEDEX_GATEWAY_URL ?? "http://127.0.0.1:3210",
           evidenceDirectory,
           repoRoot,
           deadlineMs: scenario.deadlineMs + (options.driverOverheadMs ?? 60_000),
@@ -156,7 +165,13 @@ export async function runLiveEvaluation(
 
   manifest.piVersions = [...versions].sort();
   await writeJsonAtomic(resolve(artifactDirectory, "manifest.json"), manifest);
-  const report = buildReport(catalog.contractVersion, runs, undefined, now().toISOString(), driverSamples);
+  const report = buildReport(
+    catalog.contractVersion,
+    runs,
+    undefined,
+    now().toISOString(),
+    driverSamples,
+  );
   await writeJsonAtomic(resolve(artifactDirectory, "report.json"), report);
   return { artifactDirectory, manifest, report };
 }
@@ -171,8 +186,14 @@ async function readDriverRecords(
   for (const name of await readdir(directory)) {
     if (!name.endsWith(".json")) continue;
     try {
-      const record = JSON.parse(await readFile(resolve(directory, name), "utf8")) as DriverEvidenceRecord;
-      if (record.driverRunId !== driverRunId || record.scenario?.id !== scenarioId || !STACKS.includes(record.stack)) {
+      const record = JSON.parse(
+        await readFile(resolve(directory, name), "utf8"),
+      ) as DriverEvidenceRecord;
+      if (
+        record.driverRunId !== driverRunId ||
+        record.scenario?.id !== scenarioId ||
+        !STACKS.includes(record.stack)
+      ) {
         errors.push(`${name}: evidence identity does not match this Driver run`);
       } else if (records.has(record.stack)) {
         errors.push(`${name}: duplicate evidence for ${record.stack}`);
@@ -233,7 +254,10 @@ function dispatchGate(
  * event log. A stack trace is not authoritative on its own: every forwarded
  * call must have exactly one matching event in the same position.
  */
-export function corroborateGatewayTrace(record: DriverEvidenceRecord, evidence: InvestigationEvidence): string[] {
+export function corroborateGatewayTrace(
+  record: DriverEvidenceRecord,
+  evidence: InvestigationEvidence,
+): string[] {
   const calls = evidence.toolCalls.filter((call) => call.disposition === "gateway");
   const details: string[] = [];
   if (!Array.isArray(record.gatewayEvents)) {
@@ -241,7 +265,9 @@ export function corroborateGatewayTrace(record: DriverEvidenceRecord, evidence: 
   }
   const events = record.gatewayEvents;
   if (events.length !== calls.length) {
-    details.push(`gateway trace count mismatch: stack reported ${calls.length}, gateway recorded ${events.length}`);
+    details.push(
+      `gateway trace count mismatch: stack reported ${calls.length}, gateway recorded ${events.length}`,
+    );
   }
   addDuplicateRequestIdDetails(
     details,
@@ -264,7 +290,9 @@ export function corroborateGatewayTrace(record: DriverEvidenceRecord, evidence: 
     const call = calls[index]!;
     const event = eventsByRequestId.get(call.requestId);
     if (!event) {
-      details.push(`gateway call ${index + 1} requestId mismatch: no event for expected ${call.requestId}`);
+      details.push(
+        `gateway call ${index + 1} requestId mismatch: no event for expected ${call.requestId}`,
+      );
       continue;
     }
     compare(details, index, "tool", event.tool, call.tool);
@@ -302,15 +330,23 @@ export function corroborateGatewayTrace(record: DriverEvidenceRecord, evidence: 
 function recordFailureDetails(record: DriverEvidenceRecord): string[] {
   const details: string[] = [];
   if ("error" in record)
-    details.push(`Driver evidence error for ${record.stack}: ${String(record.error ?? "unknown error")}`);
+    details.push(
+      `Driver evidence error for ${record.stack}: ${String(record.error ?? "unknown error")}`,
+    );
   const stackRun = record.stackRun;
-  if (stackRun?.protocolError) details.push(`${record.stack} protocol failure: ${stackRun.protocolError}`);
+  if (stackRun?.protocolError)
+    details.push(`${record.stack} protocol failure: ${stackRun.protocolError}`);
   if (stackRun?.timedOut) details.push(`${record.stack} process timed out`);
-  if (stackRun && stackRun.exitCode !== 0) details.push(`${record.stack} process exited ${stackRun.exitCode}`);
+  if (stackRun && stackRun.exitCode !== 0)
+    details.push(`${record.stack} process exited ${stackRun.exitCode}`);
   return details;
 }
 
-function addDuplicateRequestIdDetails(details: string[], source: string, requestIds: readonly unknown[]): void {
+function addDuplicateRequestIdDetails(
+  details: string[],
+  source: string,
+  requestIds: readonly unknown[],
+): void {
   const seen = new Set<string>();
   const duplicates = new Set<string>();
   for (const requestId of requestIds) {
@@ -321,7 +357,10 @@ function addDuplicateRequestIdDetails(details: string[], source: string, request
   for (const requestId of duplicates) details.push(`${source} repeats requestId ${requestId}`);
 }
 
-function addSequenceDetails(details: string[], calls: readonly InvestigationEvidence["toolCalls"][number][]): void {
+function addSequenceDetails(
+  details: string[],
+  calls: readonly InvestigationEvidence["toolCalls"][number][],
+): void {
   const sequenced = calls.filter((call) => call.sequence !== undefined);
   if (sequenced.length === 0) return;
   if (sequenced.length !== calls.length) {
@@ -332,12 +371,18 @@ function addSequenceDetails(details: string[], calls: readonly InvestigationEvid
     const sequence = sequenced[index]!.sequence;
     const previous = sequenced[index - 1]?.sequence;
     if (!Number.isSafeInteger(sequence) || (previous !== undefined && sequence! <= previous)) {
-      details.push(`stack gateway call ${index + 1} has invalid or out-of-order sequence ${String(sequence)}`);
+      details.push(
+        `stack gateway call ${index + 1} has invalid or out-of-order sequence ${String(sequence)}`,
+      );
     }
   }
 }
 
-function appendGateDetails(gates: GateResult[], gateName: GateResult["gate"], details: readonly string[]): void {
+function appendGateDetails(
+  gates: GateResult[],
+  gateName: GateResult["gate"],
+  details: readonly string[],
+): void {
   if (details.length === 0) return;
   const gate = gates.find((candidate) => candidate.gate === gateName);
   if (!gate) throw new Error(`scorer omitted required ${gateName} gate`);
@@ -345,7 +390,13 @@ function appendGateDetails(gates: GateResult[], gateName: GateResult["gate"], de
   gate.passed = false;
 }
 
-function compare(details: string[], index: number, field: string, actual: unknown, expected: unknown): void {
+function compare(
+  details: string[],
+  index: number,
+  field: string,
+  actual: unknown,
+  expected: unknown,
+): void {
   if (actual !== expected)
     details.push(
       `gateway call ${index + 1} ${field} mismatch: expected ${String(expected)}, received ${String(actual)}`,
@@ -368,7 +419,8 @@ function driverErrors(driver: PiRunEvidence | DriverFailure): string[] {
   if ("error" in driver) return [...new Set([driver.error, ...driver.protocolErrors])];
   const details = [...driver.protocolErrors];
   if (driver.timedOut) details.push("Pi Driver timed out");
-  if (driver.exitCode !== 0) details.push(`Pi Driver exited ${driver.exitCode ?? "without a status"}`);
+  if (driver.exitCode !== 0)
+    details.push(`Pi Driver exited ${driver.exitCode ?? "without a status"}`);
   return [...new Set(details)];
 }
 
@@ -391,16 +443,24 @@ const FRAMEWORK_PACKAGES: Record<StackName, readonly string[]> = {
   langchain: ["langchain", "@langchain/openai"],
 };
 
-async function readFrameworkVersions(repoRoot: string): Promise<LiveEvalManifest["frameworkVersions"]> {
+async function readFrameworkVersions(
+  repoRoot: string,
+): Promise<LiveEvalManifest["frameworkVersions"]> {
   const entries = await Promise.all(
     STACKS.map(async (stack) => {
       const packages = await Promise.all(
         FRAMEWORK_PACKAGES[stack].map(async (packageName) => {
           try {
             const packageJson = JSON.parse(
-              await readFile(resolve(repoRoot, stack, "node_modules", packageName, "package.json"), "utf8"),
+              await readFile(
+                resolve(repoRoot, stack, "node_modules", packageName, "package.json"),
+                "utf8",
+              ),
             ) as { version?: unknown };
-            return [packageName, typeof packageJson.version === "string" ? packageJson.version : null] as const;
+            return [
+              packageName,
+              typeof packageJson.version === "string" ? packageJson.version : null,
+            ] as const;
           } catch {
             return [packageName, null] as const;
           }
@@ -413,7 +473,9 @@ async function readFrameworkVersions(repoRoot: string): Promise<LiveEvalManifest
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 async function fixtureHashes(directory: string): Promise<LiveEvalManifest["fixtureHashes"]> {
@@ -428,13 +490,21 @@ async function fixtureHashes(directory: string): Promise<LiveEvalManifest["fixtu
 async function writeJsonAtomic(path: string, value: unknown): Promise<void> {
   await mkdir(resolve(path, ".."), { recursive: true });
   const temporary = `${path}.${randomUUID()}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
+  await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, {
+    encoding: "utf8",
+    flag: "wx",
+    mode: 0o600,
+  });
   await rename(temporary, path);
 }
 
 async function readGitSha(repoRoot: string): Promise<string | null> {
   try {
-    const child = Bun.spawn(["git", "rev-parse", "HEAD"], { cwd: repoRoot, stdout: "pipe", stderr: "ignore" });
+    const child = Bun.spawn(["git", "rev-parse", "HEAD"], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "ignore",
+    });
     if ((await child.exited) !== 0) return null;
     const sha = (await new Response(child.stdout).text()).trim();
     return /^[0-9a-f]{40}$/i.test(sha) ? sha : null;

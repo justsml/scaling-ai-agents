@@ -91,7 +91,15 @@ interface Outcome {
 async function runOne(plan: SnippetPlan): Promise<Outcome> {
   const started = Date.now();
   const proc = Bun.spawn(
-    ["bun", "run", plan.file, "--budget-usd", String(plan.budgetUsd), "--deadline-ms", String(plan.deadlineMs)],
+    [
+      "bun",
+      "run",
+      plan.file,
+      "--budget-usd",
+      String(plan.budgetUsd),
+      "--deadline-ms",
+      String(plan.deadlineMs),
+    ],
     { cwd: PKG_ROOT, env: process.env, stdout: "pipe", stderr: "pipe" },
   );
 

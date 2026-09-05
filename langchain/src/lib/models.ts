@@ -46,7 +46,10 @@ export function localSlot(): LocalSlot | null {
 const cache = new Map<string, BaseChatModel>();
 
 /** Build (and reuse) a chat model from an `initChatModel` id string. */
-export async function model(id: string, opts: { temperature?: number } = {}): Promise<BaseChatModel> {
+export async function model(
+  id: string,
+  opts: { temperature?: number } = {},
+): Promise<BaseChatModel> {
   const key = `${id}::${opts.temperature ?? "default"}`;
   const hit = cache.get(key);
   if (hit) return hit;

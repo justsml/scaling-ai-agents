@@ -55,7 +55,9 @@ export function isPriced(modelId: string): boolean {
 /** USD for one call. Prices in the table are per 1M tokens. */
 export function estimateCostUsd(modelId: string, usage: Usage): number {
   const price = priceFor(modelId);
-  return (usage.inputTokens / 1_000_000) * price.input + (usage.outputTokens / 1_000_000) * price.output;
+  return (
+    (usage.inputTokens / 1_000_000) * price.input + (usage.outputTokens / 1_000_000) * price.output
+  );
 }
 
 /** Pull `usage_metadata` off anything LangChain hands back, tolerating older shapes. */

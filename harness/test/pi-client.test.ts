@@ -31,7 +31,10 @@ describe("Pi RPC client", () => {
       protocolErrors: [],
     });
     expect(result.toolCalls).toHaveLength(7);
-    expect(result.dispatch).toMatchObject({ passed: true, observed: ["ai-sdk", "mastra", "langchain"] });
+    expect(result.dispatch).toMatchObject({
+      passed: true,
+      observed: ["ai-sdk", "mastra", "langchain"],
+    });
     expect(result.sessionStats).toMatchObject({ toolCalls: 1 });
     expect(rpc.commands.map((command) => command.type)).toEqual([
       "get_state",
@@ -59,16 +62,21 @@ describe("Pi RPC client", () => {
 
   test("rejects the wrong model or reasoning state", () => {
     expect(() =>
-      assertDriverState({ model: { provider: "openai", id: "gpt-5.6-luna" }, thinkingLevel: "low" }),
+      assertDriverState({
+        model: { provider: "openai", id: "gpt-5.6-luna" },
+        thinkingLevel: "low",
+      }),
     ).toThrow("thinking level");
-    expect(() => assertDriverState({ model: { provider: "other", id: "gpt-5.6-luna" }, thinkingLevel: "off" })).toThrow(
-      "unexpected model",
-    );
+    expect(() =>
+      assertDriverState({ model: { provider: "other", id: "gpt-5.6-luna" }, thinkingLevel: "off" }),
+    ).toThrow("unexpected model");
   });
 
   test("requires Pi 0.85.x before starting RPC mode", async () => {
     const spawner = new QueueSpawner([versionProcess("0.86.0\n")]);
-    await expect(readCompatiblePiVersion("pi", "/repo", spawner)).rejects.toThrow("Pi 0.85.x is required");
+    await expect(readCompatiblePiVersion("pi", "/repo", spawner)).rejects.toThrow(
+      "Pi 0.85.x is required",
+    );
   });
 
   test("prompt forbids the Driver from answering the investigation", () => {
@@ -81,8 +89,18 @@ describe("Pi RPC client", () => {
   test("dispatch verification rejects missing ends, duplicates, and wrong-scenario runs", () => {
     const frames = [
       ...completedTool("list", "list_stacks", {}, {}),
-      ...completedTool("run-1", "run_scenario", { stack: "ai-sdk", scenarioId: "case-1" }, { evidenceId: "ev-1" }),
-      ...completedTool("run-2", "run_scenario", { stack: "ai-sdk", scenarioId: "case-1" }, { evidenceId: "ev-2" }),
+      ...completedTool(
+        "run-1",
+        "run_scenario",
+        { stack: "ai-sdk", scenarioId: "case-1" },
+        { evidenceId: "ev-1" },
+      ),
+      ...completedTool(
+        "run-2",
+        "run_scenario",
+        { stack: "ai-sdk", scenarioId: "case-1" },
+        { evidenceId: "ev-2" },
+      ),
       {
         type: "tool_execution_start",
         toolCallId: "run-3",
@@ -103,7 +121,12 @@ describe("Pi RPC client", () => {
   test("dispatch verification requires successful reads for exactly the returned evidence IDs", () => {
     const frames = [
       ...completedTool("list", "list_stacks", {}, {}),
-      ...completedTool("run", "run_scenario", { stack: "ai-sdk", scenarioId: "case-1" }, { evidenceId: "ev-1" }),
+      ...completedTool(
+        "run",
+        "run_scenario",
+        { stack: "ai-sdk", scenarioId: "case-1" },
+        { evidenceId: "ev-1" },
+      ),
       ...completedTool("wrong-read", "read_evidence", { evidenceId: "ev-other" }, {}, true),
     ];
     const result = verifyDriverDispatch(frames, "case-1", ["ai-sdk"]);
@@ -118,7 +141,12 @@ describe("Pi RPC client", () => {
     const frames = [
       listFrames[1],
       listFrames[0],
-      ...completedTool("run", "run_scenario", { stack: "ai-sdk", scenarioId: "case-1" }, { evidenceId: "ev-1" }),
+      ...completedTool(
+        "run",
+        "run_scenario",
+        { stack: "ai-sdk", scenarioId: "case-1" },
+        { evidenceId: "ev-1" },
+      ),
       ...completedTool("read", "read_evidence", { evidenceId: "ev-1" }, {}),
     ];
     const result = verifyDriverDispatch(frames, "case-1", ["ai-sdk"]);
@@ -194,11 +222,19 @@ class FakeRpcProcess implements ChildProcessHandle {
         for (const [index, stack] of ["ai-sdk", "mastra", "langchain"].entries()) {
           const evidenceId = `ev-${index + 1}`;
           this.emitMany(
-            completedTool(`call-${index + 2}`, "run_scenario", { stack, scenarioId: "case-1" }, { evidenceId }),
+            completedTool(
+              `call-${index + 2}`,
+              "run_scenario",
+              { stack, scenarioId: "case-1" },
+              { evidenceId },
+            ),
           );
           this.emitMany(completedTool(`read-${index + 1}`, "read_evidence", { evidenceId }, {}));
         }
-        this.emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "done" }] } });
+        this.emit({
+          type: "message_end",
+          message: { role: "assistant", content: [{ type: "text", text: "done" }] },
+        });
         this.emit({ type: "agent_settled" });
       }
     } else if (command.type === "abort") {

@@ -36,7 +36,12 @@ import { PROFILES, modelForProfile, profileByName, stripFences } from "../lib/pr
 import { candidateRows, rubricTotal, type Candidate } from "../lib/judge.ts";
 import { readBuggyModule } from "../lib/sandbox.ts";
 import { runMetadata, stampRun, startTracing } from "../lib/trace.ts";
-import { buildCompeteGraph, latestByProfile, type AttemptResult, type CompeteDeps } from "../graphs/compete.ts";
+import {
+  buildCompeteGraph,
+  latestByProfile,
+  type AttemptResult,
+  type CompeteDeps,
+} from "../graphs/compete.ts";
 import { header, kv, ledgerTable, note, section, skip, stopLine, table } from "../lib/print.ts";
 
 // ---------------------------------------------------------------------------
@@ -136,7 +141,8 @@ export async function attemptOnce(
       ctx.caps.charge(costUsd);
       if (ctx.chargeLedger !== false) ctx.ledger.charge(costUsd);
 
-      const text = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+      const text =
+        typeof response.content === "string" ? response.content : JSON.stringify(response.content);
       return {
         value: {
           patch: stripFences(text),
@@ -280,7 +286,10 @@ async function main() {
   // The table a speaker reads aloud.
   // -------------------------------------------------------------------------
   section("tournament");
-  table(["profile", "tests", "rubric", "cost", "ms", "note"], candidateRows(result.candidates, result.winner));
+  table(
+    ["profile", "tests", "rubric", "cost", "ms", "note"],
+    candidateRows(result.candidates, result.winner),
+  );
 
   if (result.skipped.length > 0) {
     section("did not run");
@@ -301,7 +310,9 @@ async function main() {
     kv("latency", `${w.latencyMs}ms`);
     kv("tie-break", "tests passed > rubric total > cost > latency (deterministic)");
     if (w.sandbox && !w.sandbox.green) {
-      note(`the winner is still not green: ${w.sandbox.failures.join("; ") || "see sandbox output"}`);
+      note(
+        `the winner is still not green: ${w.sandbox.failures.join("; ") || "see sandbox output"}`,
+      );
     }
   } else {
     console.log("  no winner: every candidate was disqualified, failed, or never ran");

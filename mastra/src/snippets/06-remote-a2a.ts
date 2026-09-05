@@ -29,7 +29,17 @@
 import { parseCaps, deadlineHit, describeCaps, hasOpenAiKey, remainingMs } from "../lib/caps.js";
 import type { StopReason } from "../lib/caps.js";
 import { Ledger } from "../lib/ledger.js";
-import { bullet, header, json, ledgerTable, reportSpend, section, stopBanner, table, usd } from "../lib/print.js";
+import {
+  bullet,
+  header,
+  json,
+  ledgerTable,
+  reportSpend,
+  section,
+  stopBanner,
+  table,
+  usd,
+} from "../lib/print.js";
 import {
   ArtifactAssembler,
   REMOTE_AGENT_ID,
@@ -108,7 +118,9 @@ async function main(): Promise<void> {
     // -----------------------------------------------------------------------
     section("2. the agent card");
     bullet(`well-known URL: ${REMOTE_CARD_URL}`);
-    bullet("note the /api prefix — it is part of the well-known path when the server uses the default apiPrefix.");
+    bullet(
+      "note the /api prefix — it is part of the well-known path when the server uses the default apiPrefix.",
+    );
     const card = (await a2a.getAgentCard()) as Record<string, any>;
     json("agent card", {
       protocolVersion: card.protocolVersion,
@@ -118,24 +130,48 @@ async function main(): Promise<void> {
       capabilities: card.capabilities,
       defaultInputModes: card.defaultInputModes,
       defaultOutputModes: card.defaultOutputModes,
-      skills: (card.skills ?? []).map((s: any) => ({ id: s.id, description: s.description, tags: s.tags })),
+      skills: (card.skills ?? []).map((s: any) => ({
+        id: s.id,
+        description: s.description,
+        tags: s.tags,
+      })),
       descriptionLength: String(card.description ?? "").length,
     });
 
     section("what the card publishes, and what it does not");
     table([
       { field: "name / url / version", published: "yes", note: "discovery needs these" },
-      { field: "capabilities", published: "yes", note: "streaming, pushNotifications, stateTransitionHistory" },
-      { field: "skills", published: "yes", note: "ONE ENTRY PER TOOL ID — tool names leak by design" },
+      {
+        field: "capabilities",
+        published: "yes",
+        note: "streaming, pushNotifications, stateTransitionHistory",
+      },
+      {
+        field: "skills",
+        published: "yes",
+        note: "ONE ENTRY PER TOOL ID — tool names leak by design",
+      },
       {
         field: "description",
         published: "yes",
         note: "in 1.64 this is the agent INSTRUCTIONS verbatim. Write them as public text.",
       },
-      { field: "model", published: "no", note: "the caller cannot tell what is behind the endpoint" },
+      {
+        field: "model",
+        published: "no",
+        note: "the caller cannot tell what is behind the endpoint",
+      },
       { field: "tool input/output schemas", published: "no", note: "only the ids appear" },
-      { field: "memory / storage / threads", published: "no", note: "entirely private to the remote" },
-      { field: "cost", published: "no", note: "the remote bills its own provider; 04 estimates it locally" },
+      {
+        field: "memory / storage / threads",
+        published: "no",
+        note: "entirely private to the remote",
+      },
+      {
+        field: "cost",
+        published: "no",
+        note: "the remote bills its own provider; 04 estimates it locally",
+      },
     ]);
 
     // -----------------------------------------------------------------------
@@ -184,7 +220,9 @@ async function main(): Promise<void> {
       })),
     );
     bullet(`task id: ${taskId ?? "(none)"} · ${events.length} events · ${streamMs}ms`);
-    bullet("artifact-update chunks either REPLACE or APPEND. Concatenating blindly corrupts the artifact.");
+    bullet(
+      "artifact-update chunks either REPLACE or APPEND. Concatenating blindly corrupts the artifact.",
+    );
     bullet(`remote said: ${answer.trim().slice(0, 220)}`);
 
     ledger.reconcile("remote:stream", {
@@ -198,7 +236,8 @@ async function main(): Promise<void> {
       costUsd: ledger.get("remote:stream")!.actualUsd,
       latencyMs: streamMs,
       outcome: "completed",
-      whyItExisted: "shows the full task lifecycle over the protocol rather than an in-process call",
+      whyItExisted:
+        "shows the full task lifecycle over the protocol rather than an in-process call",
       taskId: taskId ?? null,
     });
 
@@ -214,7 +253,10 @@ async function main(): Promise<void> {
           id: task?.id,
           contextId: task?.contextId,
           state: task?.status?.state,
-          artifacts: (task?.artifacts ?? []).map((a: any) => ({ name: a.name, parts: a.parts?.length })),
+          artifacts: (task?.artifacts ?? []).map((a: any) => ({
+            name: a.name,
+            parts: a.parts?.length,
+          })),
           historyLength: (task?.history ?? []).length,
         });
       } catch (err) {
@@ -256,7 +298,11 @@ async function main(): Promise<void> {
           bullet(`cancelling task ${longTaskId} after ${eventsBeforeCancel} events`);
           cancelResult = await a2a.cancelTask({ id: longTaskId });
           const t = (cancelResult as any)?.result ?? cancelResult;
-          json("tasks/cancel result", { id: t?.id, state: t?.status?.state, timestamp: t?.status?.timestamp });
+          json("tasks/cancel result", {
+            id: t?.id,
+            state: t?.status?.state,
+            timestamp: t?.status?.timestamp,
+          });
           bullet(
             String((t as any)?.status?.state).includes("cancel")
               ? "the task is cancelled. The remote stopped work; this process stopped listening."
@@ -280,7 +326,11 @@ async function main(): Promise<void> {
           taskId: longTaskId ?? null,
         });
       } catch (err) {
-        ledger.reconcile("remote:cancel", { latencyMs: Date.now() - t2, outcome: "failed", note: short(err) });
+        ledger.reconcile("remote:cancel", {
+          latencyMs: Date.now() - t2,
+          outcome: "failed",
+          note: short(err),
+        });
         bullet(`cancellation path failed: ${short(err)}`);
         endWorkerSpan(cancelSpan, {
           profile: "remote:cancel",
@@ -293,7 +343,9 @@ async function main(): Promise<void> {
     }
 
     section("not exercised here");
-    bullet("push notifications: the card advertises pushNotifications, but a callback URL needs a public endpoint.");
+    bullet(
+      "push notifications: the card advertises pushNotifications, but a callback URL needs a public endpoint.",
+    );
     bullet("A2A task records live in memory, so a restart of the remote loses every paused task.");
     bullet("the v1.0 wire protocol (getA2AV1, tasks/list) exists; this snippet stays on 0.3.");
   } finally {

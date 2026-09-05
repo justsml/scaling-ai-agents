@@ -51,7 +51,10 @@ export interface CandidateResult {
 }
 
 /** Run one competitor: generate a patch, then sandbox-test it. Wrapped in one worker span. */
-async function runCompetitor(profile: CompetitorProfile, signal: AbortSignal): Promise<CandidateResult> {
+async function runCompetitor(
+  profile: CompetitorProfile,
+  signal: AbortSignal,
+): Promise<CandidateResult> {
   // `telemetry` is an agent-construction setting, not a per-call generate()
   // option (ToolLoopAgent.generate only accepts CALL_OPTIONS + lifecycle
   // callbacks + abortSignal/timeout) -- PLAN.md assumed the generateText
@@ -67,7 +70,10 @@ async function runCompetitor(profile: CompetitorProfile, signal: AbortSignal): P
 
   try {
     return await withWorkerSpan(
-      { profile: profile.name, whyItExisted: `compete: ${profile.name} proposes a patch to readiness.ts` },
+      {
+        profile: profile.name,
+        whyItExisted: `compete: ${profile.name} proposes a patch to readiness.ts`,
+      },
       async () => {
         const start = Date.now();
         const result = await agent.generate({
@@ -77,7 +83,9 @@ async function runCompetitor(profile: CompetitorProfile, signal: AbortSignal): P
         const latencyMs = Date.now() - start;
         const spend = costUsd(profile.modelId, result.usage);
         const sandbox = await runSandbox(result.output.source, 8000);
-        const outcome = sandbox.ok ? "passed-sandbox" : `failed-sandbox(${sandbox.passed}/${sandbox.total})`;
+        const outcome = sandbox.ok
+          ? "passed-sandbox"
+          : `failed-sandbox(${sandbox.passed}/${sandbox.total})`;
         return {
           result: {
             profile: profile.name,
@@ -110,7 +118,10 @@ async function runCompetitor(profile: CompetitorProfile, signal: AbortSignal): P
 }
 
 async function main() {
-  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), { budgetUsd: 0.3, deadlineMs: 60_000 });
+  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), {
+    budgetUsd: 0.3,
+    deadlineMs: 60_000,
+  });
   initTelemetry();
   heading("01 Compete — four competitors, sandboxed tests, LLM rubric judge");
   printKV("caps", { budgetUsd, deadlineMs });
@@ -168,12 +179,18 @@ async function main() {
     .sort((a, b) => (b.rubric!.score.total ?? 0) - (a.rubric!.score.total ?? 0))[0];
 
   printKV("result", {
-    winner: winner ? `${winner.profile} (${winner.modelId})` : "none (no candidate passed the sandbox and rubric)",
+    winner: winner
+      ? `${winner.profile} (${winner.modelId})`
+      : "none (no candidate passed the sandbox and rubric)",
     winnerScore: winner?.rubric?.score.total,
     totalCostUsd: formatUsd(totalCostUsd),
     budgetUsd: formatUsd(budgetUsd),
     stopReason:
-      totalCostUsd >= budgetUsd ? "budget reached" : signal.aborted ? "deadline reached" : "all candidates evaluated",
+      totalCostUsd >= budgetUsd
+        ? "budget reached"
+        : signal.aborted
+          ? "deadline reached"
+          : "all candidates evaluated",
   });
 
   const { exporter } = initTelemetry();

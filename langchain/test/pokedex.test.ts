@@ -49,7 +49,9 @@ describe("Pokédex investigation seam", () => {
     const session = new PokedexGatewaySession(request(String(server.url)));
     const tools = createPokedexTools(await loadPokedexToolContract(), session);
     expect(tools.map((t) => t.name)).toEqual([...POKEDEX_TOOLS]);
-    expect(JSON.parse(String(await tools[0]!.invoke({})))).toMatchObject({ requestId: "gw-schema" });
+    expect(JSON.parse(String(await tools[0]!.invoke({})))).toMatchObject({
+      requestId: "gw-schema",
+    });
     session.close();
   });
   test("rejects non-loopback gateway destinations", () => {
@@ -59,7 +61,10 @@ describe("Pokédex investigation seam", () => {
       "http://example.com:4111",
     ])
       expect(
-        investigationRequestSchema.safeParse({ ...request("http://localhost:4111"), gatewayBaseUrl }).success,
+        investigationRequestSchema.safeParse({
+          ...request("http://localhost:4111"),
+          gatewayBaseUrl,
+        }).success,
       ).toBeFalse();
     expect(investigationRequestSchema.safeParse(request("http://[::1]:4111")).success).toBeTrue();
   });
@@ -77,7 +82,10 @@ describe("Pokédex investigation seam", () => {
     });
     servers.push(server);
     const session = new PokedexGatewaySession(request(String(server.url)));
-    await Promise.all([session.call("pokedex_list_resources", {}), session.call("pokedex_list_resources", {})]);
+    await Promise.all([
+      session.call("pokedex_list_resources", {}),
+      session.call("pokedex_list_resources", {}),
+    ]);
     session.close();
     expect(headers?.get("x-pokedex-stack")).toBe("langchain");
     expect(session.evidence.map((e) => e.sequence)).toEqual([1, 2]);
@@ -97,7 +105,9 @@ describe("Pokédex investigation seam", () => {
     servers.push(server);
     const session = new PokedexGatewaySession(request(String(server.url), 1));
     await session.call("pokedex_list_resources", {});
-    expect(await session.call("pokedex_list_resources", {})).toMatchObject({ code: "MAX_TOOL_CALLS" });
+    expect(await session.call("pokedex_list_resources", {})).toMatchObject({
+      code: "MAX_TOOL_CALLS",
+    });
     session.close();
     expect(session.evidence).toHaveLength(2);
     expect(session.evidence[1]).toMatchObject({ disposition: "blocked" });

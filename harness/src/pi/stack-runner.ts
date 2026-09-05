@@ -3,7 +3,12 @@ import { constants } from "node:fs";
 import { delimiter, isAbsolute, resolve } from "node:path";
 import { JsonlDecoder } from "./jsonl";
 import { NodeProcessSpawner, collectUtf8, delay } from "./process";
-import type { ProcessSpawner, StackInvestigationEvidence, StackInvestigationRequest, StackName } from "./types";
+import type {
+  ProcessSpawner,
+  StackInvestigationEvidence,
+  StackInvestigationRequest,
+  StackName,
+} from "./types";
 
 export interface StackRunResult {
   evidence: StackInvestigationEvidence | null;
@@ -55,7 +60,11 @@ export class StackRunner {
     };
   }
 
-  async run(stack: StackName, request: StackInvestigationRequest, signal?: AbortSignal): Promise<StackRunResult> {
+  async run(
+    stack: StackName,
+    request: StackInvestigationRequest,
+    signal?: AbortSignal,
+  ): Promise<StackRunResult> {
     const { cwd, entrypoint } = this.#command(stack);
     const argv = [this.#bunExecutable, "run", entrypoint];
     const child = this.#spawner.spawn(argv, { cwd, env: process.env });
@@ -79,10 +88,16 @@ export class StackRunner {
     } catch (error) {
       timedOut = timeout.signal.aborted;
       child.kill("SIGTERM");
-      exitCode = await Promise.race([child.exited, delay(this.#terminationGraceMs).then(() => null)]);
+      exitCode = await Promise.race([
+        child.exited,
+        delay(this.#terminationGraceMs).then(() => null),
+      ]);
       if (exitCode === null) {
         child.kill("SIGKILL");
-        exitCode = await Promise.race([child.exited, delay(this.#terminationGraceMs).then(() => null)]);
+        exitCode = await Promise.race([
+          child.exited,
+          delay(this.#terminationGraceMs).then(() => null),
+        ]);
       }
       protocolError = error instanceof Error ? error.message : String(error);
     } finally {
@@ -103,7 +118,8 @@ export class StackRunner {
     } catch (error) {
       protocolError ??= error instanceof Error ? error.message : String(error);
     }
-    if (exitCode !== 0) protocolError ??= `stack subprocess exited ${exitCode ?? "without a status"}`;
+    if (exitCode !== 0)
+      protocolError ??= `stack subprocess exited ${exitCode ?? "without a status"}`;
 
     return {
       evidence,
@@ -145,9 +161,13 @@ export class StackRunner {
       decodeError = error instanceof Error ? error.message : String(error);
     }
     if (frames.length === 0)
-      throw new Error(decodeError ?? "stack stdout contained 0 JSONL documents; expected exactly one");
+      throw new Error(
+        decodeError ?? "stack stdout contained 0 JSONL documents; expected exactly one",
+      );
     const documentError =
-      frames.length === 1 ? undefined : `stack stdout contained ${frames.length} JSONL documents; expected exactly one`;
+      frames.length === 1
+        ? undefined
+        : `stack stdout contained ${frames.length} JSONL documents; expected exactly one`;
     return {
       evidence: frames[0] as StackInvestigationEvidence,
       ...((decodeError ?? documentError) ? { protocolError: decodeError ?? documentError } : {}),
@@ -183,7 +203,10 @@ async function executableExists(command: string): Promise<boolean> {
   return false;
 }
 
-function validateEvidence(value: unknown, stack: StackName): asserts value is StackInvestigationEvidence {
+function validateEvidence(
+  value: unknown,
+  stack: StackName,
+): asserts value is StackInvestigationEvidence {
   if (value === null || typeof value !== "object" || Array.isArray(value))
     throw new Error("stack evidence must be an object");
   const item = value as Record<string, unknown>;

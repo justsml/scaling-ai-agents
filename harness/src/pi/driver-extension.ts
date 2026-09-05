@@ -34,7 +34,11 @@ export default async function pokedexDriverExtension(pi: ExtensionAPI): Promise<
     label: "List stacks",
     description: "List the requested Stack agents and their local health. Takes no arguments.",
     parameters: Type.Object({}, { additionalProperties: false }),
-    async execute(_toolCallId: string, _params: Record<string, never>, signal: AbortSignal | undefined) {
+    async execute(
+      _toolCallId: string,
+      _params: Record<string, never>,
+      signal: AbortSignal | undefined,
+    ) {
       return toolResult(await tools.listStacks(signal));
     },
   });

@@ -36,14 +36,37 @@
  */
 import { createStep, createWorkflow } from "@mastra/core/workflows";
 import { z } from "zod";
-import { parseCaps, deadlineHit, deadlineSignal, describeCaps, hasOpenAiKey, remainingMs } from "../lib/caps.js";
+import {
+  parseCaps,
+  deadlineHit,
+  deadlineSignal,
+  describeCaps,
+  hasOpenAiKey,
+  remainingMs,
+} from "../lib/caps.js";
 import type { StopReason } from "../lib/caps.js";
 import { Ledger, usdFromUsage } from "../lib/ledger.js";
-import { bullet, header, json, ledgerTable, reportSpend, section, stopBanner, table, usd } from "../lib/print.js";
+import {
+  bullet,
+  header,
+  json,
+  ledgerTable,
+  reportSpend,
+  section,
+  stopBanner,
+  table,
+  usd,
+} from "../lib/print.js";
 import { boundedPool } from "../lib/pool.js";
 import { readinessChallenge } from "../lib/readiness-challenge.js";
 import { WORKER_MODEL } from "../lib/models.js";
-import { endWorkerSpan, contextOf, shutdownTracing, startSnippetSpan, startWorkerSpan } from "../lib/spans.js";
+import {
+  endWorkerSpan,
+  contextOf,
+  shutdownTracing,
+  startSnippetSpan,
+  startWorkerSpan,
+} from "../lib/spans.js";
 import { backgroundAgent, probeAgent } from "../mastra/agents.js";
 import { mastra } from "../mastra/index.js";
 
@@ -74,7 +97,9 @@ async function main(): Promise<void> {
     ledger.skip("parallel-tools", WORKER_MODEL, "no API key");
     stopReason = "no-api-key";
   } else {
-    const span = startWorkerSpan(snippetSpan, "parallel-tool-calls", { concurrency: TOOL_CALL_CONCURRENCY });
+    const span = startWorkerSpan(snippetSpan, "parallel-tool-calls", {
+      concurrency: TOOL_CALL_CONCURRENCY,
+    });
     const started = Date.now();
     ledger.reserve("parallel-tools", WORKER_MODEL, 0.003);
     try {
@@ -89,7 +114,10 @@ async function main(): Promise<void> {
           abortSignal: signal,
           tracingContext: contextOf(span),
           tracingOptions: { metadata: { profile: "parallel-tool-calls" }, tags: ["batching"] },
-          modelSettings: { timeout: { totalMs: Math.max(1000, remainingMs(caps)) }, maxOutputTokens: 500 },
+          modelSettings: {
+            timeout: { totalMs: Math.max(1000, remainingMs(caps)) },
+            maxOutputTokens: 500,
+          },
         },
       );
       const latencyMs = Date.now() - started;
@@ -97,7 +125,9 @@ async function main(): Promise<void> {
 
       const probes = collectProbeResults(result);
       if (probes.length === 0) {
-        bullet("the model did not call the tool. Nothing to measure; that is a prompting problem, not a runtime one.");
+        bullet(
+          "the model did not call the tool. Nothing to measure; that is a prompting problem, not a runtime one.",
+        );
       } else {
         const base = Math.min(...probes.map((p) => p.startedAt));
         table(
@@ -137,7 +167,11 @@ async function main(): Promise<void> {
     } catch (err) {
       const latencyMs = Date.now() - started;
       const aborted = isAbort(err);
-      ledger.reconcile("parallel-tools", { latencyMs, outcome: aborted ? "aborted" : "failed", note: short(err) });
+      ledger.reconcile("parallel-tools", {
+        latencyMs,
+        outcome: aborted ? "aborted" : "failed",
+        note: short(err),
+      });
       bullet(`part (a) failed: ${short(err)}`);
       if (aborted) stopReason = "deadline-hit";
       endWorkerSpan(span, {
@@ -173,25 +207,41 @@ async function main(): Promise<void> {
     id: "sandbox-one",
     description: "Run one candidate against the fixture tests in a child process.",
     inputSchema: z.object({ name: z.string(), source: z.string() }),
-    outputSchema: z.object({ name: z.string(), pass: z.number(), fail: z.number(), ms: z.number() }),
+    outputSchema: z.object({
+      name: z.string(),
+      pass: z.number(),
+      fail: z.number(),
+      ms: z.number(),
+    }),
     execute: async ({ inputData }) => {
       const t = Date.now();
-      const certification = await readinessChallenge.certify(inputData.source, { abortSignal: signal });
+      const certification = await readinessChallenge.certify(inputData.source, {
+        abortSignal: signal,
+      });
       const result = "result" in certification ? certification.result : null;
-      return { name: inputData.name, pass: result?.pass ?? 0, fail: result?.fail ?? 0, ms: Date.now() - t };
+      return {
+        name: inputData.name,
+        pass: result?.pass ?? 0,
+        fail: result?.fail ?? 0,
+        ms: Date.now() - t,
+      };
     },
   });
 
   const fanout = createWorkflow({
     id: "candidate-fanout",
     inputSchema: z.object({ items: z.array(z.object({ name: z.string(), source: z.string() })) }),
-    outputSchema: z.array(z.object({ name: z.string(), pass: z.number(), fail: z.number(), ms: z.number() })),
+    outputSchema: z.array(
+      z.object({ name: z.string(), pass: z.number(), fail: z.number(), ms: z.number() }),
+    ),
   })
     .map(async ({ inputData }) => inputData.items)
     .foreach(sandboxStep, { concurrency: FOREACH_CONCURRENCY })
     .commit();
 
-  const fanoutSpan = startWorkerSpan(snippetSpan, "workflow-foreach", { concurrency: FOREACH_CONCURRENCY });
+  const fanoutSpan = startWorkerSpan(snippetSpan, "workflow-foreach", {
+    concurrency: FOREACH_CONCURRENCY,
+  });
   const fanStart = Date.now();
   const fanRun = await fanout.createRun();
   const fanResult = await fanRun.start({ inputData: { items: candidates } });
@@ -201,9 +251,17 @@ async function main(): Promise<void> {
     fanResult.status === "success"
       ? (fanResult.result as Array<{ name: string; pass: number; fail: number; ms: number }>)
       : [];
-  table(rows.map((r) => ({ candidate: r.name, tests: `${r.pass}/${r.pass + r.fail}`, "own time": `${r.ms}ms` })));
+  table(
+    rows.map((r) => ({
+      candidate: r.name,
+      tests: `${r.pass}/${r.pass + r.fail}`,
+      "own time": `${r.ms}ms`,
+    })),
+  );
   const serialMs = rows.reduce((s, r) => s + r.ms, 0);
-  bullet(`${rows.length} candidates · sum of individual times ${serialMs}ms · wall time ${fanMs}ms`);
+  bullet(
+    `${rows.length} candidates · sum of individual times ${serialMs}ms · wall time ${fanMs}ms`,
+  );
   bullet(
     fanMs > 0 && serialMs > fanMs
       ? `speedup ${(serialMs / fanMs).toFixed(2)}x at concurrency ${FOREACH_CONCURRENCY}`
@@ -245,7 +303,9 @@ async function main(): Promise<void> {
   bullet(
     'Mastra instance: backgroundTasks { enabled, globalConcurrency 4, perAgentConcurrency 2, backpressure "queue" }',
   );
-  bullet("slow-audit declares background.enabled, and background-agent opts it in. Both layers are required.");
+  bullet(
+    "slow-audit declares background.enabled, and background-agent opts it in. Both layers are required.",
+  );
 
   if (!hasOpenAiKey()) {
     bullet("skipped: needs a model to emit the tool calls.");
@@ -300,7 +360,9 @@ async function main(): Promise<void> {
       ledger.reconcile("background", { usage, latencyMs, outcome: "ok" });
 
       if (timeline.length === 0) {
-        bullet("no background-task chunks were emitted. The tool ran in the foreground; see the note below.");
+        bullet(
+          "no background-task chunks were emitted. The tool ran in the foreground; see the note below.",
+        );
         bullet(
           "most likely cause: the model chose not to call the tool, or the run had no memory scope to write results to.",
         );
@@ -318,12 +380,17 @@ async function main(): Promise<void> {
         costUsd: usdFromUsage(WORKER_MODEL, usage),
         latencyMs,
         outcome: `${timeline.length} lifecycle events`,
-        whyItExisted: "shows work that outlives the turn that started it, with a queue in front of it",
+        whyItExisted:
+          "shows work that outlives the turn that started it, with a queue in front of it",
       });
     } catch (err) {
       const latencyMs = Date.now() - started;
       const aborted = isAbort(err);
-      ledger.reconcile("background", { latencyMs, outcome: aborted ? "aborted" : "failed", note: short(err) });
+      ledger.reconcile("background", {
+        latencyMs,
+        outcome: aborted ? "aborted" : "failed",
+        note: short(err),
+      });
       bullet(`part (c) failed: ${short(err)}`);
       if (aborted && stopReason === "completed") {
         stopReason = "deadline-hit";
@@ -342,8 +409,10 @@ async function main(): Promise<void> {
   // =========================================================================
   section("provider batch APIs");
   json("why there is nothing to run here", {
-    situation: "Mastra's model router exposes generate/stream per request; it has no batch endpoint.",
-    consequence: "a provider batch call (OpenAI Batch API, Anthropic Message Batches) is made outside Mastra.",
+    situation:
+      "Mastra's model router exposes generate/stream per request; it has no batch endpoint.",
+    consequence:
+      "a provider batch call (OpenAI Batch API, Anthropic Message Batches) is made outside Mastra.",
     honestSkip: "this snippet does not pretend to skip a feature it never had a way to reach.",
   });
 
@@ -394,7 +463,10 @@ function collectProbeResults(result: {
   toolResults?: unknown[];
   steps?: Array<{ toolResults?: unknown[] }>;
 }): ProbeRow[] {
-  const chunks: any[] = [...(result.toolResults ?? []), ...(result.steps ?? []).flatMap((s) => s.toolResults ?? [])];
+  const chunks: any[] = [
+    ...(result.toolResults ?? []),
+    ...(result.steps ?? []).flatMap((s) => s.toolResults ?? []),
+  ];
   const seen = new Set<string>();
   const rows: ProbeRow[] = [];
   for (const c of chunks) {
@@ -403,14 +475,21 @@ function collectProbeResults(result: {
     const key = `${r.service}:${r.startedAt}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    rows.push({ service: r.service, startedAt: r.startedAt, finishedAt: r.finishedAt, tookMs: r.tookMs });
+    rows.push({
+      service: r.service,
+      startedAt: r.startedAt,
+      finishedAt: r.finishedAt,
+      tookMs: r.tookMs,
+    });
   }
   return rows.sort((a, b) => a.startedAt - b.startedAt);
 }
 
 /** How many probes were in flight at this one's start. */
 function laneOf(p: ProbeRow, all: ProbeRow[]): string {
-  const concurrent = all.filter((o) => o.startedAt <= p.startedAt && o.finishedAt > p.startedAt).length;
+  const concurrent = all.filter(
+    (o) => o.startedAt <= p.startedAt && o.finishedAt > p.startedAt,
+  ).length;
   return `${concurrent} in flight`;
 }
 

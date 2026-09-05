@@ -55,7 +55,8 @@ const INCIDENT =
   "Intermittent WebSocket disconnects: sessions for user u-9 keep closing with code 1006 " +
   "and reconnects do not restore normal behaviour.";
 
-const FAVORED_HYPOTHESIS = "the proxy's idle timeout closes the connection, so raising the timeout fixes the incident";
+const FAVORED_HYPOTHESIS =
+  "the proxy's idle timeout closes the connection, so raising the timeout fixes the incident";
 
 async function main() {
   const caps = Caps.fromArgv();
@@ -80,7 +81,9 @@ async function main() {
     ["worker", "owns", "one question", "exit condition"],
     WORKERS.map((w) => [w.source, w.file, w.question.slice(0, 46), w.exitCondition.slice(0, 40)]),
   );
-  note("each worker's read tool takes NO arguments: the allow-list is a closure, not a schema field");
+  note(
+    "each worker's read tool takes NO arguments: the allow-list is a closure, not a schema field",
+  );
 
   // -------------------------------------------------------------------------
   // DECOMPOSE / the graph. Parallel edges from START, join on reviewer.
@@ -193,7 +196,10 @@ async function main() {
   table(
     ["cause", "found"],
     [
-      ["proxy idle timeout (60s) vs heartbeat default (90s)", score.foundProxyTimeout ? "yes" : "NO"],
+      [
+        "proxy idle timeout (60s) vs heartbeat default (90s)",
+        score.foundProxyTimeout ? "yes" : "NO",
+      ],
       ["subscriptions not replayed after reconnect", score.foundSubscriptionReplay ? "yes" : "NO"],
     ],
   );
@@ -208,14 +214,18 @@ async function main() {
     await deepAgentVariant(caps, ledger, tracing.callbacks);
   } else {
     section("deep agents variant");
-    console.log("  not run. Add --deep-agents to delegate with createDeepAgent instead of a graph.");
+    console.log(
+      "  not run. Add --deep-agents to delegate with createDeepAgent instead of a graph.",
+    );
   }
 
   if (caps.flags["async-subagents"]) {
     await asyncSubagentVariant(caps, ledger, tracing.callbacks);
   } else {
     section("async subagents variant");
-    console.log("  not run. Add --async-subagents to delegate to the Agent Protocol server from snippet 06.");
+    console.log(
+      "  not run. Add --async-subagents to delegate to the Agent Protocol server from snippet 06.",
+    );
   }
 
   section(`trace (${tracing.destination})`);
@@ -242,7 +252,9 @@ async function deepAgentVariant(caps: Caps, ledger: Ledger, callbacks: unknown[]
   try {
     ({ createDeepAgent } = await import("deepagents"));
   } catch (error) {
-    console.log(`  skipped: deepagents is not importable (${error instanceof Error ? error.message : error})`);
+    console.log(
+      `  skipped: deepagents is not importable (${error instanceof Error ? error.message : error})`,
+    );
     return;
   }
 
@@ -294,7 +306,9 @@ async function deepAgentVariant(caps: Caps, ledger: Ledger, callbacks: unknown[]
     },
     async () => {
       const result = await agent.invoke(
-        { messages: [new HumanMessage(`${INCIDENT}\n\nFavored hypothesis: ${FAVORED_HYPOTHESIS}`)] },
+        {
+          messages: [new HumanMessage(`${INCIDENT}\n\nFavored hypothesis: ${FAVORED_HYPOTHESIS}`)],
+        },
         {
           signal: caps.signal,
           callbacks: callbacks as never,
@@ -356,7 +370,8 @@ async function asyncSubagentVariant(caps: Caps, ledger: Ledger, callbacks: unkno
   const server = await startDevServer();
   if (!server.ok) {
     console.log(`  skipped: ${server.reason}`);
-    if (server.logTail) console.log(`  server log tail: ${server.logTail.split("\n").slice(-3).join(" | ")}`);
+    if (server.logTail)
+      console.log(`  server log tail: ${server.logTail.split("\n").slice(-3).join(" | ")}`);
     return;
   }
 
@@ -438,7 +453,10 @@ async function asyncSubagentVariant(caps: Caps, ledger: Ledger, callbacks: unkno
     kv("cost", usd(run.span.costUsd));
     kv("latency", `${run.span.latencyMs}ms`);
     console.log("");
-    for (const line of wrap(typeof last?.content === "string" ? last.content : JSON.stringify(last?.content), 86)) {
+    for (const line of wrap(
+      typeof last?.content === "string" ? last.content : JSON.stringify(last?.content),
+      86,
+    )) {
       console.log(`  ${line}`);
     }
     note(

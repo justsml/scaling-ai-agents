@@ -8,7 +8,11 @@ import type {
   ToolCallEvidence,
 } from "./types";
 
-export function scoreRun(catalog: EvalCatalog, scenario: Scenario, evidence: InvestigationEvidence): GateResult[] {
+export function scoreRun(
+  catalog: EvalCatalog,
+  scenario: Scenario,
+  evidence: InvestigationEvidence,
+): GateResult[] {
   const expectation = catalog.expected[scenario.id];
   if (!expectation) throw new Error(`No expectation for ${scenario.id}`);
   return [
@@ -29,7 +33,9 @@ export function scoreSchema(catalog: EvalCatalog, evidence: InvestigationEvidenc
   for (const [index, call] of evidence.toolCalls.entries()) {
     const schema = definitions.get(call.tool);
     if (!schema) details.push(`call ${index + 1}: unknown tool ${call.tool}`);
-    else for (const error of validateSchema(call.arguments, schema)) details.push(`call ${index + 1}: ${error}`);
+    else
+      for (const error of validateSchema(call.arguments, schema))
+        details.push(`call ${index + 1}: ${error}`);
   }
   return gate("schema", details);
 }
@@ -59,7 +65,10 @@ export function scoreSafety(evidence: InvestigationEvidence): GateResult {
   return gate("safety", details);
 }
 
-export function scoreFactual(expectation: ScenarioExpectation, evidence: InvestigationEvidence): GateResult {
+export function scoreFactual(
+  expectation: ScenarioExpectation,
+  evidence: InvestigationEvidence,
+): GateResult {
   const actual = new Map((evidence.answer?.claims ?? []).map((claim) => [claim.path, claim]));
   const details: string[] = [];
   let scored = 0;
@@ -77,7 +86,10 @@ export function scoreFactual(expectation: ScenarioExpectation, evidence: Investi
   };
 }
 
-export function scoreEvidence(expectation: ScenarioExpectation, evidence: InvestigationEvidence): GateResult {
+export function scoreEvidence(
+  expectation: ScenarioExpectation,
+  evidence: InvestigationEvidence,
+): GateResult {
   const successful = new Map(
     evidence.toolCalls
       .filter((call) => call.ok && call.disposition === "gateway")
@@ -87,16 +99,22 @@ export function scoreEvidence(expectation: ScenarioExpectation, evidence: Invest
   const details: string[] = [];
   for (const expected of expectation.claims) {
     const claim = actual.get(expected.path);
-    if (!claim || claim.requestIds.length === 0) details.push(`${expected.path}: no supporting request IDs`);
+    if (!claim || claim.requestIds.length === 0)
+      details.push(`${expected.path}: no supporting request IDs`);
     else {
       const cited = claim.requestIds.map((id) => successful.get(id));
       for (const [index, call] of cited.entries())
-        if (!call) details.push(`${expected.path}: unknown or unsuccessful request ID ${claim.requestIds[index]}`);
+        if (!call)
+          details.push(
+            `${expected.path}: unknown or unsuccessful request ID ${claim.requestIds[index]}`,
+          );
       if (cited.every((call) => call !== undefined)) {
         const bodies = cited.map((call) => call.result);
         const requiredValues =
           expected.support?.values ??
-          (expected.operator === "set-equals" && Array.isArray(expected.value) ? expected.value : [expected.value]);
+          (expected.operator === "set-equals" && Array.isArray(expected.value)
+            ? expected.value
+            : [expected.value]);
         for (const value of requiredValues)
           if (!bodies.some((body) => deepContains(body, value)))
             details.push(`${expected.path}: cited results do not support ${stable(value)}`);
@@ -104,12 +122,16 @@ export function scoreEvidence(expectation: ScenarioExpectation, evidence: Invest
     }
   }
   for (const tool of expectation.evidence.requiredTools ?? []) {
-    if (!evidence.toolCalls.some((call) => call.tool === tool && call.ok)) details.push(`missing successful ${tool}`);
+    if (!evidence.toolCalls.some((call) => call.tool === tool && call.ok))
+      details.push(`missing successful ${tool}`);
   }
   return gate("evidence", details);
 }
 
-export function scorePagination(expectation: ScenarioExpectation, evidence: InvestigationEvidence): GateResult {
+export function scorePagination(
+  expectation: ScenarioExpectation,
+  evidence: InvestigationEvidence,
+): GateResult {
   const rules = expectation.evidence;
   const pages = evidence.toolCalls.filter(
     (call) => (call.tool === "pokedex_list" || call.tool === "pokedex_search") && call.ok,
@@ -146,7 +168,10 @@ export function scorePagination(expectation: ScenarioExpectation, evidence: Inve
   return gate("pagination", details);
 }
 
-export function scoreCascade(expectation: ScenarioExpectation, evidence: InvestigationEvidence): GateResult {
+export function scoreCascade(
+  expectation: ScenarioExpectation,
+  evidence: InvestigationEvidence,
+): GateResult {
   const issued = new Set<string>();
   const seen = new Set<string>();
   const details: string[] = [];
@@ -164,14 +189,20 @@ export function scoreCascade(expectation: ScenarioExpectation, evidence: Investi
       .map((ref) => `required ref not successfully followed: ${ref}`),
   );
   const minimumGets = expectation.evidence.minimumGets ?? 0;
-  if ([...seen].length < minimumGets) details.push(`followed ${seen.size}/${minimumGets} required reads`);
+  if ([...seen].length < minimumGets)
+    details.push(`followed ${seen.size}/${minimumGets} required reads`);
   return gate("cascade", details);
 }
 
-export function scoreRetry(expectation: ScenarioExpectation, evidence: InvestigationEvidence): GateResult {
+export function scoreRetry(
+  expectation: ScenarioExpectation,
+  evidence: InvestigationEvidence,
+): GateResult {
   const details: string[] = [];
   for (const required of expectation.evidence.requiredErrors ?? []) {
-    const failureIndex = evidence.toolCalls.findIndex((call) => !call.ok && object(call.error)?.code === required);
+    const failureIndex = evidence.toolCalls.findIndex(
+      (call) => !call.ok && object(call.error)?.code === required,
+    );
     if (failureIndex < 0) {
       details.push(`required error not observed: ${required}`);
       continue;
@@ -182,7 +213,12 @@ export function scoreRetry(expectation: ScenarioExpectation, evidence: Investiga
     if (expectation.evidence.requiresRetry) {
       const later = evidence.toolCalls
         .slice(failureIndex + 1)
-        .find((call) => call.ok && call.tool === failed.tool && stable(call.arguments) === stable(failed.arguments));
+        .find(
+          (call) =>
+            call.ok &&
+            call.tool === failed.tool &&
+            stable(call.arguments) === stable(failed.arguments),
+        );
       if (!later) details.push(`${required}: retryable failure did not recover with the same call`);
       else {
         const failedAt = failed.finishedAtMs ?? failed.endedAt;
@@ -205,7 +241,9 @@ export function scoreBudget(scenario: Scenario, evidence: InvestigationEvidence)
   const attempted = evidence.stopMetadata?.toolCallAttempts ?? evidence.toolCalls.length;
   return gate(
     "budget",
-    attempted <= scenario.maxToolCalls ? [] : [`used ${attempted}/${scenario.maxToolCalls} tool calls`],
+    attempted <= scenario.maxToolCalls
+      ? []
+      : [`used ${attempted}/${scenario.maxToolCalls} tool calls`],
   );
 }
 
@@ -218,12 +256,17 @@ function validateSchema(value: unknown, schema: Record<string, any>, path = "arg
     for (const required of schema.required ?? [])
       if (!(required in record)) errors.push(`${path}.${required} is required`);
     if (schema.additionalProperties === false)
-      for (const key of Object.keys(record)) if (!(key in properties)) errors.push(`${path}.${key} is not allowed`);
+      for (const key of Object.keys(record))
+        if (!(key in properties)) errors.push(`${path}.${key} is not allowed`);
     for (const [key, child] of Object.entries(record))
-      if (properties[key]) errors.push(...validateSchema(child, properties[key]!, `${path}.${key}`));
-  } else if (schema.type === "string" && typeof value !== "string") errors.push(`${path} must be a string`);
-  else if (schema.type === "integer" && !Number.isInteger(value)) errors.push(`${path} must be an integer`);
-  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) errors.push(`${path} is not allowlisted`);
+      if (properties[key])
+        errors.push(...validateSchema(child, properties[key]!, `${path}.${key}`));
+  } else if (schema.type === "string" && typeof value !== "string")
+    errors.push(`${path} must be a string`);
+  else if (schema.type === "integer" && !Number.isInteger(value))
+    errors.push(`${path} must be an integer`);
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value))
+    errors.push(`${path} is not allowlisted`);
   if (typeof value === "string" && schema.minLength && value.length < schema.minLength)
     errors.push(`${path} is too short`);
   if (typeof value === "string" && schema.maxLength && value.length > schema.maxLength)
@@ -242,7 +285,9 @@ function compare(expected: ExpectedClaim, actual: unknown): boolean {
   if (expected.operator === "contains")
     return Array.isArray(actual)
       ? actual.some((item) => stable(item) === stable(expected.value))
-      : typeof actual === "string" && typeof expected.value === "string" && actual.includes(expected.value);
+      : typeof actual === "string" &&
+          typeof expected.value === "string" &&
+          actual.includes(expected.value);
   if (!Array.isArray(actual) || !Array.isArray(expected.value)) return false;
   return stable([...actual].sort(sortStable)) === stable([...expected.value].sort(sortStable));
 }
@@ -286,5 +331,7 @@ function collectRefs(value: unknown, output: Set<string>): void {
 function deepContains(value: unknown, wanted: unknown): boolean {
   if (stable(value) === stable(wanted)) return true;
   if (Array.isArray(value)) return value.some((item) => deepContains(item, wanted));
-  return object(value) ? Object.values(value as object).some((child) => deepContains(child, wanted)) : false;
+  return object(value)
+    ? Object.values(value as object).some((child) => deepContains(child, wanted))
+    : false;
 }

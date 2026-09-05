@@ -1,6 +1,11 @@
 export interface GatewayControl {
   health(signal?: AbortSignal): Promise<boolean>;
-  configureRun(runId: string, scenarioId: string, faults: unknown[], signal?: AbortSignal): Promise<void>;
+  configureRun(
+    runId: string,
+    scenarioId: string,
+    faults: unknown[],
+    signal?: AbortSignal,
+  ): Promise<void>;
   readEvents(runId: string, signal?: AbortSignal): Promise<unknown[]>;
   deleteRun(runId: string, signal?: AbortSignal): Promise<void>;
 }
@@ -34,24 +39,35 @@ export class HttpGatewayControl implements GatewayControl {
     }
   }
 
-  async configureRun(runId: string, scenarioId: string, faults: unknown[], signal?: AbortSignal): Promise<void> {
-    const response = await this.fetcher(`${this.#baseUrl}/control/runs/${encodeURIComponent(runId)}`, {
-      method: "PUT",
-      headers: {
-        "content-type": "application/json",
-        "x-pokedex-control-secret": this.controlSecret,
+  async configureRun(
+    runId: string,
+    scenarioId: string,
+    faults: unknown[],
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const response = await this.fetcher(
+      `${this.#baseUrl}/control/runs/${encodeURIComponent(runId)}`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          "x-pokedex-control-secret": this.controlSecret,
+        },
+        body: JSON.stringify({ scenarioId, faults }),
+        signal,
       },
-      body: JSON.stringify({ scenarioId, faults }),
-      signal,
-    });
+    );
     if (!response.ok) throw new Error(`Gateway rejected run configuration (${response.status})`);
   }
 
   async readEvents(runId: string, signal?: AbortSignal): Promise<unknown[]> {
-    const response = await this.fetcher(`${this.#baseUrl}/control/runs/${encodeURIComponent(runId)}/events`, {
-      headers: { "x-pokedex-control-secret": this.controlSecret },
-      signal,
-    });
+    const response = await this.fetcher(
+      `${this.#baseUrl}/control/runs/${encodeURIComponent(runId)}/events`,
+      {
+        headers: { "x-pokedex-control-secret": this.controlSecret },
+        signal,
+      },
+    );
     if (!response.ok) throw new Error(`Gateway event read failed (${response.status})`);
     const body = (await response.json()) as { events?: unknown };
     if (!Array.isArray(body.events)) throw new Error("Gateway returned malformed events");
@@ -59,11 +75,14 @@ export class HttpGatewayControl implements GatewayControl {
   }
 
   async deleteRun(runId: string, signal?: AbortSignal): Promise<void> {
-    const response = await this.fetcher(`${this.#baseUrl}/control/runs/${encodeURIComponent(runId)}`, {
-      method: "DELETE",
-      headers: { "x-pokedex-control-secret": this.controlSecret },
-      signal,
-    });
+    const response = await this.fetcher(
+      `${this.#baseUrl}/control/runs/${encodeURIComponent(runId)}`,
+      {
+        method: "DELETE",
+        headers: { "x-pokedex-control-secret": this.controlSecret },
+        signal,
+      },
+    );
     if (!response.ok) throw new Error(`Gateway run deletion failed (${response.status})`);
   }
 }

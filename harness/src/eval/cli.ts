@@ -5,7 +5,8 @@ const args = process.argv.slice(2).filter((argument) => argument !== "--");
 const model = option("--model") ?? LIVE_MODEL;
 const reasoningEffort = option("--reasoning-effort") ?? LIVE_REASONING_EFFORT;
 if (model !== LIVE_MODEL) fail(`Only --model ${LIVE_MODEL} is supported`);
-if (reasoningEffort !== LIVE_REASONING_EFFORT) fail(`Only --reasoning-effort ${LIVE_REASONING_EFFORT} is supported`);
+if (reasoningEffort !== LIVE_REASONING_EFFORT)
+  fail(`Only --reasoning-effort ${LIVE_REASONING_EFFORT} is supported`);
 const repetitions = positiveInteger(option("--repetitions") ?? "1", "--repetitions");
 
 try {
@@ -17,7 +18,9 @@ try {
     ...(option("--artifacts") ? { artifactsDirectory: resolve(option("--artifacts")!) } : {}),
     ...(option("--gateway") ? { gatewayBaseUrl: option("--gateway")! } : {}),
     ...(option("--run-id") ? { runId: option("--run-id")! } : {}),
-    ...(process.env.POKEDEX_CONTROL_SECRET ? { controlSecret: process.env.POKEDEX_CONTROL_SECRET } : {}),
+    ...(process.env.POKEDEX_CONTROL_SECRET
+      ? { controlSecret: process.env.POKEDEX_CONTROL_SECRET }
+      : {}),
   });
   console.log(
     JSON.stringify({

@@ -64,7 +64,10 @@ async function runParallelToolCalls(deadlineMs: number) {
   });
 
   return withWorkerSpan(
-    { profile: "parallel-tool-calls", whyItExisted: "one agent step emits N tool calls, capped at concurrency 3" },
+    {
+      profile: "parallel-tool-calls",
+      whyItExisted: "one agent step emits N tool calls, capped at concurrency 3",
+    },
     async () => {
       const genStart = Date.now();
       const result = await agent.generate({
@@ -103,14 +106,19 @@ async function runBoundedFanOut() {
     ),
   );
 
-  return { processed: results.length, maxConcurrentSeen: maxConcurrentSeen.value, requestedConcurrency: 2 };
+  return {
+    processed: results.length,
+    maxConcurrentSeen: maxConcurrentSeen.value,
+    requestedConcurrency: 2,
+  };
 }
 
 // ---- (c) provider batch API, gateway-only -------------------------------
 async function runProviderBatch() {
   if (!process.env.AI_GATEWAY_API_KEY) {
     printKV("(c) provider batch API", {
-      status: "skipped: AI_GATEWAY_API_KEY not set (experimental_startTextBatch is a Gateway-only feature)",
+      status:
+        "skipped: AI_GATEWAY_API_KEY not set (experimental_startTextBatch is a Gateway-only feature)",
       shape:
         "startTextBatch({model, requests: [{prompt|messages, ...}], webhookUrl?}) -> {batch, status}; " +
         "getBatchStatus({model, batch}) -> {status: 'validating'|'in_progress'|'completed'|'failed'|...}; " +
@@ -126,7 +134,9 @@ async function runProviderBatch() {
   } = await import("ai");
   let gatewayModel: (id: string) => Parameters<typeof startTextBatch>[0]["model"];
   try {
-    const gatewayModule = (await import(/* @vite-ignore */ "@ai-sdk/gateway")) as { gateway: typeof gatewayModel };
+    const gatewayModule = (await import(/* @vite-ignore */ "@ai-sdk/gateway")) as {
+      gateway: typeof gatewayModel;
+    };
     gatewayModel = gatewayModule.gateway;
   } catch {
     printKV("(c) provider batch API", { status: "skipped: @ai-sdk/gateway not installed" });
@@ -156,7 +166,10 @@ async function runProviderBatch() {
 }
 
 async function main() {
-  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), { budgetUsd: 0.05, deadlineMs: 30_000 });
+  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), {
+    budgetUsd: 0.05,
+    deadlineMs: 30_000,
+  });
   initTelemetry();
   heading("07 Batching — parallel tool calls, bounded pool fan-out, provider batch API");
   printKV("caps", { budgetUsd, deadlineMs });

@@ -17,7 +17,9 @@ const SHARED = resolve(PKG_ROOT, "..", "shared", "fixtures");
 
 export async function copyFixtures(): Promise<string[]> {
   if (!existsSync(SHARED)) {
-    throw new Error(`shared fixtures not found at ${SHARED}. Run from inside the monorepo checkout.`);
+    throw new Error(
+      `shared fixtures not found at ${SHARED}. Run from inside the monorepo checkout.`,
+    );
   }
   await mkdir(FIXTURES_DIR, { recursive: true });
   await cp(SHARED, FIXTURES_DIR, { recursive: true });

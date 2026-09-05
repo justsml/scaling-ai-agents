@@ -10,7 +10,14 @@ import {
   type StackName,
 } from "../src/eval/types";
 
-const scenario = { id: "case", group: "ordinary", prompt: "find it", deadlineMs: 1000, maxToolCalls: 3, faults: [] };
+const scenario = {
+  id: "case",
+  group: "ordinary",
+  prompt: "find it",
+  deadlineMs: 1000,
+  maxToolCalls: 3,
+  faults: [],
+};
 const catalog: EvalCatalog = {
   contractVersion: "1.0.0",
   scenarios: [scenario],
@@ -19,7 +26,10 @@ const catalog: EvalCatalog = {
       name: "pokedex_search",
       inputSchema: {
         type: "object",
-        properties: { resource: { type: "string", enum: ["pokemon"] }, query: { type: "string", minLength: 1 } },
+        properties: {
+          resource: { type: "string", enum: ["pokemon"] },
+          query: { type: "string", minLength: 1 },
+        },
         required: ["resource", "query"],
         additionalProperties: false,
       },
@@ -40,7 +50,11 @@ const catalog: EvalCatalog = {
         { path: "name", operator: "equals", value: "pikachu" },
         { path: "types", operator: "contains", value: "electric" },
       ],
-      evidence: { requiredTools: ["pokedex_search", "pokedex_get"], requiredRefs: ["pokemon/25"], minimumGets: 1 },
+      evidence: {
+        requiredTools: ["pokedex_search", "pokedex_get"],
+        requiredRefs: ["pokemon/25"],
+        minimumGets: 1,
+      },
     },
   },
 };
@@ -102,7 +116,9 @@ describe("eval scorers", () => {
   test("rejects a valid request ID whose result does not support the cited claim", () => {
     const wrongSource = evidence("ai-sdk");
     wrongSource.answer!.claims.find((claim) => claim.path === "types")!.requestIds = ["search-1"];
-    const support = scoreRun(catalog, scenario, wrongSource).find((gate) => gate.gate === "evidence")!;
+    const support = scoreRun(catalog, scenario, wrongSource).find(
+      (gate) => gate.gate === "evidence",
+    )!;
     expect(support.passed).toBe(false);
     expect(support.details).toContain('types: cited results do not support "electric"');
   });
@@ -169,7 +185,10 @@ describe("eval scorers", () => {
 
   test("rejects retries that ignore retry advice", () => {
     const retryCatalog = structuredClone(catalog);
-    retryCatalog.expected.case!.evidence = { requiredErrors: ["RATE_LIMITED"], requiresRetry: true };
+    retryCatalog.expected.case!.evidence = {
+      requiredErrors: ["RATE_LIMITED"],
+      requiresRetry: true,
+    };
     const run = evidence("ai-sdk");
     run.toolCalls = [
       {

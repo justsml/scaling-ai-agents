@@ -120,7 +120,10 @@ async function runViaRegistryModel(
     },
     async () => {
       const start = Date.now();
-      const model = wrapLanguageModel({ model: registry.languageModel(slot.registryId), middleware: [] });
+      const model = wrapLanguageModel({
+        model: registry.languageModel(slot.registryId),
+        middleware: [],
+      });
       const result = await generateText({
         model,
         output: Output.object({ schema: patchSchema }),
@@ -178,7 +181,10 @@ async function runViaRemoteA2A(baseUrl: string, requestId: string, signal: Abort
 }
 
 async function main() {
-  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), { budgetUsd: 0.1, deadlineMs: 60_000 });
+  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), {
+    budgetUsd: 0.1,
+    deadlineMs: 60_000,
+  });
   initTelemetry();
   heading("04 Distribute — provider pool filtered by region/dataClass, one remote A2A competitor");
   printKV("caps", { budgetUsd, deadlineMs });
@@ -217,7 +223,13 @@ async function main() {
 
   const signal = deadlineSignal(deadlineMs);
   const requests = (
-    requestsFixture as Array<{ id: string; class: string; text: string; region: string; dataClass: string }>
+    requestsFixture as Array<{
+      id: string;
+      class: string;
+      text: string;
+      region: string;
+      dataClass: string;
+    }>
   ).filter((r) => r.class === "novel");
 
   const results: DistributedResult[] = [];

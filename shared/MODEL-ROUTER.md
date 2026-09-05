@@ -73,6 +73,8 @@ Print a policy table like the security article's: route, primary model, use for,
 
 Fallback: follow `policy.routerFallbacks` only for timeout, rate-limit, or server errors. Prefer a different provider slot. Invalid structured output is a contract failure, not automatically a provider outage. Model fallback retries the same specialist contract; route fallback changes semantics and must be recorded separately.
 
+Every stack now has a native model-fallback mechanism, and every one of them is configuration executed by the harness, never a supervisor or subagent deciding to retry: Mastra `model: ModelWithRetries[]` on the Agent, LangChain `modelFallbackMiddleware` on `createAgent`, AI SDK via AI Gateway `providerOptions.gateway.models`. Use the native one for model fallback and record the attempt trail on the span yourself where the stack does not (only AI Gateway returns `modelAttempts`). Keep a run-level cap over the whole chain: per-entry `maxRetries` bounds one model, not the chain. Escalation on a contract failure (mini fails structured output twice, hand to frontier) is a route change and may involve the decision agent; a 503 never should.
+
 ## Output
 
 One screen: tier hit counts, per-route accuracy table for runs A and B, the threshold verdicts, the policy table, the failure-policy label counts, total cost.

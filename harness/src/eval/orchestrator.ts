@@ -13,7 +13,11 @@ import {
 
 export interface EvalDependencies {
   configureRun(input: { runId: string; scenario: Scenario; stack: StackName }): Promise<void>;
-  runStack(input: { runId: string; scenario: Scenario; stack: StackName }): Promise<InvestigationEvidence>;
+  runStack(input: {
+    runId: string;
+    scenario: Scenario;
+    stack: StackName;
+  }): Promise<InvestigationEvidence>;
   resetRun?(runId: string): Promise<void>;
   createRunId?(input: { scenario: Scenario; stack: StackName; repetition: number }): string;
   now?: () => Date;
@@ -31,21 +35,31 @@ export async function runEvaluation(
   options: EvalOptions = {},
 ): Promise<EvalReport> {
   const repetitions = options.repetitions ?? 1;
-  if (!Number.isSafeInteger(repetitions) || repetitions < 1) throw new Error("repetitions must be a positive integer");
+  if (!Number.isSafeInteger(repetitions) || repetitions < 1)
+    throw new Error("repetitions must be a positive integer");
   const stacks = options.stacks ?? [...STACKS];
   const scored: ScoredRun[] = [];
   for (let repetition = 1; repetition <= repetitions; repetition++) {
     for (const scenario of catalog.scenarios) {
       for (const stack of stacks) {
         const runId =
-          dependencies.createRunId?.({ scenario, stack, repetition }) ?? `${scenario.id}:${stack}:${repetition}`;
+          dependencies.createRunId?.({ scenario, stack, repetition }) ??
+          `${scenario.id}:${stack}:${repetition}`;
         await dependencies.configureRun({ runId, scenario, stack });
         try {
           const evidence = await dependencies.runStack({ runId, scenario, stack });
           if (evidence.stack !== stack)
-            throw new Error(`Run ${runId} returned evidence for ${evidence.stack}, expected ${stack}`);
+            throw new Error(
+              `Run ${runId} returned evidence for ${evidence.stack}, expected ${stack}`,
+            );
           const gates = scoreRun(catalog, scenario, evidence);
-          scored.push({ runId, scenario, evidence, gates, passed: gates.every((gate) => gate.passed) });
+          scored.push({
+            runId,
+            scenario,
+            evidence,
+            gates,
+            passed: gates.every((gate) => gate.passed),
+          });
         } finally {
           await dependencies.resetRun?.(runId);
         }

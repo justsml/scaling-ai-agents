@@ -27,7 +27,9 @@ export function createPokedexTools(
   );
 }
 
-export async function investigatePokedex(input: InvestigationRequest): Promise<InvestigationEvidence> {
+export async function investigatePokedex(
+  input: InvestigationRequest,
+): Promise<InvestigationEvidence> {
   const request = investigationRequestSchema.parse(input);
   const session = new PokedexGatewaySession(request);
   const started = Date.now();
@@ -95,7 +97,11 @@ export async function investigatePokedex(input: InvestigationRequest): Promise<I
       toolCalls: session.evidence,
       usage: collectUsage(messages as Parameters<typeof collectUsage>[0]),
       latencyMs: Date.now() - started,
-      stopReason: session.signal.aborted ? "deadline" : session.limitExceeded ? "max-tool-calls" : `error:${message}`,
+      stopReason: session.signal.aborted
+        ? "deadline"
+        : session.limitExceeded
+          ? "max-tool-calls"
+          : `error:${message}`,
       stopMetadata: {
         error: message,
         toolCallAttempts: session.evidence.length,
@@ -111,7 +117,11 @@ function collectUsage(
   messages: Array<{
     usage_metadata?: { input_tokens?: number; output_tokens?: number };
     response_metadata?: {
-      usage?: { input_tokens?: number; output_tokens?: number; output_tokens_details?: { reasoning_tokens?: number } };
+      usage?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        output_tokens_details?: { reasoning_tokens?: number };
+      };
     };
   }>,
 ) {

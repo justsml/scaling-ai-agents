@@ -48,7 +48,11 @@ describe("Ledger", () => {
   test("reconcile replaces the reservation with actuals", () => {
     const l = new Ledger({ budgetUsd: 1, label: "test" });
     l.reserve("w", "openai/gpt-5.6-luna", 0.5);
-    l.reconcile("w", { usage: { inputTokens: 1000, outputTokens: 500 }, latencyMs: 1234, outcome: "ok" });
+    l.reconcile("w", {
+      usage: { inputTokens: 1000, outputTokens: 500 },
+      latencyMs: 1234,
+      outcome: "ok",
+    });
     const e = l.get("w")!;
     expect(e.actualUsd).toBeCloseTo(0.0012, 10);
     expect(e.latencyMs).toBe(1234);

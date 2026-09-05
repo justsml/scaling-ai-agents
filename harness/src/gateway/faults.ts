@@ -25,8 +25,14 @@ export function validateFaults(value: unknown): FaultRule[] {
     }
     const rule = entry as Partial<FaultRule>;
     const types: FaultType[] = ["delay", "429", "500", "empty-page", "stale-relationship"];
-    const tools: ToolName[] = ["pokedex_list_resources", "pokedex_list", "pokedex_search", "pokedex_get"];
-    if (!types.includes(rule.type as FaultType)) throw new Error(`faults[${index}].type is invalid`);
+    const tools: ToolName[] = [
+      "pokedex_list_resources",
+      "pokedex_list",
+      "pokedex_search",
+      "pokedex_get",
+    ];
+    if (!types.includes(rule.type as FaultType))
+      throw new Error(`faults[${index}].type is invalid`);
     if (!tools.includes(rule.tool as ToolName)) throw new Error(`faults[${index}].tool is invalid`);
     if (!Number.isSafeInteger(rule.occurrence) || (rule.occurrence ?? 0) < 1) {
       throw new Error(`faults[${index}].occurrence must be a positive integer`);
@@ -39,7 +45,9 @@ export function validateFaults(value: unknown): FaultRule[] {
     }
     if (
       rule.retryAfterMs !== undefined &&
-      (!Number.isSafeInteger(rule.retryAfterMs) || rule.retryAfterMs < 0 || rule.retryAfterMs > 60_000)
+      (!Number.isSafeInteger(rule.retryAfterMs) ||
+        rule.retryAfterMs < 0 ||
+        rule.retryAfterMs > 60_000)
     ) {
       throw new Error(`faults[${index}].retryAfterMs is invalid`);
     }
@@ -47,7 +55,11 @@ export function validateFaults(value: unknown): FaultRule[] {
   });
 }
 
-export function ruleMatches(rule: FaultRule, tool: ToolName, args: Record<string, unknown>): boolean {
+export function ruleMatches(
+  rule: FaultRule,
+  tool: ToolName,
+  args: Record<string, unknown>,
+): boolean {
   return (
     rule.tool === tool &&
     (rule.resource === undefined || rule.resource === args.resource) &&

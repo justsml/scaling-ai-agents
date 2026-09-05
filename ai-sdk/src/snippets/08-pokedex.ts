@@ -29,7 +29,9 @@ export function createPokedexTools(
   );
 }
 
-export async function investigatePokedex(input: InvestigationRequest): Promise<InvestigationEvidence> {
+export async function investigatePokedex(
+  input: InvestigationRequest,
+): Promise<InvestigationEvidence> {
   const request = investigationRequestSchema.parse(input);
   const session = new PokedexGatewaySession(request, "ai-sdk");
   const started = Date.now();
@@ -47,7 +49,11 @@ export async function investigatePokedex(input: InvestigationRequest): Promise<I
         "Investigate only with the supplied Pokédex tools. Follow normalized refs; never construct URLs. Call pokedex_list_resources only when the request explicitly asks for resource discovery. For a named entity, search once and then get the exact returned ref; do not fall back to listing. Omit cursor entirely on the first pokedex_list or pokedex_search call—there is no starting cursor. For later pages, copy the exact nextCursor byte-for-byte; never invent, decode, edit, or shorten a cursor. Retry only errors marked retryable. Every factual claim must cite requestIds from successful tool results. Preserve exact raw API names, casing, numbers, and PokéAPI units; never capitalize names or convert units. Use only the requested canonical lowerCamelCase claim paths without namespace prefixes: searchable, listOnly, name, height, weight, types, abilities, hiddenAbility, heavier, difference, names, laterSpecies, region, pokedexes, baseExperience, or color. Use searchable/listOnly for resource discovery and laterSpecies for evolution descendants.",
       prompt: request.prompt,
     });
-    const answer = normalizeInvestigationAnswer(result.output ?? null, request.prompt, session.evidence);
+    const answer = normalizeInvestigationAnswer(
+      result.output ?? null,
+      request.prompt,
+      session.evidence,
+    );
     const usage = result.totalUsage as unknown as {
       inputTokens?: number;
       outputTokens?: number;
@@ -82,7 +88,11 @@ export async function investigatePokedex(input: InvestigationRequest): Promise<I
       toolCalls: session.evidence,
       usage: usageFromError(error),
       latencyMs: Date.now() - started,
-      stopReason: session.signal.aborted ? "deadline" : session.limitExceeded ? "max-tool-calls" : `error:${message}`,
+      stopReason: session.signal.aborted
+        ? "deadline"
+        : session.limitExceeded
+          ? "max-tool-calls"
+          : `error:${message}`,
       stopMetadata: {
         error: message,
         toolCallAttempts: session.evidence.length,
@@ -94,7 +104,11 @@ export async function investigatePokedex(input: InvestigationRequest): Promise<I
     session.close();
   }
 }
-function normalizeUsage(usage: { inputTokens?: number; outputTokens?: number; reasoningTokens?: number }) {
+function normalizeUsage(usage: {
+  inputTokens?: number;
+  outputTokens?: number;
+  reasoningTokens?: number;
+}) {
   return {
     inputTokens: usage.inputTokens ?? 0,
     outputTokens: usage.outputTokens ?? 0,

@@ -33,7 +33,11 @@ export type RubricScore = z.infer<typeof RubricScoreSchema>;
 export function rubricTotal(score: RubricScore): number {
   if (score.disqualified) return 0;
   return (
-    score.correctnessBeyondTests + score.minimalSurface + score.honestStop + score.backoffQuality + score.readability
+    score.correctnessBeyondTests +
+    score.minimalSurface +
+    score.honestStop +
+    score.backoffQuality +
+    score.readability
   );
 }
 
@@ -136,7 +140,8 @@ export function pickWinner(candidates: Candidate[]): Candidate | null {
   const ranked = [...eligible].sort((a, b) => {
     const passes = (b.sandbox!.passed ?? 0) - (a.sandbox!.passed ?? 0);
     if (passes !== 0) return passes;
-    const rubric = (b.rubric ? rubricTotal(b.rubric) : -1) - (a.rubric ? rubricTotal(a.rubric) : -1);
+    const rubric =
+      (b.rubric ? rubricTotal(b.rubric) : -1) - (a.rubric ? rubricTotal(a.rubric) : -1);
     if (rubric !== 0) return rubric;
     const cost = a.costUsd - b.costUsd;
     if (Math.abs(cost) > 1e-9) return cost;
@@ -146,7 +151,10 @@ export function pickWinner(candidates: Candidate[]): Candidate | null {
 }
 
 /** The rows of the tournament table, in the order a speaker reads them. */
-export function candidateRows(candidates: Candidate[], winner: Candidate | null): (string | number)[][] {
+export function candidateRows(
+  candidates: Candidate[],
+  winner: Candidate | null,
+): (string | number)[][] {
   return candidates.map((c) => [
     c.profile === winner?.profile ? `* ${c.profile}` : `  ${c.profile}`,
     c.sandbox ? `${c.sandbox.passed}/${c.sandbox.total}` : "-",

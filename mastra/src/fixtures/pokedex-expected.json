@@ -6,7 +6,16 @@
         {
           "path": "searchable",
           "operator": "set-equals",
-          "value": ["ability", "generation", "move", "pokedex", "pokemon", "pokemon-species", "region", "type"]
+          "value": [
+            "ability",
+            "generation",
+            "move",
+            "pokedex",
+            "pokemon",
+            "pokemon-species",
+            "region",
+            "type"
+          ]
         },
         { "path": "listOnly", "operator": "contains", "value": "evolution-chain" }
       ],
@@ -51,7 +60,13 @@
       "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"], "minimumGets": 2 }
     },
     "pagination-resume": {
-      "claims": [{ "path": "names", "operator": "set-equals", "value": ["charmander", "charmeleon", "charizard"] }],
+      "claims": [
+        {
+          "path": "names",
+          "operator": "set-equals",
+          "value": ["charmander", "charmeleon", "charizard"]
+        }
+      ],
       "evidence": { "requiredTools": ["pokedex_list"], "minimumPages": 2, "requiresCursor": true }
     },
     "pagination-empty-page": {
@@ -62,10 +77,16 @@
           "value": ["bulbasaur", "ivysaur", "venusaur", "squirtle", "wartortle", "blastoise"]
         }
       ],
-      "evidence": { "requiredTools": ["pokedex_list"], "minimumPages": 3, "requiresEmptyPageContinuation": true }
+      "evidence": {
+        "requiredTools": ["pokedex_list"],
+        "minimumPages": 3,
+        "requiresEmptyPageContinuation": true
+      }
     },
     "cascade-evolution": {
-      "claims": [{ "path": "laterSpecies", "operator": "set-equals", "value": ["ivysaur", "venusaur"] }],
+      "claims": [
+        { "path": "laterSpecies", "operator": "set-equals", "value": ["ivysaur", "venusaur"] }
+      ],
       "evidence": {
         "requiredTools": ["pokedex_search", "pokedex_get"],
         "requiredRefs": ["pokemon-species/1", "evolution-chain/1"]
@@ -76,7 +97,10 @@
         { "path": "region", "operator": "equals", "value": "kanto" },
         { "path": "pokedexes", "operator": "contains", "value": "kanto" }
       ],
-      "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"], "requiredRefs": ["region/1"] }
+      "evidence": {
+        "requiredTools": ["pokedex_search", "pokedex_get"],
+        "requiredRefs": ["region/1"]
+      }
     },
     "failure-rate-limit": {
       "claims": [{ "path": "baseExperience", "operator": "equals", "value": 112 }],

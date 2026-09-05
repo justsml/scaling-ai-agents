@@ -74,7 +74,10 @@ export const competitorRemote = new StateGraph(CompetitorState)
     const ask = lastHumanText(state.messages as never) || "Fix runWhenReady.";
     const llm = await initChatModel(process.env.REMOTE_WORKER_MODEL ?? "openai:gpt-5.6-luna");
     const response = await llm.invoke(
-      [new SystemMessage(REMOTE_SYSTEM_PROMPT), new HumanMessage(`${ask}\n\n=== CURRENT readiness.ts ===\n${buggy}`)],
+      [
+        new SystemMessage(REMOTE_SYSTEM_PROMPT),
+        new HumanMessage(`${ask}\n\n=== CURRENT readiness.ts ===\n${buggy}`),
+      ],
       {
         metadata: {
           profile: "remote-worker",
@@ -124,7 +127,8 @@ export const researcher = new StateGraph(ResearcherState)
     // One worker, one file. The allow-list is the exit condition: a worker that is asked
     // for evidence it does not own says so rather than reaching for another file.
     const ask = lastHumanText(state.messages as never);
-    const source = Object.keys(ALLOWED_SOURCES).find((k) => ask.toLowerCase().includes(k)) ?? state.source;
+    const source =
+      Object.keys(ALLOWED_SOURCES).find((k) => ask.toLowerCase().includes(k)) ?? state.source;
     const rel = ALLOWED_SOURCES[source];
     if (!rel) {
       return {
@@ -143,7 +147,9 @@ export const researcher = new StateGraph(ResearcherState)
             "Answer in at most four sentences and quote the exact lines you relied on.",
           ].join("\n"),
         ),
-        new HumanMessage(`${ask || "What does your evidence show?"}\n\n=== ${rel} ===\n${evidence}`),
+        new HumanMessage(
+          `${ask || "What does your evidence show?"}\n\n=== ${rel} ===\n${evidence}`,
+        ),
       ],
       {
         metadata: {
@@ -156,7 +162,8 @@ export const researcher = new StateGraph(ResearcherState)
         tags: ["decompose", "remote"],
       },
     );
-    const finding = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+    const finding =
+      typeof response.content === "string" ? response.content : JSON.stringify(response.content);
     return { source, finding, messages: [new AIMessage(finding)] };
   })
   .addEdge(START, "read")

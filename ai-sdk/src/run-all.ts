@@ -31,7 +31,12 @@ async function runOne(file: string, args: string[]): Promise<RunResult> {
     env: { ...process.env },
   });
   const exitCode = await proc.exited;
-  return { snippet: file, status: exitCode === 0 ? "ran" : "failed", exitCode, durationMs: Date.now() - start };
+  return {
+    snippet: file,
+    status: exitCode === 0 ? "ran" : "failed",
+    exitCode,
+    durationMs: Date.now() - start,
+  };
 }
 
 async function main() {
@@ -46,7 +51,9 @@ async function main() {
 
   console.log("\n\n========== run-all summary ==========");
   for (const r of results) {
-    console.log(`${r.snippet.padEnd(20)} ${r.status.padEnd(8)} exit=${r.exitCode}  ${r.durationMs}ms`);
+    console.log(
+      `${r.snippet.padEnd(20)} ${r.status.padEnd(8)} exit=${r.exitCode}  ${r.durationMs}ms`,
+    );
   }
   const failed = results.filter((r) => r.status === "failed");
   if (failed.length > 0) {

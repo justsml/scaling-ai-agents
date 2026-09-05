@@ -47,7 +47,9 @@
       "prompt": "Starting at the beginning with page size 3, continue until you have observed six Pokémon names. An empty page may still have a continuation cursor.",
       "deadlineMs": 30000,
       "maxToolCalls": 5,
-      "faults": [{ "type": "empty-page", "tool": "pokedex_list", "occurrence": 2, "resource": "pokemon" }]
+      "faults": [
+        { "type": "empty-page", "tool": "pokedex_list", "occurrence": 2, "resource": "pokemon" }
+      ]
     },
     {
       "id": "cascade-evolution",
@@ -71,7 +73,15 @@
       "prompt": "Find Pikachu and report its base experience. Recover from retryable tool errors using their retry advice.",
       "deadlineMs": 30000,
       "maxToolCalls": 6,
-      "faults": [{ "type": "429", "tool": "pokedex_search", "occurrence": 1, "resource": "pokemon", "retryAfterMs": 5 }]
+      "faults": [
+        {
+          "type": "429",
+          "tool": "pokedex_search",
+          "occurrence": 1,
+          "resource": "pokemon",
+          "retryAfterMs": 5
+        }
+      ]
     },
     {
       "id": "failure-cascade-500",

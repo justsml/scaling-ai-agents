@@ -34,16 +34,28 @@ export function startSnippetSpan(name: string, input?: unknown): AnySpan | undef
 }
 
 /** Child span for one worker. Call `endWorkerSpan` with the five keys. */
-export function startWorkerSpan(parent: AnySpan | undefined, name: string, input?: unknown): AnySpan | undefined {
+export function startWorkerSpan(
+  parent: AnySpan | undefined,
+  name: string,
+  input?: unknown,
+): AnySpan | undefined {
   if (!parent) return undefined;
   return parent.createChildSpan({ type: SpanType.GENERIC, name, input }) as AnySpan;
 }
 
-export function endWorkerSpan(span: AnySpan | undefined, metadata: WorkerSpanMetadata, output?: unknown): void {
+export function endWorkerSpan(
+  span: AnySpan | undefined,
+  metadata: WorkerSpanMetadata,
+  output?: unknown,
+): void {
   span?.end({ output, metadata });
 }
 
-export function failWorkerSpan(span: AnySpan | undefined, error: unknown, metadata: WorkerSpanMetadata): void {
+export function failWorkerSpan(
+  span: AnySpan | undefined,
+  error: unknown,
+  metadata: WorkerSpanMetadata,
+): void {
   span?.error({
     error: error instanceof Error ? error : new Error(String(error)),
     endSpan: true,

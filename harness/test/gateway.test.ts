@@ -20,11 +20,17 @@ function upstream(input: string | URL | Request): Promise<Response> {
     const limit = Number(url.searchParams.get("limit") ?? 20);
     const results = pokemon.slice(offset, offset + limit);
     return Promise.resolve(
-      Response.json({ count: pokemon.length, next: offset + limit < pokemon.length ? "next" : null, results }),
+      Response.json({
+        count: pokemon.length,
+        next: offset + limit < pokemon.length ? "next" : null,
+        results,
+      }),
     );
   }
   if (url.pathname === "/api/v2/generation/") {
-    return Promise.resolve(Response.json({ count: generations.length, next: null, results: generations }));
+    return Promise.resolve(
+      Response.json({ count: generations.length, next: null, results: generations }),
+    );
   }
   if (url.pathname === "/api/v2/pokemon/1/") {
     return Promise.resolve(
@@ -43,11 +49,14 @@ function upstream(input: string | URL | Request): Promise<Response> {
       Response.json({
         id: 4,
         name: "charmander",
-        payload: Object.fromEntries(Array.from({ length: 60 }, (_, index) => [`field-${index}`, "x".repeat(2_000)])),
+        payload: Object.fromEntries(
+          Array.from({ length: 60 }, (_, index) => [`field-${index}`, "x".repeat(2_000)]),
+        ),
       }),
     );
   }
-  if (url.pathname === "/api/v2/pokemon/999999/") return Promise.resolve(new Response("missing", { status: 404 }));
+  if (url.pathname === "/api/v2/pokemon/999999/")
+    return Promise.resolve(new Response("missing", { status: 404 }));
   return Promise.resolve(new Response("missing", { status: 404 }));
 }
 
@@ -86,7 +95,10 @@ describe("Pokédex gateway", () => {
     const response = await gateway.fetch(
       new Request(`http://gateway/control/runs/${runId}`, {
         method: "PUT",
-        headers: { "content-type": "application/json", "x-pokedex-control-secret": "control-secret" },
+        headers: {
+          "content-type": "application/json",
+          "x-pokedex-control-secret": "control-secret",
+        },
         body: JSON.stringify({ scenarioId: "scenario-1", faults }),
       }),
     );
@@ -98,7 +110,12 @@ describe("Pokédex gateway", () => {
     const response = await gateway.fetch(request("/tools/pokedex_list_resources", {}));
     const body = await response.json();
     expect(response.status).toBe(200);
-    expect(body.resources).toContainEqual({ resource: "evolution-chain", list: true, search: false, get: true });
+    expect(body.resources).toContainEqual({
+      resource: "evolution-chain",
+      list: true,
+      search: false,
+      get: true,
+    });
     expect(body.requestId).toBeString();
 
     const events = await gateway.fetch(
@@ -117,18 +134,32 @@ describe("Pokédex gateway", () => {
 
   test("lists with signed opaque cursors and rejects offsets or tampering", async () => {
     await configure();
-    const first = await gateway.fetch(request("/tools/pokedex_list", { resource: "pokemon", pageSize: 2 }));
+    const first = await gateway.fetch(
+      request("/tools/pokedex_list", { resource: "pokemon", pageSize: 2 }),
+    );
     const firstBody = await first.json();
-    expect(firstBody.items.map((item: { name: string }) => item.name)).toEqual(["bulbasaur", "ivysaur"]);
+    expect(firstBody.items.map((item: { name: string }) => item.name)).toEqual([
+      "bulbasaur",
+      "ivysaur",
+    ]);
     expect(firstBody.nextCursor).toBeString();
     expect(firstBody.nextCursor).not.toContain("offset");
 
     const second = await gateway.fetch(
-      request("/tools/pokedex_list", { resource: "pokemon", pageSize: 2, cursor: firstBody.nextCursor }),
+      request("/tools/pokedex_list", {
+        resource: "pokemon",
+        pageSize: 2,
+        cursor: firstBody.nextCursor,
+      }),
     );
-    expect((await second.json()).items.map((item: { name: string }) => item.name)).toEqual(["venusaur", "charmander"]);
+    expect((await second.json()).items.map((item: { name: string }) => item.name)).toEqual([
+      "venusaur",
+      "charmander",
+    ]);
 
-    const offset = await gateway.fetch(request("/tools/pokedex_list", { resource: "pokemon", offset: 2 }));
+    const offset = await gateway.fetch(
+      request("/tools/pokedex_list", { resource: "pokemon", offset: 2 }),
+    );
     expect(await offset.json()).toMatchObject({ code: "INVALID_ARGUMENTS", retryable: false });
     const tampered = await gateway.fetch(
       request("/tools/pokedex_list", { resource: "pokemon", cursor: `${firstBody.nextCursor}x` }),
@@ -140,7 +171,9 @@ describe("Pokédex gateway", () => {
     await configure();
     const forbidden = await gateway.fetch(request("/tools/pokedex_get", { ref: "pokemon/1" }));
     expect(await forbidden.json()).toMatchObject({ code: "UNISSUED_REFERENCE" });
-    const url = await gateway.fetch(request("/tools/pokedex_get", { ref: "https://pokeapi.co/api/v2/pokemon/1/" }));
+    const url = await gateway.fetch(
+      request("/tools/pokedex_get", { ref: "https://pokeapi.co/api/v2/pokemon/1/" }),
+    );
     expect(await url.json()).toMatchObject({ code: "INVALID_REFERENCE" });
 
     const search = await gateway.fetch(
@@ -156,7 +189,11 @@ describe("Pokédex gateway", () => {
       height: 7,
       species: { name: "bulbasaur", ref: "pokemon-species/1" },
     });
-    expect(body.related).toContainEqual({ field: "species", name: "bulbasaur", ref: "pokemon-species/1" });
+    expect(body.related).toContainEqual({
+      field: "species",
+      name: "bulbasaur",
+      ref: "pokemon-species/1",
+    });
     expect(body.related).not.toContainEqual(expect.objectContaining({ ref: "pokemon/4" }));
     expect(JSON.stringify(body)).not.toContain("example.invalid");
     const counterfeit = await gateway.fetch(request("/tools/pokedex_get", { ref: "pokemon/4" }));
@@ -166,7 +203,11 @@ describe("Pokédex gateway", () => {
   test("searches names independently of spaces, underscores, or hyphens", async () => {
     await configure();
     const search = await gateway.fetch(
-      request("/tools/pokedex_search", { resource: "generation", query: "Generation I", pageSize: 5 }),
+      request("/tools/pokedex_search", {
+        resource: "generation",
+        query: "Generation I",
+        pageSize: 5,
+      }),
     );
     const body = await search.json();
     expect(body.query).toBe("generation-i");
@@ -174,7 +215,9 @@ describe("Pokédex gateway", () => {
   });
 
   test("injects delay deterministically", async () => {
-    await configure([{ type: "delay", tool: "pokedex_list_resources", occurrence: 1, delayMs: 37 }]);
+    await configure([
+      { type: "delay", tool: "pokedex_list_resources", occurrence: 1, delayMs: 37 },
+    ]);
     expect((await gateway.fetch(request("/tools/pokedex_list_resources", {}))).status).toBe(200);
     expect(slept).toEqual([37]);
   });
@@ -193,29 +236,49 @@ describe("Pokédex gateway", () => {
   });
 
   test("injects a one-shot 429 and then permits retry", async () => {
-    await configure([{ type: "429", tool: "pokedex_list", occurrence: 1, resource: "pokemon", retryAfterMs: 7 }]);
+    await configure([
+      { type: "429", tool: "pokedex_list", occurrence: 1, resource: "pokemon", retryAfterMs: 7 },
+    ]);
     const failed = await gateway.fetch(request("/tools/pokedex_list", { resource: "pokemon" }));
     expect(failed.status).toBe(429);
-    expect(await failed.json()).toMatchObject({ code: "RATE_LIMITED", retryable: true, retryAfterMs: 7 });
-    expect((await gateway.fetch(request("/tools/pokedex_list", { resource: "pokemon" }))).status).toBe(200);
+    expect(await failed.json()).toMatchObject({
+      code: "RATE_LIMITED",
+      retryable: true,
+      retryAfterMs: 7,
+    });
+    expect(
+      (await gateway.fetch(request("/tools/pokedex_list", { resource: "pokemon" }))).status,
+    ).toBe(200);
   });
 
   test("injects a one-shot transient 500 and then permits retry", async () => {
-    await configure([{ type: "500", tool: "pokedex_list_resources", occurrence: 1, retryAfterMs: 9 }]);
+    await configure([
+      { type: "500", tool: "pokedex_list_resources", occurrence: 1, retryAfterMs: 9 },
+    ]);
     const failed = await gateway.fetch(request("/tools/pokedex_list_resources", {}));
     expect(failed.status).toBe(503);
-    expect(await failed.json()).toMatchObject({ code: "UPSTREAM_UNAVAILABLE", retryable: true, retryAfterMs: 9 });
+    expect(await failed.json()).toMatchObject({
+      code: "UPSTREAM_UNAVAILABLE",
+      retryable: true,
+      retryAfterMs: 9,
+    });
     expect((await gateway.fetch(request("/tools/pokedex_list_resources", {}))).status).toBe(200);
   });
 
   test("injects an empty intermediate page while retaining its cursor", async () => {
-    await configure([{ type: "empty-page", tool: "pokedex_list", occurrence: 2, resource: "pokemon" }]);
+    await configure([
+      { type: "empty-page", tool: "pokedex_list", occurrence: 2, resource: "pokemon" },
+    ]);
     const firstBody = await (
       await gateway.fetch(request("/tools/pokedex_list", { resource: "pokemon", pageSize: 1 }))
     ).json();
     const emptyBody = await (
       await gateway.fetch(
-        request("/tools/pokedex_list", { resource: "pokemon", pageSize: 1, cursor: firstBody.nextCursor }),
+        request("/tools/pokedex_list", {
+          resource: "pokemon",
+          pageSize: 1,
+          cursor: firstBody.nextCursor,
+        }),
       )
     ).json();
     expect(emptyBody.items).toEqual([]);
@@ -224,16 +287,26 @@ describe("Pokédex gateway", () => {
     expect(await erased.json()).toMatchObject({ code: "UNISSUED_REFERENCE" });
     const resumed = await (
       await gateway.fetch(
-        request("/tools/pokedex_list", { resource: "pokemon", pageSize: 1, cursor: emptyBody.nextCursor }),
+        request("/tools/pokedex_list", {
+          resource: "pokemon",
+          pageSize: 1,
+          cursor: emptyBody.nextCursor,
+        }),
       )
     ).json();
     expect(resumed.items[0].name).toBe("venusaur");
   });
 
   test("injects an issued stale relationship that terminates as not found", async () => {
-    await configure([{ type: "stale-relationship", tool: "pokedex_get", occurrence: 1, ref: "pokemon/1" }]);
-    await gateway.fetch(request("/tools/pokedex_search", { resource: "pokemon", query: "bulbasaur" }));
-    const source = await (await gateway.fetch(request("/tools/pokedex_get", { ref: "pokemon/1" }))).json();
+    await configure([
+      { type: "stale-relationship", tool: "pokedex_get", occurrence: 1, ref: "pokemon/1" },
+    ]);
+    await gateway.fetch(
+      request("/tools/pokedex_search", { resource: "pokemon", query: "bulbasaur" }),
+    );
+    const source = await (
+      await gateway.fetch(request("/tools/pokedex_get", { ref: "pokemon/1" }))
+    ).json();
     expect(source.related).toContainEqual({
       field: "injected-stale-relationship",
       name: "missing",

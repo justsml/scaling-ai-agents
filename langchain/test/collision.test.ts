@@ -32,9 +32,9 @@ describe("artifact collision reducer", () => {
   });
 
   test("THROWS ArtifactCollision when two workers write the same key", () => {
-    expect(() => mergeArtifacts({ network: artifact("network") }, { network: artifact("network") })).toThrow(
-      ArtifactCollision,
-    );
+    expect(() =>
+      mergeArtifacts({ network: artifact("network") }, { network: artifact("network") }),
+    ).toThrow(ArtifactCollision);
   });
 
   test("the thrown error names the contested key and says why it matters", () => {
@@ -88,7 +88,11 @@ describe("artifact collision reducer", () => {
       .addEdge(START, "worker_state")
       .compile();
     const final = await compiled.invoke({ incident: "i" });
-    expect(Object.keys(final.artifacts as Record<string, Artifact>).sort()).toEqual(["app", "network", "state"]);
+    expect(Object.keys(final.artifacts as Record<string, Artifact>).sort()).toEqual([
+      "app",
+      "network",
+      "state",
+    ]);
   });
 });
 

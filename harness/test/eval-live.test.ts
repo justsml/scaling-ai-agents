@@ -5,12 +5,18 @@ import { resolve } from "node:path";
 import type { PiDriverRequest, PiRunEvidence } from "../src/pi/client";
 import type { DriverEvidenceRecord } from "../src/pi/driver-tools";
 import type { StackInvestigationEvidence } from "../src/pi/types";
-import { corroborateGatewayTrace, LIVE_MODEL, LIVE_REASONING_EFFORT, runLiveEvaluation } from "../src/eval/live";
+import {
+  corroborateGatewayTrace,
+  LIVE_MODEL,
+  LIVE_REASONING_EFFORT,
+  runLiveEvaluation,
+} from "../src/eval/live";
 import type { EvalCatalog, InvestigationEvidence, StackName } from "../src/eval/types";
 
 const temporaryDirectories: string[] = [];
 afterEach(async () => {
-  for (const directory of temporaryDirectories.splice(0)) await rm(directory, { recursive: true, force: true });
+  for (const directory of temporaryDirectories.splice(0))
+    await rm(directory, { recursive: true, force: true });
 });
 
 describe("live Pi evaluation", () => {
@@ -45,7 +51,9 @@ describe("live Pi evaluation", () => {
     );
 
     expect(calls).toHaveLength(2);
-    expect(calls.every((call) => call.requestedStacks.join(",") === "ai-sdk,mastra,langchain")).toBeTrue();
+    expect(
+      calls.every((call) => call.requestedStacks.join(",") === "ai-sdk,mastra,langchain"),
+    ).toBeTrue();
     expect(new Set(calls.map((call) => call.driverRunId)).size).toBe(2);
     expect(result.manifest).toMatchObject({
       contractVersion: "1.0.0",
@@ -55,8 +63,13 @@ describe("live Pi evaluation", () => {
       repetitions: 2,
       piVersions: ["0.85.1"],
     });
-    expect(result.manifest.frameworkVersions["ai-sdk"]).toEqual({ ai: "7.0.93", "@ai-sdk/openai": "4.0.59" });
-    expect(Object.values(result.manifest.fixtureHashes).every((value) => /^[0-9a-f]{64}$/.test(value))).toBeTrue();
+    expect(result.manifest.frameworkVersions["ai-sdk"]).toEqual({
+      ai: "7.0.93",
+      "@ai-sdk/openai": "4.0.59",
+    });
+    expect(
+      Object.values(result.manifest.fixtureHashes).every((value) => /^[0-9a-f]{64}$/.test(value)),
+    ).toBeTrue();
     expect(result.manifest.prompts).toEqual([
       { scenarioId: "case", prompt: "find it", sha256: expect.stringMatching(/^[0-9a-f]{64}$/) },
     ]);
@@ -72,7 +85,9 @@ describe("live Pi evaluation", () => {
     });
     expect(await Bun.file(resolve(result.artifactDirectory, "manifest.json")).exists()).toBeTrue();
     expect(await Bun.file(resolve(result.artifactDirectory, "report.json")).exists()).toBeTrue();
-    expect((await readdir(result.artifactDirectory)).some((name) => name.endsWith(".tmp"))).toBeFalse();
+    expect(
+      (await readdir(result.artifactDirectory)).some((name) => name.endsWith(".tmp")),
+    ).toBeFalse();
   });
 
   test("flattering Driver prose cannot pass missing dispatch or evidence", async () => {
@@ -92,7 +107,10 @@ describe("live Pi evaluation", () => {
         getGitSha: async () => null,
         runDriver: async () => ({
           ...driverEvidence(),
-          finalMessage: { role: "assistant", content: "Everything passed perfectly across all stacks." },
+          finalMessage: {
+            role: "assistant",
+            content: "Everything passed perfectly across all stacks.",
+          },
           dispatch: {
             passed: false,
             expected: ["ai-sdk", "mastra", "langchain"],
@@ -107,9 +125,13 @@ describe("live Pi evaluation", () => {
     expect(result.report.dispatch.passed).toBeFalse();
     expect(result.report.passed).toBeFalse();
     expect(
-      result.report.runs.every((run) => run.gates.find((gate) => gate.gate === "dispatch")?.passed === false),
+      result.report.runs.every(
+        (run) => run.gates.find((gate) => gate.gate === "dispatch")?.passed === false,
+      ),
     ).toBeTrue();
-    const driver = JSON.parse(await readFile(resolve(result.artifactDirectory, "cases/001-case/driver.json"), "utf8"));
+    const driver = JSON.parse(
+      await readFile(resolve(result.artifactDirectory, "cases/001-case/driver.json"), "utf8"),
+    );
     expect(driver.finalMessage.content).toContain("passed perfectly");
     expect(driver.protocolErrors).toEqual(["malformed RPC frame"]);
   });
@@ -136,8 +158,12 @@ describe("live Pi evaluation", () => {
     );
     expect(result.report.runs).toHaveLength(3);
     expect(result.report.passed).toBeFalse();
-    expect(result.report.runs.every((run) => run.evidence.stopReason.includes("Pi executable missing"))).toBeTrue();
-    const driver = JSON.parse(await readFile(resolve(result.artifactDirectory, "cases/001-case/driver.json"), "utf8"));
+    expect(
+      result.report.runs.every((run) => run.evidence.stopReason.includes("Pi executable missing")),
+    ).toBeTrue();
+    const driver = JSON.parse(
+      await readFile(resolve(result.artifactDirectory, "cases/001-case/driver.json"), "utf8"),
+    );
     expect(driver.error).toBe("Pi executable missing");
     expect(result.report.metrics.driver).toMatchObject({
       runs: 0,
@@ -163,7 +189,9 @@ describe("live Pi evaluation", () => {
     const run = result.report.runs.find((item) => item.evidence.stack === "ai-sdk")!;
     expect(run.gates.find((gate) => gate.gate === "safety")).toMatchObject({ passed: false });
     expect(run.gates.find((gate) => gate.gate === "evidence")).toMatchObject({ passed: false });
-    expect(run.gates.find((gate) => gate.gate === "safety")?.details.join(" ")).toContain("requestId mismatch");
+    expect(run.gates.find((gate) => gate.gate === "safety")?.details.join(" ")).toContain(
+      "requestId mismatch",
+    );
     expect(result.report.passed).toBeFalse();
   });
 
@@ -223,7 +251,11 @@ describe("live Pi evaluation", () => {
       expect(corroborateGatewayTrace(changed, base).join(" ")).toContain(expected);
     }
 
-    const secondCall = { ...structuredClone(base.toolCalls[0]!), sequence: 2, requestId: "second-request" };
+    const secondCall = {
+      ...structuredClone(base.toolCalls[0]!),
+      sequence: 2,
+      requestId: "second-request",
+    };
     const ordered = { ...base, toolCalls: [base.toolCalls[0]!, secondCall] };
     const reordered = evidenceRecord("driver", "case", "ai-sdk", ordered);
     reordered.gatewayEvents.reverse();
@@ -232,7 +264,10 @@ describe("live Pi evaluation", () => {
     const badSequence = structuredClone(ordered);
     badSequence.toolCalls[1]!.sequence = 1;
     expect(
-      corroborateGatewayTrace(evidenceRecord("driver", "case", "ai-sdk", badSequence), badSequence).join(" "),
+      corroborateGatewayTrace(
+        evidenceRecord("driver", "case", "ai-sdk", badSequence),
+        badSequence,
+      ).join(" "),
     ).toContain("out-of-order sequence");
   });
 
@@ -240,14 +275,18 @@ describe("live Pi evaluation", () => {
     const evidence = stackEvidence("ai-sdk");
     const malformed = evidenceRecord("driver", "case", "ai-sdk", evidence);
     malformed.gatewayEvents = null as unknown as unknown[];
-    expect(corroborateGatewayTrace(malformed, evidence)).toEqual(["gateway trace is not an event array"]);
+    expect(corroborateGatewayTrace(malformed, evidence)).toEqual([
+      "gateway trace is not an event array",
+    ]);
 
     const duplicateEvidence = {
       ...evidence,
       toolCalls: [evidence.toolCalls[0]!, structuredClone(evidence.toolCalls[0]!)],
     };
     const duplicateRecord = evidenceRecord("driver", "case", "ai-sdk", duplicateEvidence);
-    expect(corroborateGatewayTrace(duplicateRecord, duplicateEvidence).join(" ")).toContain("repeats requestId");
+    expect(corroborateGatewayTrace(duplicateRecord, duplicateEvidence).join(" ")).toContain(
+      "repeats requestId",
+    );
   });
 
   test("scores partial evidence but hard-fails records with Driver and protocol errors", async () => {
@@ -258,13 +297,18 @@ describe("live Pi evaluation", () => {
       runDriver: async (request) => {
         await writeRecords(request, (record) => {
           record.error = "gateway cleanup failed";
-          if (record.stackRun) record.stackRun.protocolError = "stack stdout contained 2 JSONL documents";
+          if (record.stackRun)
+            record.stackRun.protocolError = "stack stdout contained 2 JSONL documents";
         });
         return driverEvidence();
       },
     });
     for (const run of result.report.runs) {
-      expect(run.gates.find((gate) => gate.gate === "factual")).toMatchObject({ passed: true, scored: 1, possible: 1 });
+      expect(run.gates.find((gate) => gate.gate === "factual")).toMatchObject({
+        passed: true,
+        scored: 1,
+        possible: 1,
+      });
       expect(run.gates.find((gate) => gate.gate === "safety")?.passed).toBeTrue();
       expect(run.gates.find((gate) => gate.gate === "evidence")?.passed).toBeFalse();
       expect(run.gates.find((gate) => gate.gate === "dispatch")?.passed).toBeFalse();
@@ -291,9 +335,13 @@ describe("live Pi evaluation", () => {
         };
       },
     });
-    expect(result.report.runs.every((run) => run.gates.find((gate) => gate.gate === "factual")?.passed)).toBeTrue();
     expect(
-      result.report.runs.every((run) => run.gates.find((gate) => gate.gate === "dispatch")?.passed === false),
+      result.report.runs.every((run) => run.gates.find((gate) => gate.gate === "factual")?.passed),
+    ).toBeTrue();
+    expect(
+      result.report.runs.every(
+        (run) => run.gates.find((gate) => gate.gate === "dispatch")?.passed === false,
+      ),
     ).toBeTrue();
     expect(result.report.passed).toBeFalse();
   });
@@ -314,28 +362,45 @@ describe("live Pi evaluation", () => {
       }),
     ).rejects.toThrow(`Only ${LIVE_MODEL}`);
     await expect(
-      runLiveEvaluation({ ...base, model: LIVE_MODEL, reasoningEffort: "low" as typeof LIVE_REASONING_EFFORT }),
+      runLiveEvaluation({
+        ...base,
+        model: LIVE_MODEL,
+        reasoningEffort: "low" as typeof LIVE_REASONING_EFFORT,
+      }),
     ).rejects.toThrow("Only reasoning effort none");
   });
 
   test("CLI rejects unsupported model selection before any live run", async () => {
-    const child = Bun.spawn(["bun", "run", "src/eval/cli.ts", "--model", "openai/unsupported-model"], {
-      cwd: resolve(import.meta.dir, ".."),
-      stdout: "pipe",
-      stderr: "pipe",
-    });
+    const child = Bun.spawn(
+      ["bun", "run", "src/eval/cli.ts", "--model", "openai/unsupported-model"],
+      {
+        cwd: resolve(import.meta.dir, ".."),
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
     const [exitCode, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
     expect(exitCode).toBe(2);
     expect(stderr).toContain(`Only --model ${LIVE_MODEL} is supported`);
   });
 });
 
-const scenario = { id: "case", group: "ordinary", prompt: "find it", deadlineMs: 100, maxToolCalls: 2, faults: [] };
+const scenario = {
+  id: "case",
+  group: "ordinary",
+  prompt: "find it",
+  deadlineMs: 100,
+  maxToolCalls: 2,
+  faults: [],
+};
 const catalog: EvalCatalog = {
   contractVersion: "1.0.0",
   scenarios: [scenario],
   tools: [
-    { name: "pokedex_list_resources", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+    {
+      name: "pokedex_list_resources",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    },
   ],
   expected: {
     case: {
@@ -348,7 +413,9 @@ const catalog: EvalCatalog = {
 function stackEvidence(stack: StackName): InvestigationEvidence {
   return {
     stack,
-    answer: { claims: [{ path: "searchable", value: ["pokemon"], requestIds: [`${stack}-request`] }] },
+    answer: {
+      claims: [{ path: "searchable", value: ["pokemon"], requestIds: [`${stack}-request`] }],
+    },
     toolCalls: [
       {
         tool: "pokedex_list_resources",
@@ -367,7 +434,10 @@ function stackEvidence(stack: StackName): InvestigationEvidence {
   };
 }
 
-async function writeRecords(request: PiDriverRequest, mutate?: (record: DriverEvidenceRecord) => void): Promise<void> {
+async function writeRecords(
+  request: PiDriverRequest,
+  mutate?: (record: DriverEvidenceRecord) => void,
+): Promise<void> {
   await mkdir(request.evidenceDirectory, { recursive: true });
   for (const stack of request.requestedStacks) {
     const record: DriverEvidenceRecord = {
@@ -404,7 +474,10 @@ async function writeRecords(request: PiDriverRequest, mutate?: (record: DriverEv
       ],
     };
     mutate?.(record);
-    await writeFile(resolve(request.evidenceDirectory, `${stack}.json`), `${JSON.stringify(record)}\n`);
+    await writeFile(
+      resolve(request.evidenceDirectory, `${stack}.json`),
+      `${JSON.stringify(record)}\n`,
+    );
   }
 }
 
@@ -450,7 +523,10 @@ function driverEvidence(): PiRunEvidence {
     argv: ["pi", "--mode", "rpc"],
     model: { provider: "openai", id: "gpt-5.6-luna" },
     thinkingLevel: "off",
-    sessionStats: { tokens: { input: 5, output: 1, cacheRead: 0, cacheWrite: 0, total: 6 }, cost: 0.001 },
+    sessionStats: {
+      tokens: { input: 5, output: 1, cacheRead: 0, cacheWrite: 0, total: 6 },
+      cost: 0.001,
+    },
     frames: [],
     toolCalls: [],
     dispatch: {
@@ -486,9 +562,18 @@ async function fixtureRoot(): Promise<string> {
   const fixtures = resolve(root, "fixtures");
   await mkdir(fixtures, { recursive: true });
   await Promise.all([
-    writeFile(resolve(fixtures, "pokedex-tools.schema.json"), '{"contractVersion":"1.0.0","tools":[]}\n'),
-    writeFile(resolve(fixtures, "pokedex-scenarios.json"), '{"contractVersion":"1.0.0","scenarios":[]}\n'),
-    writeFile(resolve(fixtures, "pokedex-expected.json"), '{"contractVersion":"1.0.0","expected":{}}\n'),
+    writeFile(
+      resolve(fixtures, "pokedex-tools.schema.json"),
+      '{"contractVersion":"1.0.0","tools":[]}\n',
+    ),
+    writeFile(
+      resolve(fixtures, "pokedex-scenarios.json"),
+      '{"contractVersion":"1.0.0","scenarios":[]}\n',
+    ),
+    writeFile(
+      resolve(fixtures, "pokedex-expected.json"),
+      '{"contractVersion":"1.0.0","expected":{}}\n',
+    ),
   ]);
   return root;
 }

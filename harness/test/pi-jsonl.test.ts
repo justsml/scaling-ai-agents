@@ -26,7 +26,11 @@ describe("Pi RPC JSONL decoder", () => {
   });
 
   test("enforces frame and stream bounds", () => {
-    expect(() => new JsonlDecoder({ maximumFrameBytes: 4 }).push(bytes("12345"))).toThrow("frame exceeded");
-    expect(() => new JsonlDecoder({ maximumTotalBytes: 4 }).push(bytes("12345"))).toThrow("stream exceeded");
+    expect(() => new JsonlDecoder({ maximumFrameBytes: 4 }).push(bytes("12345"))).toThrow(
+      "frame exceeded",
+    );
+    expect(() => new JsonlDecoder({ maximumTotalBytes: 4 }).push(bytes("12345"))).toThrow(
+      "stream exceeded",
+    );
   });
 });

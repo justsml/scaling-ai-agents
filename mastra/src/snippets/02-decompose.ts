@@ -41,10 +41,27 @@ import { RequestContext } from "@mastra/core/request-context";
 import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { parseCaps, deadlineHit, deadlineSignal, describeCaps, hasOpenAiKey, remainingMs } from "../lib/caps.js";
+import {
+  parseCaps,
+  deadlineHit,
+  deadlineSignal,
+  describeCaps,
+  hasOpenAiKey,
+  remainingMs,
+} from "../lib/caps.js";
 import type { StopReason } from "../lib/caps.js";
 import { Ledger, estimateWorkerCost, usdFromUsage } from "../lib/ledger.js";
-import { bullet, header, json, ledgerTable, reportSpend, section, stopBanner, table, usd } from "../lib/print.js";
+import {
+  bullet,
+  header,
+  json,
+  ledgerTable,
+  reportSpend,
+  section,
+  stopBanner,
+  table,
+  usd,
+} from "../lib/print.js";
 import { WORKER_MODEL } from "../lib/models.js";
 import { FIXTURES_DIR } from "../lib/setup.js";
 import {
@@ -74,7 +91,12 @@ function evidenceTool(id: string, filename: string, description: string) {
       // tool refuses by name rather than silently reading it.
       confirmSource: z.string().describe(`must be exactly "${filename}"`),
     }),
-    outputSchema: z.object({ source: z.string(), contents: z.string(), refused: z.boolean(), reason: z.string() }),
+    outputSchema: z.object({
+      source: z.string(),
+      contents: z.string(),
+      refused: z.boolean(),
+      reason: z.string(),
+    }),
     execute: async ({ confirmSource }) => {
       if (confirmSource !== filename) {
         return {
@@ -94,8 +116,16 @@ function evidenceTool(id: string, filename: string, description: string) {
   });
 }
 
-const networkTool = evidenceTool("read-network-log", "network.log", "Read the proxy/network log. This worker owns it.");
-const appTool = evidenceTool("read-app-log", "app.log", "Read the application log. This worker owns it.");
+const networkTool = evidenceTool(
+  "read-network-log",
+  "network.log",
+  "Read the proxy/network log. This worker owns it.",
+);
+const appTool = evidenceTool(
+  "read-app-log",
+  "app.log",
+  "Read the application log. This worker owns it.",
+);
 const stateTool = evidenceTool(
   "read-state-json",
   "state.json",
@@ -125,7 +155,12 @@ interface WorkerSpec {
   agent: Agent;
 }
 
-function workerAgent(id: string, source: string, tool: ReturnType<typeof evidenceTool>, question: string): Agent {
+function workerAgent(
+  id: string,
+  source: string,
+  tool: ReturnType<typeof evidenceTool>,
+  question: string,
+): Agent {
   return new Agent({
     id: `evidence-${id}`,
     name: `Evidence: ${source}`,
@@ -150,7 +185,8 @@ const WORKERS: WorkerSpec[] = [
     source: "network.log",
     question: "What does the proxy do to these connections, and on what trigger?",
     exitCondition: "a close action with a stated reason has been found, or the log ends",
-    whyItExisted: "owns the only evidence about the proxy; nothing else in the incident can see the idle timeout",
+    whyItExisted:
+      "owns the only evidence about the proxy; nothing else in the incident can see the idle timeout",
     agent: workerAgent(
       "network",
       "network.log",
@@ -161,8 +197,10 @@ const WORKERS: WorkerSpec[] = [
   {
     id: "app",
     source: "app.log",
-    question: "What does the application think is happening, including its own timing configuration?",
-    exitCondition: "the close code and the heartbeat configuration have both been read, or the log ends",
+    question:
+      "What does the application think is happening, including its own timing configuration?",
+    exitCondition:
+      "the close code and the heartbeat configuration have both been read, or the log ends",
     whyItExisted:
       "owns the application side, including the heartbeat interval that the proxy evidence alone cannot explain",
     agent: workerAgent(
@@ -177,7 +215,8 @@ const WORKERS: WorkerSpec[] = [
     source: "state.json",
     question: "After a reconnect, is the session actually restored to a working state?",
     exitCondition: "the expected and restored subscription sets have been compared",
-    whyItExisted: "owns the post-reconnect state; it is the only worker that can see a SECOND, independent failure",
+    whyItExisted:
+      "owns the post-reconnect state; it is the only worker that can see a SECOND, independent failure",
     agent: workerAgent(
       "state",
       "state.json",
@@ -199,14 +238,17 @@ const verdictSchema = z.object({
     .array(z.object({ cause: z.string(), source: z.string() }))
     .min(1)
     .max(4),
-  isComplete: z.boolean().describe("true only if every observed symptom is explained by the listed causes"),
+  isComplete: z
+    .boolean()
+    .describe("true only if every observed symptom is explained by the listed causes"),
   verdict: z.string().describe("two sentences at most"),
 });
 
 const reviewerAgent = new Agent({
   id: "incident-reviewer",
   name: "Incident Reviewer",
-  description: "Reads all three artifacts and looks for what the favoured hypothesis fails to explain.",
+  description:
+    "Reads all three artifacts and looks for what the favoured hypothesis fails to explain.",
   instructions: `You review three independent investigation artifacts.
 
 Your job is NOT to summarise them and it is NOT to agree with them. State the
@@ -289,7 +331,11 @@ async function main(): Promise<void> {
       id: `evidence-${w.id}`,
       description: w.question,
       inputSchema: z.object({ incident: z.string() }),
-      outputSchema: z.object({ worker: z.string(), artifact: artifactSchema.nullable(), note: z.string() }),
+      outputSchema: z.object({
+        worker: z.string(),
+        artifact: artifactSchema.nullable(),
+        note: z.string(),
+      }),
       execute: async ({ inputData }) => {
         const span = startWorkerSpan(snippetSpan, `evidence:${w.id}`, { source: w.source });
         const started = Date.now();
@@ -326,7 +372,10 @@ async function main(): Promise<void> {
                 requestContextKeys: ["profile", "region", "dataClass"],
                 tags: ["decompose"],
               },
-              modelSettings: { timeout: { totalMs: Math.max(1000, remainingMs(caps)) }, maxOutputTokens: 900 },
+              modelSettings: {
+                timeout: { totalMs: Math.max(1000, remainingMs(caps)) },
+                maxOutputTokens: 900,
+              },
             },
           );
           const latencyMs = Date.now() - started;
@@ -349,7 +398,11 @@ async function main(): Promise<void> {
         } catch (err) {
           const latencyMs = Date.now() - started;
           const aborted = isAbort(err);
-          ledger.reconcile(w.id, { latencyMs, outcome: aborted ? "aborted" : "failed", note: short(err) });
+          ledger.reconcile(w.id, {
+            latencyMs,
+            outcome: aborted ? "aborted" : "failed",
+            note: short(err),
+          });
           failWorkerSpan(span, err, {
             profile: w.id,
             costUsd: 0,
@@ -366,12 +419,16 @@ async function main(): Promise<void> {
   const reviewStep = createStep({
     id: "reviewer",
     description: "Read all three artifacts and look for evidence against the favoured hypothesis.",
-    inputSchema: z.array(z.object({ worker: z.string(), artifact: artifactSchema.nullable(), note: z.string() })),
+    inputSchema: z.array(
+      z.object({ worker: z.string(), artifact: artifactSchema.nullable(), note: z.string() }),
+    ),
     outputSchema: z.object({ verdict: verdictSchema.nullable(), note: z.string() }),
     execute: async ({ inputData }) => {
       const span = startWorkerSpan(snippetSpan, "reviewer", {});
       const started = Date.now();
-      const available = (inputData as Array<{ worker: string; artifact: Artifact | null }>).filter((a) => a.artifact);
+      const available = (inputData as Array<{ worker: string; artifact: Artifact | null }>).filter(
+        (a) => a.artifact,
+      );
       if (available.length === 0) {
         endWorkerSpan(span, {
           profile: "reviewer",
@@ -383,7 +440,11 @@ async function main(): Promise<void> {
         return { verdict: null, note: "no artifacts to review" };
       }
 
-      const reservation = ledger.tryReserve("reviewer", WORKER_MODEL, estimateWorkerCost(WORKER_MODEL, 3000, 600));
+      const reservation = ledger.tryReserve(
+        "reviewer",
+        WORKER_MODEL,
+        estimateWorkerCost(WORKER_MODEL, 3000, 600),
+      );
       if (!reservation) {
         endWorkerSpan(span, {
           profile: "reviewer",
@@ -403,7 +464,10 @@ async function main(): Promise<void> {
             abortSignal: signal,
             tracingContext: contextOf(span),
             tracingOptions: { metadata: { profile: "reviewer" }, tags: ["decompose"] },
-            modelSettings: { timeout: { totalMs: Math.max(1000, remainingMs(caps)) }, maxOutputTokens: 900 },
+            modelSettings: {
+              timeout: { totalMs: Math.max(1000, remainingMs(caps)) },
+              maxOutputTokens: 900,
+            },
           },
         );
         const latencyMs = Date.now() - started;
@@ -415,14 +479,19 @@ async function main(): Promise<void> {
             costUsd: usdFromUsage(WORKER_MODEL, result.usage),
             latencyMs,
             outcome: result.object?.isComplete ? "claims complete" : "claims incomplete",
-            whyItExisted: "looks for what the workers agreed to ignore; the only worker paid to disagree",
+            whyItExisted:
+              "looks for what the workers agreed to ignore; the only worker paid to disagree",
           },
           result.object,
         );
         return { verdict: result.object ?? null, note: "" };
       } catch (err) {
         const latencyMs = Date.now() - started;
-        ledger.reconcile("reviewer", { latencyMs, outcome: isAbort(err) ? "aborted" : "failed", note: short(err) });
+        ledger.reconcile("reviewer", {
+          latencyMs,
+          outcome: isAbort(err) ? "aborted" : "failed",
+          note: short(err),
+        });
         failWorkerSpan(span, err, {
           profile: "reviewer",
           costUsd: 0,
@@ -469,8 +538,14 @@ async function main(): Promise<void> {
     const gt = scoreAgainstGroundTruth(verdict);
     section("scored against incident/ground-truth.md (deterministic, no model)");
     table([
-      { check: "named the proxy idle-timeout / heartbeat mismatch", found: gt.namedTimeout ? "yes" : "NO" },
-      { check: "named the unreplayed subscriptions after reconnect", found: gt.namedSubscriptions ? "yes" : "NO" },
+      {
+        check: "named the proxy idle-timeout / heartbeat mismatch",
+        found: gt.namedTimeout ? "yes" : "NO",
+      },
+      {
+        check: "named the unreplayed subscriptions after reconnect",
+        found: gt.namedSubscriptions ? "yes" : "NO",
+      },
       { check: "score", found: `${gt.score.toFixed(1)} / 1.0` },
     ]);
     bullet(gt.detail);
@@ -524,7 +599,11 @@ state every independent cause you can support. Be brief.`,
 
     const span = startWorkerSpan(snippetSpan, "supervisor", {});
     const started = Date.now();
-    const reservation = ledger.tryReserve("supervisor", WORKER_MODEL, estimateWorkerCost(WORKER_MODEL, 2000, 900));
+    const reservation = ledger.tryReserve(
+      "supervisor",
+      WORKER_MODEL,
+      estimateWorkerCost(WORKER_MODEL, 2000, 900),
+    );
     if (!reservation) {
       bullet("skipped: no budget left for the supervisor comparison");
       ledger.skip("supervisor", WORKER_MODEL, "over budget");
@@ -538,13 +617,20 @@ state every independent cause you can support. Be brief.`,
             abortSignal: signal,
             tracingContext: contextOf(span),
             tracingOptions: { metadata: { profile: "supervisor" }, tags: ["decompose"] },
-            modelSettings: { timeout: { totalMs: Math.max(1000, remainingMs(caps)) }, maxOutputTokens: 700 },
+            modelSettings: {
+              timeout: { totalMs: Math.max(1000, remainingMs(caps)) },
+              maxOutputTokens: 700,
+            },
           },
         );
         supervisorMs = Date.now() - started;
         supervisorCost = usdFromUsage(WORKER_MODEL, result.usage);
         supervisorText = (result.text ?? "").trim();
-        ledger.reconcile("supervisor", { usage: result.usage, latencyMs: supervisorMs, outcome: "ok" });
+        ledger.reconcile("supervisor", {
+          usage: result.usage,
+          latencyMs: supervisorMs,
+          outcome: "ok",
+        });
         endWorkerSpan(span, {
           profile: "supervisor",
           costUsd: supervisorCost,
@@ -589,7 +675,9 @@ state every independent cause you can support. Be brief.`,
       "trace shape": "variable: depends what it chose to ask",
     },
   ]);
-  bullet("the workflow ran the three workers concurrently; the supervisor pays for its own routing turns.");
+  bullet(
+    "the workflow ran the three workers concurrently; the supervisor pays for its own routing turns.",
+  );
 
   ledgerTable(ledger);
   stopBanner(stopReason, caps, stopDetail || undefined);
@@ -598,7 +686,8 @@ state every independent cause you can support. Be brief.`,
     costUsd: ledger.spentUsd,
     latencyMs: Date.now() - caps.startedAt,
     outcome: stopReason,
-    whyItExisted: "splits one problem into non-overlapping sub-problems and pays a reviewer to disagree",
+    whyItExisted:
+      "splits one problem into non-overlapping sub-problems and pays a reviewer to disagree",
   });
   reportSpend(SNIPPET, ledger.spentUsd);
   await shutdownTracing();
@@ -610,7 +699,9 @@ function findCollisions(touched: Array<{ worker: string; file: string }>): strin
     if (!byFile.has(t.file)) byFile.set(t.file, new Set());
     byFile.get(t.file)!.add(t.worker);
   }
-  return [...byFile.entries()].filter(([, ws]) => ws.size > 1).map(([f, ws]) => `${f}: ${[...ws].join(", ")}`);
+  return [...byFile.entries()]
+    .filter(([, ws]) => ws.size > 1)
+    .map(([f, ws]) => `${f}: ${[...ws].join(", ")}`);
 }
 
 function short(err: unknown): string {

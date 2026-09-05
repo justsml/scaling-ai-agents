@@ -59,7 +59,8 @@ export function planFor(request: RoutableRequest, budgetUsd: number): ExecutionP
     lookup: "matched a status/lookup phrase -> direct tool call, no model loop",
     routine: "matched a summarize/report phrase -> bounded ToolLoopAgent (isStepCount(3))",
     novel: "no lookup/routine phrase matched -> full tournament or investigation (01/02)",
-    consequential: "matched an apply/push-to-main phrase -> requires human approval regardless of budget",
+    consequential:
+      "matched an apply/push-to-main phrase -> requires human approval regardless of budget",
   };
   return { requestClass, contract, reason: reasons[requestClass] };
 }

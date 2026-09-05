@@ -48,7 +48,11 @@ export interface ProviderSlot {
 }
 
 /** Filter the provider pool in code, before any network call. */
-export function pickProviders(pool: ProviderSlot[], region: string, dataClass: string): ProviderSlot[] {
+export function pickProviders(
+  pool: ProviderSlot[],
+  region: string,
+  dataClass: string,
+): ProviderSlot[] {
   return pool.filter(
     (slot) =>
       slot.available &&

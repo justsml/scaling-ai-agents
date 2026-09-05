@@ -1,4 +1,6 @@
-export type ProbeResult = { ok: true } | { ok: false; code: "ECONNREFUSED" | "EACCES" | "ETIMEDOUT" };
+export type ProbeResult =
+  | { ok: true }
+  | { ok: false; code: "ECONNREFUSED" | "EACCES" | "ETIMEDOUT" };
 
 export type Probe = () => Promise<ProbeResult>;
 
@@ -67,7 +69,8 @@ export async function runWhenReady(
       return {
         status: "denied",
         attempts,
-        reason: "the dependency refused the probe with EACCES; this is permanent, so no retry was attempted",
+        reason:
+          "the dependency refused the probe with EACCES; this is permanent, so no retry was attempted",
       };
     }
 

@@ -67,7 +67,10 @@ const summarizeTool = tool({
     // reproducible without needing to read the incident logs itself.
     return {
       user,
-      events: Array.from({ length: count }, (_, i) => `reconnect #${i + 1} closed with code 1006 (abnormal)`),
+      events: Array.from(
+        { length: count },
+        (_, i) => `reconnect #${i + 1} closed with code 1006 (abnormal)`,
+      ),
     };
   },
 });
@@ -75,7 +78,8 @@ const summarizeTool = tool({
 async function runRoutine(request: RoutableRequest, budgetUsd: number, deadlineMs: number) {
   const agent = new ToolLoopAgent({
     model: workerModel(),
-    instructions: "You are a support assistant. Use the summarize tool, then answer in two sentences.",
+    instructions:
+      "You are a support assistant. Use the summarize tool, then answer in two sentences.",
     tools: { summarize: summarizeTool },
     stopWhen: isStepCount(3),
   });
@@ -91,7 +95,12 @@ async function runRoutine(request: RoutableRequest, budgetUsd: number, deadlineM
       const latencyMs = Date.now() - start;
       const spend = costUsd(workerModelIdSafe(), result.usage);
       return {
-        result: { path: "routine" as const, text: result.text, costUsd: spend, modelCalls: result.steps.length },
+        result: {
+          path: "routine" as const,
+          text: result.text,
+          costUsd: spend,
+          modelCalls: result.steps.length,
+        },
         costUsd: spend,
         latencyMs,
         outcome: spend <= budgetUsd ? "within-budget" : "over-budget",
@@ -139,7 +148,10 @@ async function runConsequential(request: RoutableRequest) {
 }
 
 async function main() {
-  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), { budgetUsd: 0.05, deadlineMs: 30_000 });
+  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), {
+    budgetUsd: 0.05,
+    deadlineMs: 30_000,
+  });
   heading("00 Router — deterministic classify -> executor");
   printKV("caps", { budgetUsd, deadlineMs });
 
@@ -147,11 +159,21 @@ async function main() {
   let totalCostUsd = 0;
 
   for (const r of requests) {
-    const request: RoutableRequest = { id: r.id, text: r.text, region: r.region, dataClass: r.dataClass };
+    const request: RoutableRequest = {
+      id: r.id,
+      text: r.text,
+      region: r.region,
+      dataClass: r.dataClass,
+    };
     const plan = planFor(request, budgetUsd);
     const parsed = callContractSchema.safeParse(plan.contract);
     if (!parsed.success) {
-      rows.push({ id: r.id, class: plan.requestClass, ran: "no", note: "contract validation failed" });
+      rows.push({
+        id: r.id,
+        class: plan.requestClass,
+        ran: "no",
+        note: "contract validation failed",
+      });
       continue;
     }
 
@@ -172,7 +194,8 @@ async function main() {
         const out = await runConsequential(request);
         outcome = out.decision;
       } else {
-        outcome = "hand off to 01-compete.ts (novel path); not run here to keep this snippet's spend near zero";
+        outcome =
+          "hand off to 01-compete.ts (novel path); not run here to keep this snippet's spend near zero";
       }
     } catch (err) {
       outcome = `error: ${(err as Error).message.slice(0, 60)}`;
@@ -190,7 +213,11 @@ async function main() {
   }
 
   printTable("router decisions", rows);
-  printKV("stop reason", { reason: "all requests classified and dispatched", totalCostUsd, budgetUsd });
+  printKV("stop reason", {
+    reason: "all requests classified and dispatched",
+    totalCostUsd,
+    budgetUsd,
+  });
 }
 
 main().catch((err) => {

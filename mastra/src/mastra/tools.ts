@@ -25,8 +25,14 @@ export const statusTool = createTool({
   }),
   execute: async ({ service }) => {
     const table: Record<string, { status: "healthy" | "degraded" | "down"; detail: string }> = {
-      "ws-app": { status: "degraded", detail: "sessions closing with 1006; two open causes under investigation" },
-      proxy: { status: "degraded", detail: "idle_timeout(60s) closing connections before the app heartbeat" },
+      "ws-app": {
+        status: "degraded",
+        detail: "sessions closing with 1006; two open causes under investigation",
+      },
+      proxy: {
+        status: "degraded",
+        detail: "idle_timeout(60s) closing connections before the app heartbeat",
+      },
       readiness: { status: "healthy", detail: "no open incidents" },
     };
     const hit = table[service.toLowerCase()];
@@ -46,7 +52,8 @@ export const statusTool = createTool({
  */
 export const applyPatchTool = createTool({
   id: "apply-patch-to-main",
-  description: "Apply the winning readiness patch to the main branch and push. Consequential; requires a human.",
+  description:
+    "Apply the winning readiness patch to the main branch and push. Consequential; requires a human.",
   inputSchema: z.object({
     patchSummary: z.string(),
     branch: z.string().default("main"),
@@ -68,8 +75,12 @@ export const applyPatchTool = createTool({
  */
 export const probeServiceTool = createTool({
   id: "probe-service",
-  description: "Probe one dependency and report how long it took to answer. Safe to call for several services at once.",
-  inputSchema: z.object({ service: z.string(), delayMs: z.number().int().min(0).max(2000).default(250) }),
+  description:
+    "Probe one dependency and report how long it took to answer. Safe to call for several services at once.",
+  inputSchema: z.object({
+    service: z.string(),
+    delayMs: z.number().int().min(0).max(2000).default(250),
+  }),
   outputSchema: z.object({
     service: z.string(),
     ok: z.boolean(),
@@ -92,8 +103,12 @@ export const probeServiceTool = createTool({
  */
 export const slowAuditTool = createTool({
   id: "slow-audit",
-  description: "Run a slow audit of one evidence source. Takes a while; safe to run in the background.",
-  inputSchema: z.object({ source: z.string(), workMs: z.number().int().min(0).max(20_000).default(2500) }),
+  description:
+    "Run a slow audit of one evidence source. Takes a while; safe to run in the background.",
+  inputSchema: z.object({
+    source: z.string(),
+    workMs: z.number().int().min(0).max(20_000).default(2500),
+  }),
   outputSchema: z.object({ source: z.string(), findings: z.number(), tookMs: z.number() }),
   background: { enabled: true, timeoutMs: 45_000, maxRetries: 0 },
   execute: async ({ source, workMs }) => {
@@ -134,7 +149,13 @@ export const compiledReadinessTool = createTool({
     const sourceHash = hashSource(text);
     const patch = compiledPatchFor(sourceHash, reference);
     return patch
-      ? { matched: true, sourceHash, patch, reason: "hash matched the compiled rule", modelCalls: 0 }
+      ? {
+          matched: true,
+          sourceHash,
+          patch,
+          reason: "hash matched the compiled rule",
+          modelCalls: 0,
+        }
       : {
           matched: false,
           sourceHash,

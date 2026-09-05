@@ -111,7 +111,9 @@ export async function runWhenReady(
 // without a model; `test/compiled.test.ts` exercises both this and the string.
 // ---------------------------------------------------------------------------
 
-export type ProbeResult = { ok: true } | { ok: false; code: "ECONNREFUSED" | "EACCES" | "ETIMEDOUT" };
+export type ProbeResult =
+  | { ok: true }
+  | { ok: false; code: "ECONNREFUSED" | "EACCES" | "ETIMEDOUT" };
 export type Probe = () => Promise<ProbeResult>;
 
 export type ReadinessOutcome =

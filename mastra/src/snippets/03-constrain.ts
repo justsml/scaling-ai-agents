@@ -35,11 +35,27 @@
 import { parseCaps, deadlineHit, describeCaps, hasOpenAiKey, remainingMs } from "../lib/caps.js";
 import type { Caps, StopReason } from "../lib/caps.js";
 import { Ledger } from "../lib/ledger.js";
-import { bullet, header, json, ledgerTable, reportSpend, section, stopBanner, table, usd } from "../lib/print.js";
+import {
+  bullet,
+  header,
+  json,
+  ledgerTable,
+  reportSpend,
+  section,
+  stopBanner,
+  table,
+  usd,
+} from "../lib/print.js";
 import { runTournament, printTournament } from "./01-compete.js";
 import { COMPETITORS } from "../lib/profiles.js";
 import { WORKER_MODEL } from "../lib/models.js";
-import { endWorkerSpan, contextOf, shutdownTracing, startSnippetSpan, startWorkerSpan } from "../lib/spans.js";
+import {
+  endWorkerSpan,
+  contextOf,
+  shutdownTracing,
+  startSnippetSpan,
+  startWorkerSpan,
+} from "../lib/spans.js";
 import { consequentialAgent } from "../mastra/agents.js";
 import { mastra } from "../mastra/index.js";
 
@@ -60,7 +76,9 @@ async function main(): Promise<void> {
 
   if (!hasOpenAiKey()) {
     section("skipped");
-    bullet("OPENAI_API_KEY is not set. Every pass in this snippet needs real calls to show a real stop.");
+    bullet(
+      "OPENAI_API_KEY is not set. Every pass in this snippet needs real calls to show a real stop.",
+    );
     stopBanner("no-api-key", caps);
     reportSpend(SNIPPET, 0);
     return;
@@ -72,7 +90,10 @@ async function main(): Promise<void> {
   section(`pass 1 — your caps: ${describeCaps(caps)}`);
   bullet("a short deadline here is the interesting case: it should cancel workers mid-flight.");
   const ledger1 = new Ledger({ budgetUsd: caps.budgetUsd, label: `${SNIPPET} pass 1` });
-  const pass1Span = startWorkerSpan(snippetSpan, "pass1", { budgetUsd: caps.budgetUsd, deadlineMs: caps.deadlineMs });
+  const pass1Span = startWorkerSpan(snippetSpan, "pass1", {
+    budgetUsd: caps.budgetUsd,
+    deadlineMs: caps.deadlineMs,
+  });
 
   const out1 = await runTournament({
     caps,
@@ -134,9 +155,13 @@ async function main(): Promise<void> {
 
   section("partial artifacts from pass 2");
   const produced = out2.candidates.filter((c) => c.patch.length > 0);
-  bullet(`${produced.length} of ${COMPETITORS.length} competitors produced a patch before the budget ran out.`);
+  bullet(
+    `${produced.length} of ${COMPETITORS.length} competitors produced a patch before the budget ran out.`,
+  );
   for (const c of produced) {
-    bullet(`${c.id}: ${c.sandbox?.pass ?? 0}/5 tests, ${c.patch.split("\n").length} lines, ${usd(c.costUsd)}`);
+    bullet(
+      `${c.id}: ${c.sandbox?.pass ?? 0}/5 tests, ${c.patch.split("\n").length} lines, ${usd(c.costUsd)}`,
+    );
   }
   const undispatched = ledger2.list().filter((e) => e.outcome === "skipped");
   for (const e of undispatched) bullet(`${e.id}: never dispatched — ${e.note}`);
@@ -158,7 +183,9 @@ async function main(): Promise<void> {
   const remainingBudget = ledger1.remainingUsd + ledger2.remainingUsd;
   bullet(`unspent across both passes: ${usd(remainingBudget)}`);
   bullet(`time left on the wall clock: ${remainingMs(caps)}ms`);
-  bullet("neither of those is an argument. The tool carries requireApproval, so a human is on the path.");
+  bullet(
+    "neither of those is an argument. The tool carries requireApproval, so a human is on the path.",
+  );
 
   const winner = out1.winner ?? out2.winner;
   const ledger3 = new Ledger({ budgetUsd: 0.01, label: `${SNIPPET} approval` });
@@ -198,9 +225,12 @@ async function main(): Promise<void> {
       });
       const declined = await consequentialAgent.declineToolCall({
         runId: stream.runId,
-        reason: "Budget and deadline are not authorisation. Open a pull request and request review.",
+        reason:
+          "Budget and deadline are not authorisation. Open a pull request and request review.",
       });
-      bullet(`declined. The model then said: ${((await declined.text) ?? "").trim().slice(0, 160)}`);
+      bullet(
+        `declined. The model then said: ${((await declined.text) ?? "").trim().slice(0, 160)}`,
+      );
       bullet("apply-patch-to-main never executed.");
     } else {
       bullet("no approval chunk was emitted — check the tool wiring.");
@@ -251,7 +281,11 @@ async function main(): Promise<void> {
   ]);
 
   const overall: StopReason =
-    out1.stopReason !== "completed" ? out1.stopReason : out2.stopReason !== "completed" ? out2.stopReason : "completed";
+    out1.stopReason !== "completed"
+      ? out1.stopReason
+      : out2.stopReason !== "completed"
+        ? out2.stopReason
+        : "completed";
   stopBanner(overall, caps, `${out1.stopDetail} ${out2.stopDetail}`.trim() || undefined);
   endWorkerSpan(snippetSpan, {
     profile: SNIPPET,
@@ -290,7 +324,9 @@ function reportPass(
   }
   const aborted = candidates.filter((c) => c.outcome === "aborted");
   if (aborted.length > 0)
-    bullet(`${aborted.length} worker(s) were cancelled in flight: ${aborted.map((c) => c.id).join(", ")}`);
+    bullet(
+      `${aborted.length} worker(s) were cancelled in flight: ${aborted.map((c) => c.id).join(", ")}`,
+    );
   ledgerTable(ledger);
   stopBanner(reason, caps, detail || undefined);
 }

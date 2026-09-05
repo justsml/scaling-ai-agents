@@ -30,10 +30,26 @@
  * the reason the run stopped.
  */
 import { RequestContext } from "@mastra/core/request-context";
-import { parseCaps, deadlineHit, deadlineSignal, describeCaps, hasOpenAiKey, remainingMs } from "../lib/caps.js";
+import {
+  parseCaps,
+  deadlineHit,
+  deadlineSignal,
+  describeCaps,
+  hasOpenAiKey,
+  remainingMs,
+} from "../lib/caps.js";
 import type { Caps, StopReason } from "../lib/caps.js";
 import { BudgetExhausted, Ledger, estimateWorkerCost, usdFromUsage } from "../lib/ledger.js";
-import { bullet, header, ledgerTable, reportSpend, section, stopBanner, table, usd } from "../lib/print.js";
+import {
+  bullet,
+  header,
+  ledgerTable,
+  reportSpend,
+  section,
+  stopBanner,
+  table,
+  usd,
+} from "../lib/print.js";
 import {
   COMPETITORS,
   type CompetitorProfile,
@@ -43,7 +59,13 @@ import {
   localCompetitor,
   patchSchema,
 } from "../lib/profiles.js";
-import { TIEBREAK_ORDER, type Candidate, pickWinner, rubricJudgeScorer, survivors } from "../lib/judge.js";
+import {
+  TIEBREAK_ORDER,
+  type Candidate,
+  pickWinner,
+  rubricJudgeScorer,
+  survivors,
+} from "../lib/judge.js";
 import { readinessChallenge, type ReadinessTestResult } from "../lib/readiness-challenge.js";
 import { hashSource, registerCompiled } from "../lib/compiled.js";
 import { JUDGE_MODEL } from "../lib/models.js";
@@ -99,10 +121,19 @@ export async function runTournament(opts: {
 
   if (!hasOpenAiKey()) {
     for (const p of profiles) ledger.skip(p.id, p.model, "OPENAI_API_KEY is not set");
-    return { candidates: [], winner: null, ledger, stopReason: "no-api-key", stopDetail: "", buggySource };
+    return {
+      candidates: [],
+      winner: null,
+      ledger,
+      stopReason: "no-api-key",
+      stopDetail: "",
+      buggySource,
+    };
   }
   if (!local && !opts.quiet) {
-    bullet("local slot: skipped. LOCAL_OPENAI_BASE_URL is unset, so there is no on-premise competitor.");
+    bullet(
+      "local slot: skipped. LOCAL_OPENAI_BASE_URL is unset, so there is no on-premise competitor.",
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -112,13 +143,21 @@ export async function runTournament(opts: {
   // -------------------------------------------------------------------------
   const dispatchable: CompetitorProfile[] = [];
   for (const p of profiles) {
-    const estimate = estimateWorkerCost(p.priceKey, prompt.length + p.instructions.length, p.expectedOutputTokens);
+    const estimate = estimateWorkerCost(
+      p.priceKey,
+      prompt.length + p.instructions.length,
+      p.expectedOutputTokens,
+    );
     try {
       ledger.reserve(p.id, p.priceKey, estimate);
       dispatchable.push(p);
     } catch (err) {
       if (!(err instanceof BudgetExhausted)) throw err;
-      ledger.skip(p.id, p.priceKey, `not dispatched: ${err.message.split(":")[1]?.trim() ?? "over budget"}`);
+      ledger.skip(
+        p.id,
+        p.priceKey,
+        `not dispatched: ${err.message.split(":")[1]?.trim() ?? "over budget"}`,
+      );
       stopReason = "budget-exhausted";
       stopDetail = `${p.id} was never dispatched; the reservation would have crossed the cap`;
     }
@@ -197,7 +236,8 @@ export async function runTournament(opts: {
       latencyMs,
       rubricScore: null,
       rubricReason: "",
-      whyItExisted: "the free baseline; if no model beats it, the tournament produced nothing worth paying for",
+      whyItExisted:
+        "the free baseline; if no model beats it, the tournament produced nothing worth paying for",
       outcome: certification.outcome === "certified" ? "ok" : "failed",
       note: certification.outcome === "certified" ? "" : certification.outcome,
     });
@@ -205,7 +245,9 @@ export async function runTournament(opts: {
       profile: "reference",
       costUsd: 0,
       latencyMs,
-      outcome: sandbox?.green ? "green" : `${sandbox?.pass ?? 0}/${(sandbox?.pass ?? 0) + (sandbox?.fail ?? 0)}`,
+      outcome: sandbox?.green
+        ? "green"
+        : `${sandbox?.pass ?? 0}/${(sandbox?.pass ?? 0) + (sandbox?.fail ?? 0)}`,
       whyItExisted: "free control on the same contract",
     });
   }
@@ -217,7 +259,9 @@ export async function runTournament(opts: {
   // -------------------------------------------------------------------------
   const alive = survivors(candidates);
   if (!opts.quiet) {
-    section(`rubric judge (${JUDGE_MODEL}) — ${alive.length} of ${candidates.length} candidates survived pass 1`);
+    section(
+      `rubric judge (${JUDGE_MODEL}) — ${alive.length} of ${candidates.length} candidates survived pass 1`,
+    );
   }
 
   if (wantJudge && alive.length > 0 && !deadlineHit(caps)) {
@@ -267,7 +311,8 @@ export async function runTournament(opts: {
           costUsd: ledger.get(`judge:${c.id}`)!.actualUsd,
           latencyMs,
           outcome: `score ${result.score}/10`,
-          whyItExisted: "ranks candidates the deterministic tests cannot separate, against a human-written rubric",
+          whyItExisted:
+            "ranks candidates the deterministic tests cannot separate, against a human-written rubric",
         });
       } catch (err) {
         const latencyMs = Date.now() - started;
@@ -285,7 +330,9 @@ export async function runTournament(opts: {
   } else if (!wantJudge) {
     bullet("rubric judge skipped by the caller (see 03: the cap decided, not the code)");
   } else if (alive.length === 0) {
-    bullet("no survivors, so no judge call was made. The deterministic pass decided the whole tournament.");
+    bullet(
+      "no survivors, so no judge call was made. The deterministic pass decided the whole tournament.",
+    );
   }
 
   const winner = pickWinner(candidates);
@@ -386,7 +433,12 @@ async function runCompetitor(
       return base;
     }
 
-    ledger.reconcile(profile.id, { usage: result.usage, latencyMs, outcome: "ok", model: profile.priceKey });
+    ledger.reconcile(profile.id, {
+      usage: result.usage,
+      latencyMs,
+      outcome: "ok",
+      model: profile.priceKey,
+    });
     base.patch = patch;
     base.costUsd = costUsd;
     base.latencyMs = latencyMs;
@@ -406,7 +458,9 @@ async function runCompetitor(
           : certification.outcome === "execution-error"
             ? "failed"
             : "ok";
-      base.note = base.sandbox?.green ? "" : base.sandbox?.failed.slice(0, 2).join("; ") || certification.outcome;
+      base.note = base.sandbox?.green
+        ? ""
+        : base.sandbox?.failed.slice(0, 2).join("; ") || certification.outcome;
     }
 
     endWorkerSpan(
@@ -504,7 +558,9 @@ async function main(): Promise<void> {
       testsPassed: outcome.winner.sandbox.pass,
       testsFailed: outcome.winner.sandbox.fail,
     });
-    bullet(`compiled: winner stored under source hash ${hashSource(outcome.buggySource)} for snippet 05`);
+    bullet(
+      `compiled: winner stored under source hash ${hashSource(outcome.buggySource)} for snippet 05`,
+    );
   }
 
   ledgerTable(ledger);
@@ -526,7 +582,16 @@ function isAbort(err: unknown): boolean {
 }
 
 function failedEligibility(reason: string): ReadinessTestResult {
-  return { pass: 0, fail: 5, skip: 0, green: false, output: "", exitCode: 1, durationMs: 0, failed: [reason] };
+  return {
+    pass: 0,
+    fail: 5,
+    skip: 0,
+    green: false,
+    output: "",
+    exitCode: 1,
+    durationMs: 0,
+    failed: [reason],
+  };
 }
 
 if (import.meta.main) {

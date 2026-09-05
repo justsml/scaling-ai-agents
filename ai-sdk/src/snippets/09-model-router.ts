@@ -83,7 +83,11 @@ function fallbackConfig() {
       note: "secondary credential slot (same provider)",
     };
   return {
-    agent: createAiSdkDecisionAgent({ instructions, modelId: "openai/gpt-5.6-luna", providerSlot: "primary" }),
+    agent: createAiSdkDecisionAgent({
+      instructions,
+      modelId: "openai/gpt-5.6-luna",
+      providerSlot: "primary",
+    }),
     note: "same-provider nano fallback; tier fallback, not provider resilience",
   };
 }
@@ -121,7 +125,11 @@ async function runExperiment(options: {
   for (const item of cases) {
     if (Date.now() >= options.deadlineAt || spend >= options.budgetUsd) {
       run.counts["budget stop"] = (run.counts["budget stop"] ?? 0) + 1;
-      run.traces.push({ caseId: item.id, provenance: item.groundTruth.source, terminalFailureLabel: "budget stop" });
+      run.traces.push({
+        caseId: item.id,
+        provenance: item.groundTruth.source,
+        terminalFailureLabel: "budget stop",
+      });
       continue;
     }
     try {
@@ -144,9 +152,11 @@ async function runExperiment(options: {
       }
       run.counts[result.outcome.source]++;
       const expected = item.groundTruth.route ?? item.groundTruth.preferredRoute;
-      if (!expected || !result.specialist) throw new Error(`route case ${item.id} lacks expected route or specialist`);
+      if (!expected || !result.specialist)
+        throw new Error(`route case ${item.id} lacks expected route or specialist`);
       const acceptable =
-        item.groundTruth.acceptedRoutes?.includes(result.outcome.route) ?? result.outcome.route === expected;
+        item.groundTruth.acceptedRoutes?.includes(result.outcome.route) ??
+        result.outcome.route === expected;
       const forbiddenPassed = scoreForbiddenRoute(result.outcome, item.groundTruth.forbidden) === 1;
       const costClassPassed = scoreCostClass(result.outcome, result.specialist.modelClass) === 1;
       if (!costClassPassed) run.costClassViolations++;
@@ -188,7 +198,11 @@ async function runExperiment(options: {
         usageTokens: 0,
       });
       run.counts[terminalFailureLabel] = (run.counts[terminalFailureLabel] ?? 0) + 1;
-      run.traces.push({ caseId: item.id, provenance: item.groundTruth.source, terminalFailureLabel });
+      run.traces.push({
+        caseId: item.id,
+        provenance: item.groundTruth.source,
+        terminalFailureLabel,
+      });
     }
   }
   return run;
@@ -221,7 +235,9 @@ function reportRun(run: ExperimentRun) {
       };
     }),
   );
-  const judged = run.traces.flatMap((trace) => (trace.reasonableness === undefined ? [] : [trace.reasonableness]));
+  const judged = run.traces.flatMap((trace) =>
+    trace.reasonableness === undefined ? [] : [trace.reasonableness],
+  );
   printKV("ambiguous explanation judge", {
     judgedCases: judged.length,
     averageScore: judged.length ? judged.reduce((a, b) => a + b, 0) / judged.length : 0,
@@ -230,7 +246,10 @@ function reportRun(run: ExperimentRun) {
 }
 
 async function main() {
-  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), { budgetUsd: 0.05, deadlineMs: 120_000 });
+  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), {
+    budgetUsd: 0.05,
+    deadlineMs: 120_000,
+  });
   if (!process.env.OPENAI_API_KEY) {
     console.log("skipped: OPENAI_API_KEY is required for router experiments");
     return;
@@ -268,7 +287,9 @@ async function main() {
   for (const run of runs) reportRun(run);
   const totalCostUsd = runs.reduce(
     (sum, run) =>
-      sum + run.observations.reduce((subtotal, row) => subtotal + row.costUsd, 0) + run.reasonablenessCostUsd,
+      sum +
+      run.observations.reduce((subtotal, row) => subtotal + row.costUsd, 0) +
+      run.reasonablenessCostUsd,
     0,
   );
   printTable(
@@ -276,13 +297,15 @@ async function main() {
     runs.map((run) => {
       const routed = run.traces.filter((trace) => trace.result?.outcome.action === "route");
       const ruleHits = routed.filter(
-        (trace) => trace.result?.outcome.action === "route" && trace.result.outcome.source === "rule",
+        (trace) =>
+          trace.result?.outcome.action === "route" && trace.result.outcome.source === "rule",
       ).length;
       return {
         run: run.name,
         accuracy: thresholdVerdict(run.observations).routeAccuracy,
         ruleHitRate: routed.length ? ruleHits / routed.length : 0,
-        costUsd: run.observations.reduce((sum, row) => sum + row.costUsd, 0) + run.reasonablenessCostUsd,
+        costUsd:
+          run.observations.reduce((sum, row) => sum + row.costUsd, 0) + run.reasonablenessCostUsd,
       };
     }),
   );
@@ -300,7 +323,10 @@ async function main() {
   );
   const failed =
     runs.some(
-      (run) => !thresholdVerdict(run.observations).pass || run.approvalPasses !== 2 || run.costClassViolations > 0,
+      (run) =>
+        !thresholdVerdict(run.observations).pass ||
+        run.approvalPasses !== 2 ||
+        run.costClassViolations > 0,
     ) || totalCostUsd > budgetUsd;
   if (failed) process.exitCode = 1;
 }

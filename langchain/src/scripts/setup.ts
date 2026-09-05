@@ -59,7 +59,8 @@ async function main() {
 
   const listed = await readdir(LOCAL, { recursive: true, withFileTypes: true });
   for (const entry of listed) {
-    if (entry.isFile()) console.log(`  ${entry.parentPath.replace(HERE, "./").replace("//", "/")}/${entry.name}`);
+    if (entry.isFile())
+      console.log(`  ${entry.parentPath.replace(HERE, "./").replace("//", "/")}/${entry.name}`);
   }
 
   if (missing.length > 0) {

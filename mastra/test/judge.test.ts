@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { type Candidate, TIEBREAK_ORDER, compareCandidates, pickWinner, survivors } from "../src/lib/judge.js";
+import {
+  type Candidate,
+  TIEBREAK_ORDER,
+  compareCandidates,
+  pickWinner,
+  survivors,
+} from "../src/lib/judge.js";
 import type { ReadinessTestResult } from "../src/lib/readiness-challenge.js";
 
 function sandbox(pass: number, fail: number): ReadinessTestResult {
@@ -35,7 +41,9 @@ function candidate(over: Partial<Candidate>): Candidate {
 
 describe("tie-break order", () => {
   test("is stated, not implied", () => {
-    expect(TIEBREAK_ORDER).toBe("tests passed (desc) → rubric score (desc) → cost (asc) → latency (asc)");
+    expect(TIEBREAK_ORDER).toBe(
+      "tests passed (desc) → rubric score (desc) → cost (asc) → latency (asc)",
+    );
   });
 
   test("tests beat a better rubric score", () => {

@@ -44,7 +44,10 @@ export type CertificationResult =
 export interface ReadinessChallenge {
   load(kind: "buggy"): Promise<ReadinessArtifact>;
   load(kind: "reference"): Promise<ReferenceArtifact>;
-  certify(source: string | ReadinessArtifact, options?: { abortSignal?: AbortSignal }): Promise<CertificationResult>;
+  certify(
+    source: string | ReadinessArtifact,
+    options?: { abortSignal?: AbortSignal },
+  ): Promise<CertificationResult>;
 }
 
 export const readinessChallenge: ReadinessChallenge = createReadinessChallenge();

@@ -34,8 +34,20 @@ interface SnippetSpec {
 }
 
 const SNIPPETS: SnippetSpec[] = [
-  { id: "00", file: "src/snippets/00-router.ts", title: "Router", budgetUsd: 0.06, deadlineMs: 180_000 },
-  { id: "01", file: "src/snippets/01-compete.ts", title: "Compete", budgetUsd: 0.08, deadlineMs: 180_000 },
+  {
+    id: "00",
+    file: "src/snippets/00-router.ts",
+    title: "Router",
+    budgetUsd: 0.06,
+    deadlineMs: 180_000,
+  },
+  {
+    id: "01",
+    file: "src/snippets/01-compete.ts",
+    title: "Compete",
+    budgetUsd: 0.08,
+    deadlineMs: 180_000,
+  },
   {
     id: "02",
     file: "src/snippets/02-decompose.ts",
@@ -44,11 +56,41 @@ const SNIPPETS: SnippetSpec[] = [
     deadlineMs: 180_000,
     extraArgs: ["--deep-agents"],
   },
-  { id: "03", file: "src/snippets/03-constrain.ts", title: "Constrain", budgetUsd: 0.1, deadlineMs: 180_000 },
-  { id: "04", file: "src/snippets/04-distribute.ts", title: "Distribute", budgetUsd: 0.08, deadlineMs: 240_000 },
-  { id: "05", file: "src/snippets/05-compile.ts", title: "Compile", budgetUsd: 0.05, deadlineMs: 180_000 },
-  { id: "06", file: "src/snippets/06-remote.ts", title: "Remote worker", budgetUsd: 0.04, deadlineMs: 240_000 },
-  { id: "07", file: "src/snippets/07-batching.ts", title: "Batching", budgetUsd: 0.04, deadlineMs: 120_000 },
+  {
+    id: "03",
+    file: "src/snippets/03-constrain.ts",
+    title: "Constrain",
+    budgetUsd: 0.1,
+    deadlineMs: 180_000,
+  },
+  {
+    id: "04",
+    file: "src/snippets/04-distribute.ts",
+    title: "Distribute",
+    budgetUsd: 0.08,
+    deadlineMs: 240_000,
+  },
+  {
+    id: "05",
+    file: "src/snippets/05-compile.ts",
+    title: "Compile",
+    budgetUsd: 0.05,
+    deadlineMs: 180_000,
+  },
+  {
+    id: "06",
+    file: "src/snippets/06-remote.ts",
+    title: "Remote worker",
+    budgetUsd: 0.04,
+    deadlineMs: 240_000,
+  },
+  {
+    id: "07",
+    file: "src/snippets/07-batching.ts",
+    title: "Batching",
+    budgetUsd: 0.04,
+    deadlineMs: 120_000,
+  },
 ];
 
 interface Result {
@@ -63,13 +105,19 @@ interface Result {
 
 async function main() {
   const args = parseArgs();
-  const only = typeof args.flags.only === "string" ? new Set(args.flags.only.split(",").map((s) => s.trim())) : null;
+  const only =
+    typeof args.flags.only === "string"
+      ? new Set(args.flags.only.split(",").map((s) => s.trim()))
+      : null;
 
   const dir = await mkdtemp(join(tmpdir(), "agentic-parallelism-all-"));
   const spendFile = join(dir, "spend.tsv");
   await writeFile(spendFile, "", "utf8");
 
-  header("agentic-parallelism / langchain — all snippets", `run started ${new Date().toISOString()}`);
+  header(
+    "agentic-parallelism / langchain — all snippets",
+    `run started ${new Date().toISOString()}`,
+  );
 
   if (!process.env.OPENAI_API_KEY) {
     kv("warning", "OPENAI_API_KEY is not set — most snippets will print `skipped` and exit 0");
@@ -81,8 +129,10 @@ async function main() {
     if (only && !only.has(snippet.id)) continue;
 
     section(`${snippet.id} ${snippet.title}`);
-    const budget = typeof args.flags["budget-usd"] === "string" ? args.budgetUsd : snippet.budgetUsd;
-    const deadline = typeof args.flags["deadline-ms"] === "string" ? args.deadlineMs : snippet.deadlineMs;
+    const budget =
+      typeof args.flags["budget-usd"] === "string" ? args.budgetUsd : snippet.budgetUsd;
+    const deadline =
+      typeof args.flags["deadline-ms"] === "string" ? args.deadlineMs : snippet.deadlineMs;
 
     console.log(`  $ bun run ${snippet.file} --budget-usd ${budget} --deadline-ms ${deadline}`);
     const started = Date.now();
@@ -162,7 +212,14 @@ async function main() {
   section("summary");
   table(
     ["id", "snippet", "status", "wall clock", "charged", "detail"],
-    results.map((r) => [r.id, r.title, r.status, `${(r.wallMs / 1000).toFixed(1)}s`, usd(r.chargedUsd), r.detail]),
+    results.map((r) => [
+      r.id,
+      r.title,
+      r.status,
+      `${(r.wallMs / 1000).toFixed(1)}s`,
+      usd(r.chargedUsd),
+      r.detail,
+    ]),
   );
 
   const total = results.reduce((a, r) => a + r.chargedUsd, 0);
@@ -178,7 +235,9 @@ async function main() {
   );
   console.log("");
   console.log("Costs are estimates from usage_metadata and src/fixtures/prices.json.");
-  console.log("The remote worker's spend is estimated, not measured: its usage is not visible here.");
+  console.log(
+    "The remote worker's spend is estimated, not measured: its usage is not visible here.",
+  );
   console.log("");
 
   process.exit(failures.length === 0 ? 0 : 1);

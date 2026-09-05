@@ -56,7 +56,9 @@ function hashOf(source: string): string {
 // directly and never builds an agent at all.
 const compiledReadinessTool = tool({
   description: "Deterministically run the compiled, already-fixed readiness check (no model call).",
-  inputSchema: z.object({ probeSequence: z.array(z.enum(["ok", "econnrefused", "eacces", "etimedout"])) }),
+  inputSchema: z.object({
+    probeSequence: z.array(z.enum(["ok", "econnrefused", "eacces", "etimedout"])),
+  }),
   execute: async ({ probeSequence }) => {
     let i = 0;
     const probe: Probe = async () => {
@@ -64,9 +66,18 @@ const compiledReadinessTool = tool({
       i++;
       return code === "ok"
         ? { ok: true }
-        : { ok: false, code: code === "econnrefused" ? "ECONNREFUSED" : code === "eacces" ? "EACCES" : "ETIMEDOUT" };
+        : {
+            ok: false,
+            code:
+              code === "econnrefused" ? "ECONNREFUSED" : code === "eacces" ? "EACCES" : "ETIMEDOUT",
+          };
     };
-    const options: ReadinessOptions = { deadlineMs: 2000, baseDelayMs: 5, now: () => 0, sleep: async () => {} };
+    const options: ReadinessOptions = {
+      deadlineMs: 2000,
+      baseDelayMs: 5,
+      now: () => 0,
+      sleep: async () => {},
+    };
     return runWhenReady(probe, async () => {}, options);
   },
 });
@@ -161,14 +172,22 @@ async function handleRequest(
 }
 
 async function main() {
-  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), { budgetUsd: 0.05, deadlineMs: 30_000 });
+  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), {
+    budgetUsd: 0.05,
+    deadlineMs: 30_000,
+  });
   initTelemetry();
-  heading("05 Compile — registry hit skips the model entirely; a miss still runs the tournament path");
+  heading(
+    "05 Compile — registry hit skips the model entirely; a miss still runs the tournament path",
+  );
   printKV("caps", { budgetUsd, deadlineMs });
   console.log(`\nregistry note: ${registry._note}`);
 
   const buggySource = await readFile(new URL("../fixtures/readiness.ts", import.meta.url), "utf8");
-  const variantSource = buggySource.replace("BUGGY on purpose", "BUGGY on purpose, variant A (never tournamented)");
+  const variantSource = buggySource.replace(
+    "BUGGY on purpose",
+    "BUGGY on purpose, variant A (never tournamented)",
+  );
   const negativeSource = `${buggySource}\n// negative case: a trailing comment nobody has certified\n`;
 
   const outcomes: RequestOutcome[] = [];
@@ -181,10 +200,20 @@ async function main() {
     ),
   );
   outcomes.push(
-    await handleRequest("request-2 (exact certified input, zero model calls)", buggySource, budgetUsd, deadlineMs),
+    await handleRequest(
+      "request-2 (exact certified input, zero model calls)",
+      buggySource,
+      budgetUsd,
+      deadlineMs,
+    ),
   );
   outcomes.push(
-    await handleRequest("negative case (different bytes, must still miss)", negativeSource, budgetUsd, deadlineMs),
+    await handleRequest(
+      "negative case (different bytes, must still miss)",
+      negativeSource,
+      budgetUsd,
+      deadlineMs,
+    ),
   );
 
   printTable(
@@ -203,14 +232,20 @@ async function main() {
   printKV("result", {
     totalModelCalls: outcomes.reduce((s, o) => s + o.modelCalls, 0),
     expectation: "request-2 has 0 model calls; request-1 and the negative case each have exactly 1",
-    matchesExpectation: outcomes[1]!.modelCalls === 0 && outcomes[0]!.modelCalls === 1 && outcomes[2]!.modelCalls === 1,
+    matchesExpectation:
+      outcomes[1]!.modelCalls === 0 &&
+      outcomes[0]!.modelCalls === 1 &&
+      outcomes[2]!.modelCalls === 1,
     totalCostUsd: formatUsd(totalCostUsd),
     budgetUsd: formatUsd(budgetUsd),
   });
 
   // Sanity: the compiled tool's own contract is still enforced by the
   // fixture tests, copied next to it and run here in-process.
-  const compiledSource = await readFile(new URL("../compiled/readiness.ts", import.meta.url), "utf8");
+  const compiledSource = await readFile(
+    new URL("../compiled/readiness.ts", import.meta.url),
+    "utf8",
+  );
   const sandbox = await runSandbox(compiledSource, 6000);
   printKV("compiled contract check (src/compiled/readiness.test.ts)", {
     passed: sandbox.passed,

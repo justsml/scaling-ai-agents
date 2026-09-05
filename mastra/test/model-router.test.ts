@@ -27,7 +27,9 @@ describe("model router", () => {
     const shared = resolve(import.meta.dir, "../../shared/fixtures/router");
     expect((await readdir(local)).sort()).toEqual((await readdir(shared)).sort());
     for (const file of await readdir(shared))
-      expect(await Bun.file(resolve(local, file)).text()).toBe(await Bun.file(resolve(shared, file)).text());
+      expect(await Bun.file(resolve(local, file)).text()).toBe(
+        await Bun.file(resolve(shared, file)).text(),
+      );
   });
   test("ordered rules handle exact routes and approval without collisions", async () => {
     const rules = await loadRules();
@@ -41,11 +43,16 @@ describe("model router", () => {
         forbidden: 1,
       });
     for (const item of cases.filter((item) => item.groundTruth.action === "approval"))
-      expect(await decide(item.input, rules, never, { rulesEnabled: false })).toMatchObject({ action: "approval" });
-    expect(deterministic(cases.find((item) => item.id === "ambiguous-deploy-logs")!.input, rules)?.action).not.toBe(
-      "approval",
-    );
-    expect(deterministic(cases.find((item) => item.id === "ambiguous-stack-summary")!.input, rules)).toMatchObject({
+      expect(await decide(item.input, rules, never, { rulesEnabled: false })).toMatchObject({
+        action: "approval",
+      });
+    expect(
+      deterministic(cases.find((item) => item.id === "ambiguous-deploy-logs")!.input, rules)
+        ?.action,
+    ).not.toBe("approval");
+    expect(
+      deterministic(cases.find((item) => item.id === "ambiguous-stack-summary")!.input, rules),
+    ).toMatchObject({
       action: "route",
       route: "general",
     });
@@ -90,5 +97,7 @@ describe("model router", () => {
     ).rejects.toThrow("invalid structured");
   });
   test("outcome union rejects mixed states", () =>
-    expect(Outcome.safeParse({ action: "approval", route: "code", reason: "x", source: "rule" }).success).toBe(false));
+    expect(
+      Outcome.safeParse({ action: "approval", route: "code", reason: "x", source: "rule" }).success,
+    ).toBe(false));
 });

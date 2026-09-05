@@ -133,10 +133,16 @@ describe("ledger: reserve then reconcile", () => {
 
 describe("pool: region and dataClass filter providers before any call", () => {
   test("restricted data can only ever reach the local slot", () => {
-    const withLocal = selectProvider({ region: "eu", dataClass: "restricted" }, { localAvailable: true });
+    const withLocal = selectProvider(
+      { region: "eu", dataClass: "restricted" },
+      { localAvailable: true },
+    );
     expect(withLocal.provider?.id).toBe("local-slot");
 
-    const withoutLocal = selectProvider({ region: "eu", dataClass: "restricted" }, { localAvailable: false });
+    const withoutLocal = selectProvider(
+      { region: "eu", dataClass: "restricted" },
+      { localAvailable: false },
+    );
     expect(withoutLocal.provider).toBeNull();
     expect(withoutLocal.reason).toContain("no provider qualifies");
   });
@@ -147,7 +153,10 @@ describe("pool: region and dataClass filter providers before any call", () => {
   });
 
   test("eu internal drops the us-only providers", () => {
-    const decision = selectProvider({ region: "eu", dataClass: "internal" }, { localAvailable: false });
+    const decision = selectProvider(
+      { region: "eu", dataClass: "internal" },
+      { localAvailable: false },
+    );
     expect(decision.provider?.id).toBe("openai-nano");
     const dropped = decision.considered.filter((c) => !c.kept).map((c) => c.id);
     expect(dropped).toContain("openai-primary");
@@ -175,7 +184,15 @@ describe("judge: deterministic first, and a deterministic tie-break", () => {
     const winner = pickWinner([
       base({
         profile: "a",
-        sandbox: { passed: 3, failed: 2, total: 5, green: false, durationMs: 1, failures: [], output: "" },
+        sandbox: {
+          passed: 3,
+          failed: 2,
+          total: 5,
+          green: false,
+          durationMs: 1,
+          failures: [],
+          output: "",
+        },
         rubric: {
           correctnessBeyondTests: 2,
           minimalSurface: 2,
@@ -188,7 +205,15 @@ describe("judge: deterministic first, and a deterministic tie-break", () => {
       }),
       base({
         profile: "b",
-        sandbox: { passed: 5, failed: 0, total: 5, green: true, durationMs: 1, failures: [], output: "" },
+        sandbox: {
+          passed: 5,
+          failed: 0,
+          total: 5,
+          green: true,
+          durationMs: 1,
+          failures: [],
+          output: "",
+        },
         rubric: {
           correctnessBeyondTests: 1,
           minimalSurface: 1,
@@ -204,7 +229,15 @@ describe("judge: deterministic first, and a deterministic tie-break", () => {
   });
 
   test("cost breaks a tie on tests and rubric", () => {
-    const sandbox = { passed: 5, failed: 0, total: 5, green: true, durationMs: 1, failures: [], output: "" };
+    const sandbox = {
+      passed: 5,
+      failed: 0,
+      total: 5,
+      green: true,
+      durationMs: 1,
+      failures: [],
+      output: "",
+    };
     const winner = pickWinner([
       base({ profile: "pricey", sandbox, costUsd: 0.02 }),
       base({ profile: "cheap", sandbox, costUsd: 0.001 }),
@@ -213,7 +246,15 @@ describe("judge: deterministic first, and a deterministic tie-break", () => {
   });
 
   test("a disqualified candidate never wins and never reaches the rubric judge", () => {
-    const sandbox = { passed: 5, failed: 0, total: 5, green: true, durationMs: 1, failures: [], output: "" };
+    const sandbox = {
+      passed: 5,
+      failed: 0,
+      total: 5,
+      green: true,
+      durationMs: 1,
+      failures: [],
+      output: "",
+    };
     const list = [
       base({ profile: "dq", sandbox, disqualifiedFor: "adds a dependency (lodash)" }),
       base({ profile: "ok", sandbox }),

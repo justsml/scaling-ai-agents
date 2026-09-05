@@ -13,10 +13,20 @@
  */
 import { Agent } from "@mastra/core/agent";
 import { z } from "zod";
-import { FRONTIER_MODEL, LOCAL_MODEL_ID, WORKER_MODEL, localModelConfig, localSlotAvailable } from "./models.js";
+import {
+  FRONTIER_MODEL,
+  LOCAL_MODEL_ID,
+  WORKER_MODEL,
+  localModelConfig,
+  localSlotAvailable,
+} from "./models.js";
 
 export const patchSchema = z.object({
-  patch: z.string().describe("The complete new contents of readiness.ts. Not a diff. No markdown fences, no prose."),
+  patch: z
+    .string()
+    .describe(
+      "The complete new contents of readiness.ts. Not a diff. No markdown fences, no prose.",
+    ),
   rationale: z.string().describe("One or two sentences on what you changed and why."),
 });
 

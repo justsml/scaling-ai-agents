@@ -38,7 +38,14 @@ export function buildReport(
   const gates = Object.fromEntries(
     GATES.map((name) => {
       if (name === "dispatch")
-        return [name, { passed: dispatchPassed, passedRuns: dispatchPassed ? runs.length : 0, totalRuns: runs.length }];
+        return [
+          name,
+          {
+            passed: dispatchPassed,
+            passedRuns: dispatchPassed ? runs.length : 0,
+            totalRuns: runs.length,
+          },
+        ];
       const results = runs
         .map((run) => run.gates.find((gate) => gate.gate === name))
         .filter((gate) => gate !== undefined);
@@ -48,7 +55,9 @@ export function buildReport(
         return [
           name,
           {
-            passed: perStack.every(({ scored, possible }) => possible > 0 && scored / possible >= 0.9),
+            passed: perStack.every(
+              ({ scored, possible }) => possible > 0 && scored / possible >= 0.9,
+            ),
             passedRuns,
             totalRuns: runs.length,
           },
@@ -56,7 +65,11 @@ export function buildReport(
       }
       return [
         name,
-        { passed: results.length === runs.length && passedRuns === runs.length, passedRuns, totalRuns: runs.length },
+        {
+          passed: results.length === runs.length && passedRuns === runs.length,
+          passedRuns,
+          totalRuns: runs.length,
+        },
       ];
     }),
   ) as EvalReport["gates"];
@@ -85,7 +98,9 @@ export function buildReport(
       estimatedCostUsd,
       costStatus: price ? "available" : "unavailable-no-price",
       latencyMs: distribution(runs.map((run) => run.evidence.latencyMs)),
-      toolLatencyMs: distribution(runs.flatMap((run) => run.evidence.toolCalls.map((call) => call.latencyMs))),
+      toolLatencyMs: distribution(
+        runs.flatMap((run) => run.evidence.toolCalls.map((call) => call.latencyMs)),
+      ),
       driver: summarizeDriver(driverSamples),
     },
     passed: Object.values(gates).every((gate) => gate.passed),
@@ -101,10 +116,15 @@ function summarizeDriver(samples: DriverMetricSample[]): EvalReport["metrics"]["
   const tokenFields = ["input", "output", "cacheRead", "cacheWrite", "total"] as const;
   const tokensAvailable =
     parsed.length > 0 &&
-    parsed.every(({ tokens }) => tokenFields.every((field) => isNonnegativeFiniteNumber(tokens[field])));
+    parsed.every(({ tokens }) =>
+      tokenFields.every((field) => isNonnegativeFiniteNumber(tokens[field])),
+    );
   const tokens = tokensAvailable
     ? (Object.fromEntries(
-        tokenFields.map((field) => [field, parsed.reduce((sum, item) => sum + (item.tokens[field] as number), 0)]),
+        tokenFields.map((field) => [
+          field,
+          parsed.reduce((sum, item) => sum + (item.tokens[field] as number), 0),
+        ]),
       ) as EvalReport["metrics"]["driver"]["tokens"])
     : null;
   const costs = parsed.map(({ stats }) => stats.cost);
@@ -112,7 +132,9 @@ function summarizeDriver(samples: DriverMetricSample[]): EvalReport["metrics"]["
   return {
     runs: samples.length,
     tokens,
-    reportedCostUsd: costsAvailable ? (costs as number[]).reduce((sum, cost) => sum + cost, 0) : null,
+    reportedCostUsd: costsAvailable
+      ? (costs as number[]).reduce((sum, cost) => sum + cost, 0)
+      : null,
     costStatus: costsAvailable ? "reported" : "unavailable",
     latencyMs: distribution(samples.map((sample) => sample.latencyMs)),
   };
@@ -123,7 +145,9 @@ function isNonnegativeFiniteNumber(value: unknown): value is number {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 export function distribution(values: number[]): { p50: number | null; p95: number | null } {
@@ -141,7 +165,8 @@ function dispatchIsBalanced(runs: ScoredRun[]): boolean {
   if (scenarios.size === 0) return false;
   for (const scenario of scenarios) {
     const counts = STACKS.map(
-      (stack) => runs.filter((run) => run.scenario.id === scenario && run.evidence.stack === stack).length,
+      (stack) =>
+        runs.filter((run) => run.scenario.id === scenario && run.evidence.stack === stack).length,
     );
     if (counts.some((count) => count < 1 || count !== counts[0])) return false;
   }
@@ -158,7 +183,10 @@ function resultsForStack(
     .reduce(
       (total, run) => {
         const gate = run.gates.find((candidate) => candidate.gate === gateName);
-        return { scored: total.scored + (gate?.scored ?? 0), possible: total.possible + (gate?.possible ?? 0) };
+        return {
+          scored: total.scored + (gate?.scored ?? 0),
+          possible: total.possible + (gate?.possible ?? 0),
+        };
       },
       { scored: 0, possible: 0 },
     );

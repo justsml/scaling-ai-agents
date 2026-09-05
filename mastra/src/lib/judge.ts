@@ -60,7 +60,8 @@ export const rubricAnalysisSchema = z.object({
 export const rubricJudgeScorer = createScorer<{ patch: string }, { patch: string }>({
   id: "rubric-judge",
   name: "Rubric judge (fixtures/rubric.md)",
-  description: "Scores a surviving patch against the human-written rubric. Never writes its own criteria.",
+  description:
+    "Scores a surviving patch against the human-written rubric. Never writes its own criteria.",
   judge: {
     model: JUDGE_MODEL,
     instructions:
@@ -117,7 +118,10 @@ Set disqualified to true only if a listed disqualifier clearly applies.`;
  * Deterministic scorer used as a gate in 05. It reads a sandbox result off the
  * workflow output; there is no model in this path at all.
  */
-export const fixtureScorer = createScorer<unknown, { pass?: number; fail?: number; green?: boolean }>({
+export const fixtureScorer = createScorer<
+  unknown,
+  { pass?: number; fail?: number; green?: boolean }
+>({
   id: "fixture-pass",
   name: "Fixture tests pass",
   description: "Scores 1 when every fixture test passes, 0 otherwise. Deterministic; no judge.",
@@ -148,7 +152,8 @@ export interface Candidate {
  * table, because a tournament whose tie-break rule is implicit is a tournament
  * whose result cannot be argued with.
  */
-export const TIEBREAK_ORDER = "tests passed (desc) → rubric score (desc) → cost (asc) → latency (asc)";
+export const TIEBREAK_ORDER =
+  "tests passed (desc) → rubric score (desc) → cost (asc) → latency (asc)";
 
 export function pickWinner(candidates: Candidate[]): Candidate | null {
   const eligible = candidates.filter((c) => c.outcome === "ok" && c.sandbox && c.sandbox.pass > 0);

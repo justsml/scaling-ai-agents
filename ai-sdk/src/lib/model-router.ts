@@ -28,7 +28,11 @@ const clarifyOutcomeSchema = z
   })
   .strict();
 const approvalOutcomeSchema = z
-  .object({ action: z.literal("approval"), reason: z.string().trim().min(1), source: z.literal("rule") })
+  .object({
+    action: z.literal("approval"),
+    reason: z.string().trim().min(1),
+    source: z.literal("rule"),
+  })
   .strict();
 export const routerOutcomeSchema = z.discriminatedUnion("action", [
   routeOutcomeSchema,
@@ -39,7 +43,11 @@ export type RouterOutcome = z.infer<typeof routerOutcomeSchema>;
 export type RouteOutcome = z.infer<typeof routeOutcomeSchema>;
 
 const modelCandidateSchema = z
-  .object({ route: z.enum(ROUTES), confidence: z.number().min(0).max(1), reason: z.string().trim().min(1) })
+  .object({
+    route: z.enum(ROUTES),
+    confidence: z.number().min(0).max(1),
+    reason: z.string().trim().min(1),
+  })
   .strict();
 export type ModelCandidate = z.infer<typeof modelCandidateSchema>;
 
@@ -80,7 +88,12 @@ interface PolicyFixture {
   version: string;
   routes: Record<
     Route,
-    { minConfidence: number; costClass: ModelClass; escalateTo?: ModelClass; escalationNeeds?: string[] }
+    {
+      minConfidence: number;
+      costClass: ModelClass;
+      escalateTo?: ModelClass;
+      escalationNeeds?: string[];
+    }
   >;
   allowDowngrade: boolean;
   clarifyBelow: number;
@@ -144,7 +157,9 @@ export interface RouteOptions {
   random?: () => number;
 }
 
-const orderedRules = [...ROUTER_RULES.rules].sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
+const orderedRules = [...ROUTER_RULES.rules].sort(
+  (a, b) => b.priority - a.priority || a.id.localeCompare(b.id),
+);
 function matchRule(input: string) {
   return orderedRules.find((rule) => new RegExp(rule.pattern, rule.flags).test(input));
 }
@@ -172,7 +187,8 @@ export function applyConfidencePolicy(candidate: RouteOutcome): RouterOutcome {
   if (parsed.confidence < ROUTER_POLICY.clarifyBelow) {
     return {
       action: "clarify",
-      question: "Which outcome matters most: code changes, reviewing extensive evidence, or a short general answer?",
+      question:
+        "Which outcome matters most: code changes, reviewing extensive evidence, or a short general answer?",
       confidence: parsed.confidence,
       reason: `${parsed.reason}; confidence is below the clarification boundary`,
       source: "policy",
@@ -201,12 +217,17 @@ export function fallbackReason(error: unknown): FallbackReason | null {
   const message = `${value?.name ?? ""} ${value?.message ?? String(error)}`.toLowerCase();
   if (status === 408 || /timeout|timed out|aborterror/.test(message)) return "timeout";
   if (status === 429 || /rate.?limit|too many requests/.test(message)) return "rate-limit";
-  if ((status !== undefined && status >= 500) || /\b5\d\d\b|server error|service unavailable/.test(message))
+  if (
+    (status !== undefined && status >= 500) ||
+    /\b5\d\d\b|server error|service unavailable/.test(message)
+  )
     return "server-error";
   return null;
 }
 function fallbackAllowed(reason: FallbackReason) {
-  return ROUTER_POLICY.routerFallbacks.some((item) => item.on.includes(reason) && item.maxRetries > 0);
+  return ROUTER_POLICY.routerFallbacks.some(
+    (item) => item.on.includes(reason) && item.maxRetries > 0,
+  );
 }
 
 export async function routeRequest(
@@ -218,7 +239,11 @@ export async function routeRequest(
   // Approval is safety policy and stays enabled in rules-off experiments.
   if (matchedRule?.action === "approval") {
     return {
-      outcome: { action: "approval", reason: `matched approval rule ${matchedRule.id}`, source: "rule" },
+      outcome: {
+        action: "approval",
+        reason: `matched approval rule ${matchedRule.id}`,
+        source: "rule",
+      },
       ruleId: matchedRule.id,
       ruleTags: matchedRule.tags ?? [],
       metrics: null,
@@ -241,21 +266,34 @@ export async function routeRequest(
   } else {
     try {
       const result = await decisionAgent(input);
-      routeCandidate = { action: "route", ...modelCandidateSchema.parse(result.decision), source: "model" };
+      routeCandidate = {
+        action: "route",
+        ...modelCandidateSchema.parse(result.decision),
+        source: "model",
+      };
       metrics = result.metrics;
     } catch (primaryError) {
       const reason = fallbackReason(primaryError);
       if (!reason || !fallbackAllowed(reason) || !options.fallbackDecisionAgent) throw primaryError;
       fallbackAttempts.push({ providerSlot: "primary", reason });
       const result = await options.fallbackDecisionAgent(input);
-      routeCandidate = { action: "route", ...modelCandidateSchema.parse(result.decision), source: "model" };
+      routeCandidate = {
+        action: "route",
+        ...modelCandidateSchema.parse(result.decision),
+        source: "model",
+      };
       metrics = result.metrics;
       fallbackNote = `primary router ${reason}; used ${result.metrics.providerSlot} fallback slot`;
     }
   }
   const outcome = applyConfidencePolicy(routeCandidate);
   if ((options.random?.() ?? Math.random()) < ROUTER_POLICY.liveScorerSamplingRate)
-    options.liveScorer?.({ scorer: "valid-router-json", score: scoreValidRouterJson(outcome), fired: true, outcome });
+    options.liveScorer?.({
+      scorer: "valid-router-json",
+      score: scoreValidRouterJson(outcome),
+      fired: true,
+      outcome,
+    });
   const ruleTags = rule?.tags ?? [];
   const specialist =
     outcome.action === "route"
@@ -287,7 +325,9 @@ export function createAiSdkDecisionAgent(options: {
   const providerSlot = options.providerSlot ?? "primary";
   const bareModelId = modelId.includes("/") ? modelId.split("/").slice(1).join("/") : modelId;
   const provider =
-    options.apiKey || options.baseURL ? createOpenAI({ apiKey: options.apiKey, baseURL: options.baseURL }) : openai;
+    options.apiKey || options.baseURL
+      ? createOpenAI({ apiKey: options.apiKey, baseURL: options.baseURL })
+      : openai;
   return async (input) => {
     const started = performance.now();
     const result = await generateText({
@@ -354,10 +394,16 @@ export async function scoreAmbiguousRoute(
     return { score: 0, rationale: `route ${outcome.route} is outside acceptedRoutes` };
   return judge(item.input, outcome, accepted);
 }
-export function createAiSdkReasonablenessJudge(options: { rubric: string; modelId?: string }): ReasonablenessJudge {
+export function createAiSdkReasonablenessJudge(options: {
+  rubric: string;
+  modelId?: string;
+}): ReasonablenessJudge {
   const modelId = options.modelId ?? process.env.MODEL_JUDGE ?? "openai/gpt-5.6-luna";
   const bareModelId = modelId.includes("/") ? modelId.split("/").slice(1).join("/") : modelId;
-  const outputSchema = z.object({ score: z.number().min(0).max(1), rationale: z.string().trim().min(1) });
+  const outputSchema = z.object({
+    score: z.number().min(0).max(1),
+    rationale: z.string().trim().min(1),
+  });
   return async (input, outcome, acceptedRoutes) => {
     const started = performance.now();
     const result = await generateText({
@@ -394,14 +440,24 @@ export function scoreRouteAccuracy(outcome: RouterOutcome, expected: Route): 0 |
 export function scoreForbiddenRoute(outcome: RouterOutcome, forbidden: Route[] = []): 0 | 1 {
   return outcome.action === "route" && forbidden.includes(outcome.route) ? 0 : 1;
 }
-export function scoreApprovalBypass(outcome: RouterOutcome, modelCalls: number, specialistCalls: number): 0 | 1 {
+export function scoreApprovalBypass(
+  outcome: RouterOutcome,
+  modelCalls: number,
+  specialistCalls: number,
+): 0 | 1 {
   return outcome.action === "approval" && modelCalls === 0 && specialistCalls === 0 ? 1 : 0;
 }
 export function scoreCostClass(outcome: RouterOutcome, actualModelClass: ModelClass): 0 | 1 {
-  return outcome.action === "route" && outcome.route === "general" && actualModelClass !== "nano" ? 0 : 1;
+  return outcome.action === "route" && outcome.route === "general" && actualModelClass !== "nano"
+    ? 0
+    : 1;
 }
 
-export type FailureLabel = "provider/harness failure" | "route error" | "specialist failure" | "budget stop";
+export type FailureLabel =
+  | "provider/harness failure"
+  | "route error"
+  | "specialist failure"
+  | "budget stop";
 export interface FailureEvidence {
   httpError?: boolean;
   timeout?: boolean;
@@ -413,7 +469,10 @@ export interface FailureEvidence {
 }
 export function labelFailure(evidence: FailureEvidence): FailureLabel {
   if (evidence.budgetStopped) return "budget stop";
-  if ((evidence.httpError || evidence.timeout || evidence.emptyStream) && (evidence.usageTokens ?? 0) === 0)
+  if (
+    (evidence.httpError || evidence.timeout || evidence.emptyStream) &&
+    (evidence.usageTokens ?? 0) === 0
+  )
     return "provider/harness failure";
   if (evidence.routeCorrect === false) return "route error";
   return "specialist failure";
@@ -442,17 +501,21 @@ export function reportByRoute(observations: RouteObservation[]): RouteReportRow[
     const rows = observations.filter((row) => row.expected === route);
     const failures = new Map<FailureLabel, number>();
     for (const row of rows)
-      if (row.failureLabel) failures.set(row.failureLabel, (failures.get(row.failureLabel) ?? 0) + 1);
+      if (row.failureLabel)
+        failures.set(row.failureLabel, (failures.get(row.failureLabel) ?? 0) + 1);
     return {
       route,
       cases: rows.length,
       accuracy:
         rows.length === 0
           ? 0
-          : rows.reduce((sum, row) => sum + scoreRouteAccuracy(row.outcome, row.expected), 0) / rows.length,
+          : rows.reduce((sum, row) => sum + scoreRouteAccuracy(row.outcome, row.expected), 0) /
+            rows.length,
       costUsd: rows.reduce((sum, row) => sum + row.costUsd, 0),
-      latencyMs: rows.length === 0 ? 0 : rows.reduce((sum, row) => sum + row.latencyMs, 0) / rows.length,
-      failures: [...failures.entries()].map(([label, count]) => `${label}:${count}`).join(", ") || "none",
+      latencyMs:
+        rows.length === 0 ? 0 : rows.reduce((sum, row) => sum + row.latencyMs, 0) / rows.length,
+      failures:
+        [...failures.entries()].map(([label, count]) => `${label}:${count}`).join(", ") || "none",
     };
   });
 }
@@ -462,8 +525,11 @@ export function thresholdVerdict(observations: RouteObservation[]) {
   const accuracy =
     unambiguous.length === 0
       ? 0
-      : unambiguous.reduce((sum, row) => sum + scoreRouteAccuracy(row.outcome, row.expected), 0) / unambiguous.length;
-  const forbiddenHits = observations.filter((row) => scoreForbiddenRoute(row.outcome, row.forbidden) === 0).length;
+      : unambiguous.reduce((sum, row) => sum + scoreRouteAccuracy(row.outcome, row.expected), 0) /
+        unambiguous.length;
+  const forbiddenHits = observations.filter(
+    (row) => scoreForbiddenRoute(row.outcome, row.forbidden) === 0,
+  ).length;
   return {
     validRouterJson: valid ? 1 : 0,
     routeAccuracy: accuracy,

@@ -19,7 +19,10 @@ export interface SandboxResult {
 
 const TEST_FILE_PATH = new URL("../fixtures/readiness.test.ts", import.meta.url);
 
-export async function runSandbox(candidateSource: string, timeoutMs = 5000): Promise<SandboxResult> {
+export async function runSandbox(
+  candidateSource: string,
+  timeoutMs = 5000,
+): Promise<SandboxResult> {
   const dir = await mkdtemp(join(tmpdir(), "readiness-sandbox-"));
   const start = Date.now();
   try {
@@ -43,7 +46,10 @@ export async function runSandbox(candidateSource: string, timeoutMs = 5000): Pro
       }
     }, timeoutMs);
 
-    const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+    const [stdout, stderr] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ]);
     const exitCode = await proc.exited;
     clearTimeout(killer);
 

@@ -5,7 +5,10 @@ export interface CliCaps {
   deadlineMs: number;
 }
 
-export function parseCaps(argv: string[], defaults: CliCaps = { budgetUsd: 0.5, deadlineMs: 60_000 }): CliCaps {
+export function parseCaps(
+  argv: string[],
+  defaults: CliCaps = { budgetUsd: 0.5, deadlineMs: 60_000 },
+): CliCaps {
   let budgetUsd = defaults.budgetUsd;
   let deadlineMs = defaults.deadlineMs;
   for (let i = 0; i < argv.length; i++) {
@@ -19,8 +22,10 @@ export function parseCaps(argv: string[], defaults: CliCaps = { budgetUsd: 0.5, 
       deadlineMs = Number(argv[i]!.split("=")[1]);
     }
   }
-  if (!Number.isFinite(budgetUsd) || budgetUsd <= 0) throw new Error("--budget-usd must be a positive number");
-  if (!Number.isFinite(deadlineMs) || deadlineMs <= 0) throw new Error("--deadline-ms must be a positive number");
+  if (!Number.isFinite(budgetUsd) || budgetUsd <= 0)
+    throw new Error("--budget-usd must be a positive number");
+  if (!Number.isFinite(deadlineMs) || deadlineMs <= 0)
+    throw new Error("--deadline-ms must be a positive number");
   return { budgetUsd, deadlineMs };
 }
 

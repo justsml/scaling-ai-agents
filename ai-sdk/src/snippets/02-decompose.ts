@@ -54,10 +54,16 @@ interface WorkerArtifact {
 }
 
 /** Fixed-plan worker: reads exactly one evidence file via one bound tool call. */
-async function runFixedWorker(source: EvidenceSource, signal: AbortSignal): Promise<WorkerArtifact> {
+async function runFixedWorker(
+  source: EvidenceSource,
+  signal: AbortSignal,
+): Promise<WorkerArtifact> {
   const content = await readFile(EVIDENCE[source], "utf8");
   return withWorkerSpan(
-    { profile: `decompose-${source}`, whyItExisted: `investigate ${source}.log/json for the ws-disconnect incident` },
+    {
+      profile: `decompose-${source}`,
+      whyItExisted: `investigate ${source}.log/json for the ws-disconnect incident`,
+    },
     async () => {
       const start = Date.now();
       const result = await generateText({
@@ -170,7 +176,10 @@ async function runSubagentVariant(signal: AbortSignal) {
 }
 
 async function main() {
-  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), { budgetUsd: 0.2, deadlineMs: 60_000 });
+  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), {
+    budgetUsd: 0.2,
+    deadlineMs: 60_000,
+  });
   initTelemetry();
   heading("02 Decompose — three workers, one file each, a contrarian reviewer");
   printKV("caps", { budgetUsd, deadlineMs });
@@ -198,7 +207,10 @@ async function main() {
   });
 
   // Deterministic check against ground truth: did the reviewer find BOTH causes?
-  const groundTruth = await readFile(new URL("../fixtures/incident/ground-truth.md", import.meta.url), "utf8");
+  const groundTruth = await readFile(
+    new URL("../fixtures/incident/ground-truth.md", import.meta.url),
+    "utf8",
+  );
   const expectsTwoCauses = /Two independent causes/i.test(groundTruth);
   const scoredCorrectly = expectsTwoCauses ? review.mentionsIndependentSecondCause : true;
   printKV("deterministic score vs ground-truth.md", {
@@ -222,10 +234,13 @@ async function main() {
 
   const totalCostUsd = fixedTotalCostUsd + (subagentResult?.costUsd ?? 0);
   printKV("merge record", {
-    filesWritten: "network.log -> worker(network), app.log -> worker(app), state.json -> worker(state); no overlap",
+    filesWritten:
+      "network.log -> worker(network), app.log -> worker(app), state.json -> worker(state); no overlap",
     fixedPlanCostUsd: formatUsd(fixedTotalCostUsd),
     subagentCostUsd: subagentResult ? formatUsd(subagentResult.costUsd) : "skipped(budget)",
-    costDeltaVsFixed: subagentResult ? formatUsd(subagentResult.costUsd - artifacts[0]!.costUsd) : "-",
+    costDeltaVsFixed: subagentResult
+      ? formatUsd(subagentResult.costUsd - artifacts[0]!.costUsd)
+      : "-",
     totalCostUsd: formatUsd(totalCostUsd),
     stopReason: totalCostUsd >= budgetUsd ? "budget reached" : "all workers and reviewer completed",
   });

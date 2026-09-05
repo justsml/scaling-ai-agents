@@ -12,7 +12,10 @@ import { judgeCandidate } from "../src/lib/judge";
 // single call against the known-good compiled patch to bound spend.
 describe("judge order", () => {
   test("a sandbox failure never reaches the rubric judge (deterministic gate)", async () => {
-    const buggySource = await readFile(new URL("../src/fixtures/readiness.ts", import.meta.url), "utf8");
+    const buggySource = await readFile(
+      new URL("../src/fixtures/readiness.ts", import.meta.url),
+      "utf8",
+    );
     const sandbox = await runSandbox(buggySource, 6000);
     expect(sandbox.ok).toBe(false);
     // The gate itself: 01-compete.ts only calls judgeCandidate for
@@ -21,7 +24,10 @@ describe("judge order", () => {
   }, 15000);
 
   test("a sandbox survivor is scored by the LLM rubric judge against rubric.md", async () => {
-    const fixedSource = await readFile(new URL("../src/compiled/readiness.ts", import.meta.url), "utf8");
+    const fixedSource = await readFile(
+      new URL("../src/compiled/readiness.ts", import.meta.url),
+      "utf8",
+    );
     const sandbox = await runSandbox(fixedSource, 6000);
     expect(sandbox.ok).toBe(true);
 

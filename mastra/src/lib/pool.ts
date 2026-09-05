@@ -7,7 +7,13 @@
  * nicely not to log", not "prompted to be careful". If nothing is eligible,
  * the request fails with a reason rather than silently downgrading.
  */
-import { FRONTIER_MODEL, JUDGE_MODEL, LOCAL_MODEL_ID, WORKER_MODEL, localSlotAvailable } from "./models.js";
+import {
+  FRONTIER_MODEL,
+  JUDGE_MODEL,
+  LOCAL_MODEL_ID,
+  WORKER_MODEL,
+  localSlotAvailable,
+} from "./models.js";
 
 export type Region = "us" | "eu";
 export type DataClass = "public" | "internal" | "restricted";
@@ -98,19 +104,35 @@ export function resolveProvider(req: Requirement, opts: { exclude?: string[] } =
 
   for (const p of POOL) {
     if (exclude.has(p.id)) {
-      considered.push({ id: p.id, eligible: false, reason: "excluded by the caller (already tried)" });
+      considered.push({
+        id: p.id,
+        eligible: false,
+        reason: "excluded by the caller (already tried)",
+      });
       continue;
     }
     if (!p.regions.includes(req.region)) {
-      considered.push({ id: p.id, eligible: false, reason: `not cleared for region ${req.region}` });
+      considered.push({
+        id: p.id,
+        eligible: false,
+        reason: `not cleared for region ${req.region}`,
+      });
       continue;
     }
     if (!p.dataClasses.includes(req.dataClass)) {
-      considered.push({ id: p.id, eligible: false, reason: `not cleared for dataClass ${req.dataClass}` });
+      considered.push({
+        id: p.id,
+        eligible: false,
+        reason: `not cleared for dataClass ${req.dataClass}`,
+      });
       continue;
     }
     if (!p.available()) {
-      considered.push({ id: p.id, eligible: false, reason: "configured but unavailable (missing env)" });
+      considered.push({
+        id: p.id,
+        eligible: false,
+        reason: "configured but unavailable (missing env)",
+      });
       continue;
     }
     considered.push({ id: p.id, eligible: true, reason: p.why });
@@ -125,23 +147,30 @@ export function resolveProvider(req: Requirement, opts: { exclude?: string[] } =
     reason: provider
       ? `${provider.id} (${provider.why})`
       : `no provider is cleared for region=${req.region} dataClass=${req.dataClass}` +
-        (req.dataClass === "restricted" ? "; set LOCAL_OPENAI_BASE_URL to enable the on-premise slot" : ""),
+        (req.dataClass === "restricted"
+          ? "; set LOCAL_OPENAI_BASE_URL to enable the on-premise slot"
+          : ""),
   };
 }
 
 /**
  * Fallback chain in code.
  *
- * @mastra/core 1.64 exposes a `models` array only on custom model gateways, not
- * on `Agent` or on `generate()` options, so the fallback is implemented here
- * rather than delegated to the SDK. Each attempt is reported so the printed
- * table can say which provider actually served the worker and why.
+ * @mastra/core 1.64 does accept `model: ModelWithRetries[]` on `Agent` (per-entry
+ * `maxRetries`, fails over on 5xx, rate limit, or per-step timeout). This
+ * hand-rolled chain predates that and is kept because it prints the attempt
+ * trail and applies the pool's region and data-class filter before each try.
+ * TODO: show the native array alongside it, or replace this with it.
  */
 export async function withFallback<T>(
   req: Requirement,
   attempt: (provider: ProviderEntry) => Promise<T>,
   opts: { maxAttempts?: number } = {},
-): Promise<{ value: T | null; served: ProviderEntry | null; trail: Array<{ id: string; error?: string }> }> {
+): Promise<{
+  value: T | null;
+  served: ProviderEntry | null;
+  trail: Array<{ id: string; error?: string }>;
+}> {
   const maxAttempts = opts.maxAttempts ?? 2;
   const trail: Array<{ id: string; error?: string }> = [];
   const tried: string[] = [];

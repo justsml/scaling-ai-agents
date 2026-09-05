@@ -51,7 +51,16 @@
         "properties": {
           "resource": {
             "type": "string",
-            "enum": ["ability", "generation", "move", "pokedex", "pokemon", "pokemon-species", "region", "type"]
+            "enum": [
+              "ability",
+              "generation",
+              "move",
+              "pokedex",
+              "pokemon",
+              "pokemon-species",
+              "region",
+              "type"
+            ]
           },
           "query": { "type": "string", "minLength": 1, "maxLength": 100 },
           "cursor": {

@@ -73,7 +73,10 @@ async function executeTask(record: TaskRecord, message: A2AMessage): Promise<voi
   record.status = { state: "working" };
   try {
     const text = message.parts.map((p) => p.text).join("\n");
-    const result = await remoteAgent.generate({ prompt: text, abortSignal: record.controller.signal });
+    const result = await remoteAgent.generate({
+      prompt: text,
+      abortSignal: record.controller.signal,
+    });
     const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.6-luna", result.usage);
     record.artifacts.push({
       name: "patch",
@@ -116,7 +119,10 @@ export function createA2AServer(port = 0) {
     async fetch(req) {
       const url = new URL(req.url);
 
-      if (req.method === "GET" && url.pathname === "/.well-known/competitor-remote/agent-card.json") {
+      if (
+        req.method === "GET" &&
+        url.pathname === "/.well-known/competitor-remote/agent-card.json"
+      ) {
         return Response.json(AGENT_CARD);
       }
 
@@ -156,7 +162,10 @@ export function createA2AServer(port = 0) {
           const stream = new ReadableStream({
             async start(controller) {
               const send = (event: string, task: A2ATask, artifact?: A2AArtifact) => {
-                const frame = jsonRpcResult(id, artifact ? { event, task, artifact } : { event, task });
+                const frame = jsonRpcResult(
+                  id,
+                  artifact ? { event, task, artifact } : { event, task },
+                );
                 controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(frame)}\n\n`));
               };
               send("status-update", toA2ATask(record));
@@ -197,7 +206,10 @@ export function createA2AServer(port = 0) {
 }
 
 async function main() {
-  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), { budgetUsd: 0.05, deadlineMs: 30_000 });
+  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), {
+    budgetUsd: 0.05,
+    deadlineMs: 30_000,
+  });
   heading("06 Remote A2A — hand-rolled JSON-RPC server + client self-test");
   printKV("caps", { budgetUsd, deadlineMs });
 
@@ -225,8 +237,14 @@ async function main() {
   });
 
   const events: string[] = [];
-  const streamTask = await client.streamMessage(message, (evt) => events.push(evt.event), { signal });
-  printKV("message/stream result", { taskId: streamTask.id, state: streamTask.status.state, events: events.join(",") });
+  const streamTask = await client.streamMessage(message, (evt) => events.push(evt.event), {
+    signal,
+  });
+  printKV("message/stream result", {
+    taskId: streamTask.id,
+    state: streamTask.status.state,
+    events: events.join(","),
+  });
 
   const fetched = await client.getTask(streamTask.id);
   printKV("tasks/get", { taskId: fetched.id, state: fetched.status.state });

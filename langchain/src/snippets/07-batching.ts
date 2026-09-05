@@ -244,7 +244,8 @@ async function main() {
   // `.batch()`, and the concurrency cap is a config field rather than code you write.
   const inputs = SERVICES.map((service) => [
     new SystemMessage(
-      "You classify a service name into exactly one word: infra, product, or unknown. " + "Reply with only that word.",
+      "You classify a service name into exactly one word: infra, product, or unknown. " +
+        "Reply with only that word.",
     ),
     new HumanMessage(service),
   ]);
@@ -329,7 +330,11 @@ async function main() {
       { input: FanInput },
     )
     .addEdge(START, "plan")
-    .addConditionalEdges("plan", (state) => state.services.map((service) => new Send("probe", { service })), ["probe"])
+    .addConditionalEdges(
+      "plan",
+      (state) => state.services.map((service) => new Send("probe", { service })),
+      ["probe"],
+    )
     .addEdge("probe", END)
     .compile();
 
@@ -361,10 +366,30 @@ async function main() {
   table(
     ["mechanism", "what it actually is", "wrapped by LangChain.js?", "latency"],
     [
-      ["Runnable.batch({maxConcurrency})", "N normal requests, dispatched with a client-side cap", "yes", "seconds"],
-      ["LangGraph Send + maxConcurrency", "N graph tasks in one superstep, capped", "yes", "seconds"],
-      ["tool node parallel calls", "every tool call in one AI turn, run together", "yes (default)", "seconds"],
-      ["OpenAI /v1/batches", "a JSONL file uploaded, processed offline, polled for", "NO", "up to 24 hours"],
+      [
+        "Runnable.batch({maxConcurrency})",
+        "N normal requests, dispatched with a client-side cap",
+        "yes",
+        "seconds",
+      ],
+      [
+        "LangGraph Send + maxConcurrency",
+        "N graph tasks in one superstep, capped",
+        "yes",
+        "seconds",
+      ],
+      [
+        "tool node parallel calls",
+        "every tool call in one AI turn, run together",
+        "yes (default)",
+        "seconds",
+      ],
+      [
+        "OpenAI /v1/batches",
+        "a JSONL file uploaded, processed offline, polled for",
+        "NO",
+        "up to 24 hours",
+      ],
     ],
   );
   note(
@@ -387,8 +412,22 @@ async function main() {
         `${SERVICES.length * 600}ms`,
         usd(agentCost),
       ],
-      ["(b) Runnable.batch", `${inputs.length}`, `${CONCURRENCY}`, `${batchMs}ms`, "n/a (real calls)", usd(batchCost)],
-      ["(c) Send fan-out", `${SERVICES.length}`, `${CONCURRENCY}`, `${fanMs}ms`, `${SERVICES.length * 500}ms`, usd(0)],
+      [
+        "(b) Runnable.batch",
+        `${inputs.length}`,
+        `${CONCURRENCY}`,
+        `${batchMs}ms`,
+        "n/a (real calls)",
+        usd(batchCost),
+      ],
+      [
+        "(c) Send fan-out",
+        `${SERVICES.length}`,
+        `${CONCURRENCY}`,
+        `${fanMs}ms`,
+        `${SERVICES.length * 500}ms`,
+        usd(0),
+      ],
     ],
   );
 

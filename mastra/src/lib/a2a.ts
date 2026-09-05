@@ -27,7 +27,9 @@ export interface RemoteHandle {
  * answers. Returns null if it never comes up, so callers can skip honestly
  * instead of hanging.
  */
-export async function startRemoteServer(opts: { timeoutMs?: number } = {}): Promise<RemoteHandle | null> {
+export async function startRemoteServer(
+  opts: { timeoutMs?: number } = {},
+): Promise<RemoteHandle | null> {
   const timeoutMs = opts.timeoutMs ?? 20_000;
   const proc = Bun.spawn(["bun", "run", "src/remote/server.ts"], {
     cwd: PKG_ROOT,

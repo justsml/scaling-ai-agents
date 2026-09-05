@@ -30,10 +30,27 @@
  * the reason the run stopped.
  */
 import { RequestContext } from "@mastra/core/request-context";
-import { parseCaps, deadlineHit, deadlineSignal, describeCaps, hasOpenAiKey, remainingMs } from "../lib/caps.js";
+import {
+  parseCaps,
+  deadlineHit,
+  deadlineSignal,
+  describeCaps,
+  hasOpenAiKey,
+  remainingMs,
+} from "../lib/caps.js";
 import type { StopReason } from "../lib/caps.js";
 import { Ledger, estimateWorkerCost, usdFromUsage } from "../lib/ledger.js";
-import { bullet, header, json, ledgerTable, reportSpend, section, stopBanner, table, usd } from "../lib/print.js";
+import {
+  bullet,
+  header,
+  json,
+  ledgerTable,
+  reportSpend,
+  section,
+  stopBanner,
+  table,
+  usd,
+} from "../lib/print.js";
 import {
   STRATEGY_VERSION,
   type FixtureRequest,
@@ -44,7 +61,13 @@ import {
   validateContract,
 } from "../lib/router.js";
 import { WORKER_MODEL } from "../lib/models.js";
-import { contextOf, endWorkerSpan, shutdownTracing, startSnippetSpan, startWorkerSpan } from "../lib/spans.js";
+import {
+  contextOf,
+  endWorkerSpan,
+  shutdownTracing,
+  startSnippetSpan,
+  startWorkerSpan,
+} from "../lib/spans.js";
 import { mastra } from "../mastra/index.js";
 import { statusTool } from "../mastra/tools.js";
 // Both agents are registered on the Mastra instance in src/mastra/agents.ts.
@@ -110,7 +133,9 @@ async function main(): Promise<void> {
   for (const req of requests) {
     try {
       validated.set(req.id, validateContract(contracts.get(req.id), req));
-      bullet(`${req.id}: accepted (${contracts.get(req.id)!.class} / ${contracts.get(req.id)!.strategy})`);
+      bullet(
+        `${req.id}: accepted (${contracts.get(req.id)!.class} / ${contracts.get(req.id)!.strategy})`,
+      );
     } catch (err) {
       bullet(`${req.id}: REJECTED — ${(err as Error).message}`);
     }
@@ -173,7 +198,8 @@ async function main(): Promise<void> {
       costUsd: 0,
       latencyMs,
       outcome: "answered",
-      whyItExisted: "the request maps to a deterministic table; spending a model call on it would be waste",
+      whyItExisted:
+        "the request maps to a deterministic table; spending a model call on it would be waste",
       strategyVersion: STRATEGY_VERSION,
       reason: contract.reason,
     });
@@ -182,7 +208,8 @@ async function main(): Promise<void> {
   // --- routine ------------------------------------------------------------
   if (!hasOpenAiKey()) {
     stopReason = "no-api-key";
-    stopDetail = "OPENAI_API_KEY unset; the routine and consequential paths need one model call each";
+    stopDetail =
+      "OPENAI_API_KEY unset; the routine and consequential paths need one model call each";
     ledger.skip("r2:routine", WORKER_MODEL, "no API key");
     ledger.skip("r5:consequential", WORKER_MODEL, "no API key");
   } else if (deadlineHit(caps)) {
@@ -193,7 +220,11 @@ async function main(): Promise<void> {
     const req = requests.find((r) => r.id === "r2")!;
     const span = startWorkerSpan(snippetSpan, "dispatch:routine", { requestId: "r2" });
     const estimate = estimateWorkerCost(WORKER_MODEL, req.text.length + 600, 400);
-    const reservation = ledger.tryReserve("r2:routine", WORKER_MODEL, Math.min(estimate, contract.caps.budgetUsd));
+    const reservation = ledger.tryReserve(
+      "r2:routine",
+      WORKER_MODEL,
+      Math.min(estimate, contract.caps.budgetUsd),
+    );
     const started = Date.now();
 
     if (!reservation) {
@@ -236,7 +267,8 @@ async function main(): Promise<void> {
           costUsd: usdFromUsage(WORKER_MODEL, result.usage),
           latencyMs,
           outcome: "answered",
-          whyItExisted: "a known question shape that still needs language; one agent, three steps, read-only tools",
+          whyItExisted:
+            "a known question shape that still needs language; one agent, three steps, read-only tools",
           strategyVersion: STRATEGY_VERSION,
           reason: contract.reason,
         });
@@ -297,17 +329,25 @@ async function main(): Promise<void> {
     const started = Date.now();
     const reservation = ledger.tryReserve("r5:consequential", WORKER_MODEL, 0.002);
     section("consequential → the approval prompt (budget remaining is irrelevant)");
-    bullet(`budget still available at this point: ${usd(ledger.remainingUsd)} — and it does not matter`);
+    bullet(
+      `budget still available at this point: ${usd(ledger.remainingUsd)} — and it does not matter`,
+    );
 
     if (!reservation) {
-      ledger.skip("r5:consequential", WORKER_MODEL, "no budget left to phrase the approval request");
+      ledger.skip(
+        "r5:consequential",
+        WORKER_MODEL,
+        "no budget left to phrase the approval request",
+      );
     } else {
       try {
         const stream = await consequentialAgent.stream(r5.text, {
           maxSteps: 2,
           abortSignal: deadlineSignal(caps),
           tracingContext: contextOf(span),
-          tracingOptions: { metadata: { strategyVersion: STRATEGY_VERSION, reason: contract.reason } },
+          tracingOptions: {
+            metadata: { strategyVersion: STRATEGY_VERSION, reason: contract.reason },
+          },
         });
 
         // Drain the stream to completion first. The run is only *suspended* —
@@ -347,7 +387,9 @@ async function main(): Promise<void> {
           note: approvalSeen ? "stopped for approval, then declined" : "no approval chunk seen",
         });
         bullet(
-          approvalSeen ? "the agent stopped and waited. It did not execute the tool." : "no approval chunk was emitted",
+          approvalSeen
+            ? "the agent stopped and waited. It did not execute the tool."
+            : "no approval chunk was emitted",
         );
         if (declinedText) bullet(`model, after the decline: ${declinedText.trim().slice(0, 160)}`);
 
@@ -365,7 +407,8 @@ async function main(): Promise<void> {
           costUsd: usdFromUsage(WORKER_MODEL, usage),
           latencyMs,
           outcome: approvalSeen ? "declined" : "no-approval-chunk",
-          whyItExisted: "the action is irreversible, so a human is on the path regardless of remaining budget",
+          whyItExisted:
+            "the action is irreversible, so a human is on the path regardless of remaining budget",
           strategyVersion: STRATEGY_VERSION,
           reason: contract.reason,
         });
@@ -383,7 +426,8 @@ async function main(): Promise<void> {
           costUsd: 0,
           latencyMs,
           outcome: aborted ? "aborted" : "failed",
-          whyItExisted: "the action is irreversible, so a human is on the path regardless of remaining budget",
+          whyItExisted:
+            "the action is irreversible, so a human is on the path regardless of remaining budget",
           strategyVersion: STRATEGY_VERSION,
           reason: contract.reason,
         });

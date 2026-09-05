@@ -82,21 +82,24 @@ export const WORKERS: WorkerSpec[] = [
   {
     source: "network",
     file: "incident/network.log",
-    question: "What does the proxy do to these connections, and on what timer? Quote the exact lines.",
+    question:
+      "What does the proxy do to these connections, and on what timer? Quote the exact lines.",
     exitCondition: "the proxy's close reason and its threshold are quoted, or absent from the log",
     whyItExisted: "owns the network boundary; nothing else can see the proxy's own decisions",
   },
   {
     source: "app",
     file: "incident/app.log",
-    question: "What does the application do on connect, on close, and on reconnect? Quote any configured intervals.",
+    question:
+      "What does the application do on connect, on close, and on reconnect? Quote any configured intervals.",
     exitCondition: "the heartbeat interval and the reconnect outcome are quoted, or absent",
     whyItExisted: "owns the application's view; the only place configuration defaults show up",
   },
   {
     source: "state",
     file: "incident/state.json",
-    question: "What is the session's subscription state after reconnect, and does it match what is expected?",
+    question:
+      "What is the session's subscription state after reconnect, and does it match what is expected?",
     exitCondition: "expected vs restored subscriptions are compared, or the file does not say",
     whyItExisted: "owns durable state; a log can show a reconnect succeeded and still hide this",
   },
@@ -234,7 +237,8 @@ export function buildWorkerSubgraph(spec: WorkerSpec, deps: EvidenceDeps) {
       const usage = readUsage(response);
       const costUsd = estimateCostUsd(deps.modelId, usage);
       deps.onCost?.(costUsd);
-      const finding = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+      const finding =
+        typeof response.content === "string" ? response.content : JSON.stringify(response.content);
 
       return {
         artifacts: {
@@ -316,7 +320,9 @@ export function buildDecomposeGraph(deps: ReviewerDeps) {
                 `Incident: ${state.incident}`,
                 ``,
                 ...artifacts.map((a) =>
-                  [`=== report: ${a.source} ===`, `question: ${a.question}`, a.finding, ``].join("\n"),
+                  [`=== report: ${a.source} ===`, `question: ${a.question}`, a.finding, ``].join(
+                    "\n",
+                  ),
                 ),
               ].join("\n"),
             ),
@@ -326,7 +332,8 @@ export function buildDecomposeGraph(deps: ReviewerDeps) {
             callbacks: deps.callbacks as never,
             metadata: {
               profile: "reviewer",
-              whyItExisted: "reads all three artifacts and hunts for evidence against the favored hypothesis",
+              whyItExisted:
+                "reads all three artifacts and hunts for evidence against the favored hypothesis",
               outcome: "pending",
               costUsd: 0,
               latencyMs: 0,
@@ -339,7 +346,10 @@ export function buildDecomposeGraph(deps: ReviewerDeps) {
         const usage = readUsage(response);
         const costUsd = estimateCostUsd(deps.modelId, usage);
         deps.onCost?.(costUsd);
-        const text = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+        const text =
+          typeof response.content === "string"
+            ? response.content
+            : JSON.stringify(response.content);
 
         return {
           verdict: text,
@@ -404,10 +414,15 @@ export async function scoreAgainstGroundTruth(
   // opened here.
   await readFile(join(FIXTURES, "incident/ground-truth.md"), "utf8");
 
-  const haystack = [reviewerText, ...Object.values(artifacts).map((a) => a.finding)].join("\n").toLowerCase();
+  const haystack = [reviewerText, ...Object.values(artifacts).map((a) => a.finding)]
+    .join("\n")
+    .toLowerCase();
 
-  const foundProxyTimeout = /idle[_\s-]?timeout|60s|heartbeat/.test(haystack) && /proxy|heartbeat/.test(haystack);
-  const foundSubscriptionReplay = /subscription|subscribe|restored_after_reconnect|replay/.test(haystack);
+  const foundProxyTimeout =
+    /idle[_\s-]?timeout|60s|heartbeat/.test(haystack) && /proxy|heartbeat/.test(haystack);
+  const foundSubscriptionReplay = /subscription|subscribe|restored_after_reconnect|replay/.test(
+    haystack,
+  );
 
   const found = [foundProxyTimeout, foundSubscriptionReplay].filter(Boolean).length;
   return {

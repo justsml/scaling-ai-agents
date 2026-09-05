@@ -44,7 +44,8 @@ describe("compiled implementation: the four dependency states", () => {
   test("starting: waits with exponential backoff, then runs once", async () => {
     const c = clock();
     let calls = 0;
-    const probe: Probe = async () => (calls++ < 3 ? { ok: false, code: "ECONNREFUSED" } : { ok: true });
+    const probe: Probe = async () =>
+      calls++ < 3 ? { ok: false, code: "ECONNREFUSED" } : { ok: true };
     let ran = 0;
     const out = await runWhenReady(probe, async () => void ran++, {
       deadlineMs: 5000,
@@ -108,7 +109,8 @@ describe("compiled implementation: the four dependency states", () => {
   test("ETIMEDOUT is retried like ECONNREFUSED, not treated as denied", async () => {
     const c = clock();
     let calls = 0;
-    const probe: Probe = async () => (calls++ < 1 ? { ok: false, code: "ETIMEDOUT" } : { ok: true });
+    const probe: Probe = async () =>
+      calls++ < 1 ? { ok: false, code: "ETIMEDOUT" } : { ok: true };
     const out = await runWhenReady(probe, async () => {}, {
       deadlineMs: 5000,
       baseDelayMs: 10,

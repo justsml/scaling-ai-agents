@@ -1,7 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { z } from "zod";
 
-export const POKEDEX_TOOLS = ["pokedex_list_resources", "pokedex_list", "pokedex_search", "pokedex_get"] as const;
+export const POKEDEX_TOOLS = [
+  "pokedex_list_resources",
+  "pokedex_list",
+  "pokedex_search",
+  "pokedex_get",
+] as const;
 export type PokedexToolName = (typeof POKEDEX_TOOLS)[number];
 export const investigationRequestSchema = z.object({
   runId: z.string().min(1),
@@ -19,7 +24,11 @@ const claimValueSchema = z.union([claimScalarSchema, z.array(claimScalarSchema)]
 export const answerSchema = z.object({
   summary: z.string(),
   claims: z.array(
-    z.object({ path: z.string().min(1), value: claimValueSchema, requestIds: z.array(z.string()).min(1) }),
+    z.object({
+      path: z.string().min(1),
+      value: claimValueSchema,
+      requestIds: z.array(z.string()).min(1),
+    }),
   ),
 });
 export type InvestigationAnswer = z.infer<typeof answerSchema>;
@@ -62,7 +71,9 @@ export async function loadPokedexToolContract(): Promise<Record<PokedexToolName,
   const tools = raw.tools;
   const source = (
     Array.isArray(tools)
-      ? Object.fromEntries(tools.map((item) => [String((item as Record<string, unknown>).name), item]))
+      ? Object.fromEntries(
+          tools.map((item) => [String((item as Record<string, unknown>).name), item]),
+        )
       : (tools ?? raw)
   ) as Record<string, unknown>;
   const out = {} as Record<PokedexToolName, ToolDefinition>;
@@ -72,7 +83,11 @@ export async function loadPokedexToolContract(): Promise<Record<PokedexToolName,
     out[name] = {
       description: String(item.description ?? name),
       inputSchema: (item.inputSchema ??
-        item.parameters ?? { type: "object", properties: {}, additionalProperties: false }) as Record<string, unknown>,
+        item.parameters ?? {
+          type: "object",
+          properties: {},
+          additionalProperties: false,
+        }) as Record<string, unknown>,
     };
   }
   return out;
@@ -86,7 +101,10 @@ export class PokedexGatewaySession {
   #timer: ReturnType<typeof setTimeout>;
   constructor(readonly request: InvestigationRequest) {
     const controller = new AbortController();
-    this.#timer = setTimeout(() => controller.abort(new Error("investigation deadline exceeded")), request.deadlineMs);
+    this.#timer = setTimeout(
+      () => controller.abort(new Error("investigation deadline exceeded")),
+      request.deadlineMs,
+    );
     this.signal = controller.signal;
   }
   close(): void {
@@ -121,17 +139,20 @@ export class PokedexGatewaySession {
       return error;
     }
     try {
-      const response = await fetch(`${this.request.gatewayBaseUrl.replace(/\/$/, "")}/tools/${tool}`, {
-        method: "POST",
-        signal: this.signal,
-        headers: {
-          "content-type": "application/json",
-          "x-pokedex-run-id": this.request.runId,
-          "x-pokedex-scenario-id": this.request.scenarioId,
-          "x-pokedex-stack": "langchain",
+      const response = await fetch(
+        `${this.request.gatewayBaseUrl.replace(/\/$/, "")}/tools/${tool}`,
+        {
+          method: "POST",
+          signal: this.signal,
+          headers: {
+            "content-type": "application/json",
+            "x-pokedex-run-id": this.request.runId,
+            "x-pokedex-scenario-id": this.request.scenarioId,
+            "x-pokedex-stack": "langchain",
+          },
+          body: JSON.stringify(args ?? {}),
         },
-        body: JSON.stringify(args ?? {}),
-      });
+      );
       const body = (await response.json()) as Record<string, unknown>;
       const requestId = String(
         body.requestId ??
@@ -218,7 +239,11 @@ export class PokedexGatewaySession {
     }
     return args;
   }
-  #rememberPaginationCursor(tool: PokedexToolName, value: unknown, body: Record<string, unknown>): void {
+  #rememberPaginationCursor(
+    tool: PokedexToolName,
+    value: unknown,
+    body: Record<string, unknown>,
+  ): void {
     if (
       (tool !== "pokedex_list" && tool !== "pokedex_search") ||
       value === null ||
@@ -227,7 +252,10 @@ export class PokedexGatewaySession {
     )
       return;
     if (typeof body.nextCursor === "string")
-      this.#paginationCursors.set(paginationKey(tool, value as Record<string, unknown>), body.nextCursor);
+      this.#paginationCursors.set(
+        paginationKey(tool, value as Record<string, unknown>),
+        body.nextCursor,
+      );
   }
 }
 export function normalizeInvestigationAnswer(
@@ -291,7 +319,9 @@ export function normalizeInvestigationAnswer(
     return {
       ...claim,
       requestIds:
-        supportingIds.length > 0 ? [...new Set(supportingIds)] : claim.requestIds.filter((id) => validIds.has(id)),
+        supportingIds.length > 0
+          ? [...new Set(supportingIds)]
+          : claim.requestIds.filter((id) => validIds.has(id)),
     };
   });
   if (/weighs more|heavier|by how much/i.test(prompt)) {
@@ -304,12 +334,17 @@ export function normalizeInvestigationAnswer(
     ];
     if (comparisonIds.length > 0)
       claims = claims.map((claim) =>
-        claim.path === "heavier" || claim.path === "difference" ? { ...claim, requestIds: comparisonIds } : claim,
+        claim.path === "heavier" || claim.path === "difference"
+          ? { ...claim, requestIds: comparisonIds }
+          : claim,
       );
   }
   return { summary: answer.summary, claims };
 }
-export function validateCitations(answer: InvestigationAnswer | null, calls: ToolCallEvidence[]): boolean {
+export function validateCitations(
+  answer: InvestigationAnswer | null,
+  calls: ToolCallEvidence[],
+): boolean {
   const ids = new Set(calls.filter((c) => c.ok).map((c) => c.requestId));
   return Boolean(answer && answer.claims.every((c) => c.requestIds.every((id) => ids.has(id))));
 }

@@ -6,7 +6,8 @@ import { EvidenceStore } from "../src/pi/evidence-store";
 
 const directories: string[] = [];
 afterEach(async () => {
-  for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true });
+  for (const directory of directories.splice(0))
+    await rm(directory, { recursive: true, force: true });
 });
 
 describe("Pi evidence store", () => {

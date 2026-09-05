@@ -26,7 +26,10 @@ describe("A2A client against the local 06 server", () => {
   });
 
   test("tasks/cancel transitions a task to canceled", async () => {
-    const message: A2AMessage = { role: "user", parts: [{ type: "text", text: "Patch it (will be cancelled)." }] };
+    const message: A2AMessage = {
+      role: "user",
+      parts: [{ type: "text", text: "Patch it (will be cancelled)." }],
+    };
     const pending = client.sendMessage(message, "cancel-me").catch(() => undefined);
     await new Promise((r) => setTimeout(r, 5));
     const cancelled = await client.cancelTask("cancel-me");

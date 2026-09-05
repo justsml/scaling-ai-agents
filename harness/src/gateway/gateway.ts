@@ -77,7 +77,9 @@ const OMITTED_FIELDS = new Set([
   "version_group_details",
 ]);
 
-export function createGateway(options: GatewayOptions): { fetch(request: Request): Promise<Response> } {
+export function createGateway(options: GatewayOptions): {
+  fetch(request: Request): Promise<Response>;
+} {
   const upstreamFetch = options.fetch ?? globalThis.fetch;
   const sleep = options.sleep ?? ((milliseconds: number) => Bun.sleep(milliseconds));
   const now = options.now ?? Date.now;
@@ -123,11 +125,18 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
       }
 
       let result = await executeTool(tool, args, context);
-      if (selected?.type === "empty-page" && (tool === "pokedex_list" || tool === "pokedex_search")) {
+      if (
+        selected?.type === "empty-page" &&
+        (tool === "pokedex_list" || tool === "pokedex_search")
+      ) {
         result = { ...(result as object), items: [] };
       }
       if (selected?.type === "stale-relationship" && tool === "pokedex_get") {
-        const stale = { field: "injected-stale-relationship", name: "missing", ref: "pokemon/999999" };
+        const stale = {
+          field: "injected-stale-relationship",
+          name: "missing",
+          ref: "pokemon/999999",
+        };
         const current = result as { related?: unknown[] };
         result = { ...current, related: [...(current.related ?? []), stale] };
       }
@@ -196,7 +205,11 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
     return { runId, scenarioId, stack, run, requestId: crypto.randomUUID() };
   }
 
-  async function executeTool(tool: ToolName, args: Record<string, unknown>, context: RequestContext): Promise<unknown> {
+  async function executeTool(
+    tool: ToolName,
+    args: Record<string, unknown>,
+    context: RequestContext,
+  ): Promise<unknown> {
     switch (tool) {
       case "pokedex_list_resources": {
         assertExactKeys(args, []);
@@ -227,7 +240,9 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
       args.cursor === undefined
         ? 0
         : decodeCursor(args.cursor, { operation: "list", resource }, options.cursorSecret).offset;
-    const data = await upstreamJson<ListResponse>(`api/v2/${resource}/?limit=${pageSize}&offset=${offset}`);
+    const data = await upstreamJson<ListResponse>(
+      `api/v2/${resource}/?limit=${pageSize}&offset=${offset}`,
+    );
     const items = data.results.map((item) =>
       normalizeNamedResource(item, resource, new URL(options.upstreamBaseUrl).origin),
     );
@@ -239,7 +254,10 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
       nextCursor:
         nextOffset === null
           ? null
-          : encodeCursor({ v: 1, operation: "list", resource, offset: nextOffset }, options.cursorSecret),
+          : encodeCursor(
+              { v: 1, operation: "list", resource, offset: nextOffset },
+              options.cursorSecret,
+            ),
       requestId: context.requestId,
     };
   }
@@ -265,14 +283,17 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
     const offset =
       args.cursor === undefined
         ? 0
-        : decodeCursor(args.cursor, { operation: "search", resource, query }, options.cursorSecret).offset;
+        : decodeCursor(args.cursor, { operation: "search", resource, query }, options.cursorSecret)
+            .offset;
     let pending = searchIndexes.get(resource);
     if (!pending) {
       pending = buildSearchIndex(resource);
       searchIndexes.set(resource, pending);
       pending.catch(() => searchIndexes.delete(resource));
     }
-    const matches = (await pending).filter((entry) => entry.name.toLocaleLowerCase("en-US").includes(query));
+    const matches = (await pending).filter((entry) =>
+      entry.name.toLocaleLowerCase("en-US").includes(query),
+    );
     const items = matches.slice(offset, offset + pageSize);
     const nextOffset = offset + pageSize < matches.length ? offset + pageSize : null;
     return {
@@ -283,24 +304,32 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
       nextCursor:
         nextOffset === null
           ? null
-          : encodeCursor({ v: 1, operation: "search", resource, query, offset: nextOffset }, options.cursorSecret),
+          : encodeCursor(
+              { v: 1, operation: "search", resource, query, offset: nextOffset },
+              options.cursorSecret,
+            ),
       requestId: context.requestId,
     };
   }
 
-  async function buildSearchIndex(resource: Resource): Promise<Array<{ name: string; ref: string }>> {
+  async function buildSearchIndex(
+    resource: Resource,
+  ): Promise<Array<{ name: string; ref: string }>> {
     const results: Array<{ name: string; ref: string }> = [];
     let offset = 0;
     const limit = 200;
     for (;;) {
-      const page = await upstreamJson<ListResponse>(`api/v2/${resource}/?limit=${limit}&offset=${offset}`);
+      const page = await upstreamJson<ListResponse>(
+        `api/v2/${resource}/?limit=${limit}&offset=${offset}`,
+      );
       for (const item of page.results) {
         const ref = normalizeUrl(item.url, new URL(options.upstreamBaseUrl).origin);
         if (ref?.startsWith(`${resource}/`)) results.push({ name: item.name, ref });
       }
       if (!page.next) break;
       offset += limit;
-      if (offset > 100_000) throw new Error(`Search index for ${resource} exceeded its safety bound`);
+      if (offset > 100_000)
+        throw new Error(`Search index for ${resource} exceeded its safety bound`);
     }
     return results;
   }
@@ -328,7 +357,14 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
     const data = await upstreamJson<Record<string, unknown>>(`api/v2/${args.ref}/`);
     const related: Array<{ field: string; name?: string; ref: string }> = [];
     const truncation = { value: false };
-    const compact = compactValue(data, "", 0, related, new URL(options.upstreamBaseUrl).origin, truncation);
+    const compact = compactValue(
+      data,
+      "",
+      0,
+      related,
+      new URL(options.upstreamBaseUrl).origin,
+      truncation,
+    );
     return {
       resource,
       ref: args.ref,
@@ -383,7 +419,10 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
   }
 
   async function control(request: Request, url: URL): Promise<Response> {
-    if (options.controlSecret && request.headers.get("x-pokedex-control-secret") !== options.controlSecret) {
+    if (
+      options.controlSecret &&
+      request.headers.get("x-pokedex-control-secret") !== options.controlSecret
+    ) {
       return Response.json({ code: "CONTROL_UNAUTHORIZED" }, { status: 401 });
     }
     if (url.pathname === "/control/reset" && request.method === "POST") {
@@ -401,14 +440,22 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
       runs.delete(runId);
       return new Response(null, { status: 204 });
     }
-    if (request.method !== "PUT") return Response.json({ code: "METHOD_NOT_ALLOWED" }, { status: 405 });
+    if (request.method !== "PUT")
+      return Response.json({ code: "METHOD_NOT_ALLOWED" }, { status: 405 });
     try {
       const body = (await request.json()) as { scenarioId?: unknown; faults?: unknown };
       if (typeof body.scenarioId !== "string" || !/^[A-Za-z0-9._:-]{1,128}$/.test(body.scenarioId))
         throw new Error("scenarioId is invalid");
-      const configuration = { scenarioId: body.scenarioId, faults: validateFaults(body.faults ?? []) };
+      const configuration = {
+        scenarioId: body.scenarioId,
+        faults: validateFaults(body.faults ?? []),
+      };
       runs.set(runId, { configuration, issuedRefs: new Set(), matchCounts: new Map(), events: [] });
-      return Response.json({ runId, scenarioId: configuration.scenarioId, faultCount: configuration.faults.length });
+      return Response.json({
+        runId,
+        scenarioId: configuration.scenarioId,
+        faultCount: configuration.faults.length,
+      });
     } catch (error) {
       return Response.json(
         {
@@ -420,7 +467,11 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
     }
   }
 
-  function selectFault(run: RunState, tool: ToolName, args: Record<string, unknown>): FaultRule | undefined {
+  function selectFault(
+    run: RunState,
+    tool: ToolName,
+    args: Record<string, unknown>,
+  ): FaultRule | undefined {
     for (const [index, rule] of run.configuration.faults.entries()) {
       if (!ruleMatches(rule, tool, args)) continue;
       const occurrence = (run.matchCounts.get(index) ?? 0) + 1;
@@ -472,7 +523,8 @@ function normalizeNamedResource(
   upstreamOrigin: string,
 ): { name: string; ref: string } {
   const ref = normalizeUrl(item.url, upstreamOrigin);
-  if (!ref || !ref.startsWith(`${resource}/`)) throw new Error(`Upstream returned a non-local ${resource} URL`);
+  if (!ref || !ref.startsWith(`${resource}/`))
+    throw new Error(`Upstream returned a non-local ${resource} URL`);
   return { name: item.name, ref };
 }
 
@@ -502,7 +554,12 @@ function compactValue(
     truncated.value = true;
     return value.slice(0, 2_000);
   }
-  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  )
     return value;
   if (depth > 7) {
     truncated.value = true;
@@ -512,13 +569,19 @@ function compactValue(
     if (value.length > 20) truncated.value = true;
     return value
       .slice(0, 20)
-      .map((entry, index) => compactValue(entry, `${field}[${index}]`, depth + 1, related, upstreamOrigin, truncated));
+      .map((entry, index) =>
+        compactValue(entry, `${field}[${index}]`, depth + 1, related, upstreamOrigin, truncated),
+      );
   }
   if (typeof value !== "object") return undefined;
   const object = value as Record<string, unknown>;
   const ref = normalizeUrl(object.url, upstreamOrigin);
   if (ref) {
-    const relation = { field, ...(typeof object.name === "string" ? { name: object.name } : {}), ref };
+    const relation = {
+      field,
+      ...(typeof object.name === "string" ? { name: object.name } : {}),
+      ref,
+    };
     related.push(relation);
     return typeof object.name === "string" ? { name: object.name, ref } : { ref };
   }
@@ -530,7 +593,14 @@ function compactValue(
       if (key !== "url") truncated.value = true;
       continue;
     }
-    const compact = compactValue(child, field ? `${field}.${key}` : key, depth + 1, related, upstreamOrigin, truncated);
+    const compact = compactValue(
+      child,
+      field ? `${field}.${key}` : key,
+      depth + 1,
+      related,
+      upstreamOrigin,
+      truncated,
+    );
     if (compact !== undefined) result[key] = compact;
   }
   return result;
@@ -551,11 +621,18 @@ function deduplicateRelations(
 function boundedValue(value: unknown, requestId: string): unknown {
   const json = JSON.stringify(value);
   if (Buffer.byteLength(json) <= MAX_RESPONSE_BYTES) return value;
-  const object = value as { resource?: unknown; ref?: unknown; data?: unknown; related?: unknown[] };
+  const object = value as {
+    resource?: unknown;
+    ref?: unknown;
+    data?: unknown;
+    related?: unknown[];
+  };
   const data =
     object.data && typeof object.data === "object" && !Array.isArray(object.data)
       ? Object.fromEntries(
-          Object.entries(object.data as Record<string, unknown>).filter(([key]) => key === "id" || key === "name"),
+          Object.entries(object.data as Record<string, unknown>).filter(
+            ([key]) => key === "id" || key === "name",
+          ),
         )
       : undefined;
   return {

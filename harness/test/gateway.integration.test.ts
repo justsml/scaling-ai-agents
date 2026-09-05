@@ -28,7 +28,9 @@ describe.skipIf(!enabled)("live Compose gateway", () => {
     }
 
     const runId = "integration-stale";
-    await configure(runId, [{ type: "stale-relationship", tool: "pokedex_get", occurrence: 1, ref: "pokemon/1" }]);
+    await configure(runId, [
+      { type: "stale-relationship", tool: "pokedex_get", occurrence: 1, ref: "pokemon/1" },
+    ]);
     await tool(runId, "pokedex_search", { resource: "pokemon", query: "bulbasaur" });
     const source = await (await tool(runId, "pokedex_get", { ref: "pokemon/1" })).json();
     expect(source.related).toContainEqual({

@@ -27,7 +27,8 @@ export type StopReason =
 
 export const STOP_REASON_TEXT: Record<StopReason, string> = {
   completed: "all planned work finished inside both caps",
-  "budget-exhausted": "the USD budget was reserved out before the remaining work could be dispatched",
+  "budget-exhausted":
+    "the USD budget was reserved out before the remaining work could be dispatched",
   "deadline-hit": "the wall-clock deadline fired; in-flight calls were aborted",
   "no-api-key": "OPENAI_API_KEY is not set, so no model call could be made",
   "dependency-missing": "an optional dependency (local model slot, remote server) was absent",

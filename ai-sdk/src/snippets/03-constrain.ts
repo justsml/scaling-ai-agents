@@ -51,7 +51,10 @@ function estimateReservation(modelId: string): number {
   const price = priceFor(modelId);
   const estimatedInputTokens = 400;
   const estimatedOutputTokens = 900;
-  return (estimatedInputTokens / 1_000_000) * price.input + (estimatedOutputTokens / 1_000_000) * price.output;
+  return (
+    (estimatedInputTokens / 1_000_000) * price.input +
+    (estimatedOutputTokens / 1_000_000) * price.output
+  );
 }
 
 async function runOneConstrainedWorker(
@@ -95,7 +98,10 @@ async function runOneConstrainedWorker(
 
   try {
     return await withWorkerSpan(
-      { profile: profile.name, whyItExisted: `constrain: ${profile.name} competes under a hard USD/ms cap` },
+      {
+        profile: profile.name,
+        whyItExisted: `constrain: ${profile.name} competes under a hard USD/ms cap`,
+      },
       async () => {
         const start = Date.now();
         const result = await agent.generate({
@@ -112,7 +118,14 @@ async function runOneConstrainedWorker(
           outcome = sandbox.ok ? "completed;passed-sandbox" : "completed;failed-sandbox";
         }
         return {
-          result: { profile: profile.name, reserved: true, ranSteps: stepsSeen, costUsd: actual, outcome, sandboxOk },
+          result: {
+            profile: profile.name,
+            reserved: true,
+            ranSteps: stepsSeen,
+            costUsd: actual,
+            outcome,
+            sandboxOk,
+          },
           costUsd: actual,
           latencyMs,
           outcome,
@@ -127,7 +140,9 @@ async function runOneConstrainedWorker(
       reserved: true,
       ranSteps: stepsSeen,
       costUsd: 0,
-      outcome: cancelled ? "cancelled(cap-reached)" : `error(${(err as Error).message.slice(0, 40)})`,
+      outcome: cancelled
+        ? "cancelled(cap-reached)"
+        : `error(${(err as Error).message.slice(0, 40)})`,
     };
   }
 }
@@ -138,11 +153,19 @@ async function runTournament(budgetUsd: number, deadlineMs: number) {
   const combined = AbortSignal.any([deadline, ledger.signal]);
 
   const profiles = competitorProfiles();
-  const settled = await Promise.allSettled(profiles.map((p) => runOneConstrainedWorker(p, ledger, combined)));
+  const settled = await Promise.allSettled(
+    profiles.map((p) => runOneConstrainedWorker(p, ledger, combined)),
+  );
   const results: ConstrainedResult[] = settled.map((s, i) =>
     s.status === "fulfilled"
       ? s.value
-      : { profile: profiles[i]!.name, reserved: false, ranSteps: 0, costUsd: 0, outcome: "rejected" },
+      : {
+          profile: profiles[i]!.name,
+          reserved: false,
+          ranSteps: 0,
+          costUsd: 0,
+          outcome: "rejected",
+        },
   );
 
   return { results, ledger, deadlineHit: deadline.aborted, budgetHit: ledger.exceeded };
@@ -158,7 +181,8 @@ const applyPatchTool = tool({
 async function runConsequentialGate(remainingBudgetUsd: number) {
   const agent = new ToolLoopAgent({
     model: competitorProfiles()[0]!.model,
-    instructions: "You are a release assistant. Apply the winning patch to main using the applyPatch tool.",
+    instructions:
+      "You are a release assistant. Apply the winning patch to main using the applyPatch tool.",
     tools: { applyPatch: applyPatchTool },
     toolApproval: {
       // Consequential regardless of remaining budget -- the policy check
@@ -167,7 +191,9 @@ async function runConsequentialGate(remainingBudgetUsd: number) {
     },
     stopWhen: isStepCount(2),
   });
-  const result = await agent.generate({ prompt: "Apply the winning readiness patch to main and push." });
+  const result = await agent.generate({
+    prompt: "Apply the winning readiness patch to main and push.",
+  });
   const approvalRequests = result.content.filter((p) => p.type === "tool-approval-request");
   return {
     approvalRequested: approvalRequests.length > 0,

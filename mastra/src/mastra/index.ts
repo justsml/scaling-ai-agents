@@ -9,7 +9,13 @@
 import { Mastra } from "@mastra/core";
 import { LibSQLStore } from "@mastra/libsql";
 import { MastraStorageExporter, Observability, SensitiveDataFilter } from "@mastra/observability";
-import { applyPatchTool, compiledReadinessTool, probeServiceTool, slowAuditTool, statusTool } from "./tools.js";
+import {
+  applyPatchTool,
+  compiledReadinessTool,
+  probeServiceTool,
+  slowAuditTool,
+  statusTool,
+} from "./tools.js";
 import { backgroundAgent, consequentialAgent, probeAgent, routineAgent } from "./agents.js";
 import { fixtureScorer, rubricJudgeScorer } from "../lib/judge.js";
 
@@ -60,7 +66,8 @@ export const mastra = new Mastra({
         if (rc && typeof rc.set === "function") {
           if (!rc.has?.("requestId")) rc.set("requestId", crypto.randomUUID());
           if (!rc.has?.("region")) rc.set("region", context.req.header("x-region") ?? "us");
-          if (!rc.has?.("dataClass")) rc.set("dataClass", context.req.header("x-data-class") ?? "internal");
+          if (!rc.has?.("dataClass"))
+            rc.set("dataClass", context.req.header("x-data-class") ?? "internal");
         }
         await next();
       },

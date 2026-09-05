@@ -35,7 +35,8 @@ export class EvidenceStore<T> {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
       throw error;
     }
-    if (metadata.size > this.maximumReadBytes) throw new Error(`Evidence ${id} exceeds the read bound`);
+    if (metadata.size > this.maximumReadBytes)
+      throw new Error(`Evidence ${id} exceeds the read bound`);
     const value = JSON.parse(await readFile(path, "utf8")) as T;
     this.#memory.set(id, value);
     return value;

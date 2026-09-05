@@ -16,9 +16,14 @@ describe("runWhenReady", () => {
   test("starting: waits with backoff then runs once", async () => {
     const c = clock();
     let calls = 0;
-    const probe: Probe = async () => (calls++ < 3 ? { ok: false, code: "ECONNREFUSED" } : { ok: true });
+    const probe: Probe = async () =>
+      calls++ < 3 ? { ok: false, code: "ECONNREFUSED" } : { ok: true };
     let ran = 0;
-    const out = await runWhenReady(probe, async () => void ran++, { deadlineMs: 5000, baseDelayMs: 50, ...c });
+    const out = await runWhenReady(probe, async () => void ran++, {
+      deadlineMs: 5000,
+      baseDelayMs: 50,
+      ...c,
+    });
     expect(out.status).toBe("ran");
     expect(ran).toBe(1);
     expect(out.attempts).toBe(4);
@@ -76,8 +81,13 @@ describe("runWhenReady", () => {
   test("negative case: ETIMEDOUT is retried like ECONNREFUSED, not treated as denied", async () => {
     const c = clock();
     let calls = 0;
-    const probe: Probe = async () => (calls++ < 1 ? { ok: false, code: "ETIMEDOUT" } : { ok: true });
-    const out = await runWhenReady(probe, async () => {}, { deadlineMs: 5000, baseDelayMs: 10, ...c });
+    const probe: Probe = async () =>
+      calls++ < 1 ? { ok: false, code: "ETIMEDOUT" } : { ok: true };
+    const out = await runWhenReady(probe, async () => {}, {
+      deadlineMs: 5000,
+      baseDelayMs: 10,
+      ...c,
+    });
     expect(out.status).toBe("ran");
     expect(out.attempts).toBe(2);
   });
