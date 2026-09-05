@@ -147,7 +147,7 @@ export class DriverTools {
   }
 }
 
-function cleanupSignal(timeoutMs = 2_000): AbortSignal {
+function cleanupSignal(timeoutMs = 10_000): AbortSignal {
   return AbortSignal.timeout(timeoutMs);
 }
 
