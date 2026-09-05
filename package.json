@@ -1,0 +1,11 @@
+{
+  "name": "agentic-parallelism",
+  "private": true,
+  "scripts": {
+    "format": "biome format --write .",
+    "format:check": "biome format ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.12"
+  }
+}
