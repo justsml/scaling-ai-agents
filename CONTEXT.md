@@ -23,3 +23,15 @@ _Avoid_: PokéAPI benchmark, Pokémon lookup
 **Conformance harness**:
 The common agent-driven test system that runs comparable scenarios across the independent stacks and collects normalized evidence. It does not replace a stack's deterministic certification.
 _Avoid_: Shared implementation, test agent
+
+**Driver**:
+The Pi-controlled actor that submits conformance scenarios to each stack and collects their evidence without solving the scenario itself.
+_Avoid_: Test agent, evaluator model
+
+**Stack agent**:
+The framework-specific agent whose reasoning, tool use, and answer are evaluated during a conformance run.
+_Avoid_: Driver, harness agent
+
+**Pokédex tool contract**:
+The common set of discovery, paging, search, and read operations available to every stack agent during a Pokédex investigation.
+_Avoid_: PokéAPI client, shared tool implementation
