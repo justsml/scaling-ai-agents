@@ -1,0 +1,91 @@
+{
+  "contractVersion": "1.0.0",
+  "scenarios": [
+    {
+      "id": "ordinary-discovery",
+      "group": "ordinary",
+      "prompt": "Which local resource kinds support search, and which supported kind can only be listed and read?",
+      "deadlineMs": 30000,
+      "maxToolCalls": 2,
+      "faults": []
+    },
+    {
+      "id": "ordinary-pikachu",
+      "group": "ordinary",
+      "prompt": "Find Pikachu locally and report its height, weight, and types with evidence.",
+      "deadlineMs": 30000,
+      "maxToolCalls": 4,
+      "faults": []
+    },
+    {
+      "id": "ordinary-ability",
+      "group": "ordinary",
+      "prompt": "What abilities does Bulbasaur have, and which is hidden? Use only local Pokédex evidence.",
+      "deadlineMs": 30000,
+      "maxToolCalls": 4,
+      "faults": []
+    },
+    {
+      "id": "ordinary-comparison",
+      "group": "ordinary",
+      "prompt": "Which weighs more, Bulbasaur or Charmander, and by how much in PokéAPI weight units?",
+      "deadlineMs": 30000,
+      "maxToolCalls": 7,
+      "faults": []
+    },
+    {
+      "id": "pagination-resume",
+      "group": "pagination",
+      "prompt": "List the names on the second page of Pokémon when page size is 3. Start at the beginning and use the returned cursor.",
+      "deadlineMs": 30000,
+      "maxToolCalls": 3,
+      "faults": []
+    },
+    {
+      "id": "pagination-empty-page",
+      "group": "pagination",
+      "prompt": "Starting at the beginning with page size 3, continue until you have observed six Pokémon names. An empty page may still have a continuation cursor.",
+      "deadlineMs": 30000,
+      "maxToolCalls": 5,
+      "faults": [
+        { "type": "empty-page", "tool": "pokedex_list", "occurrence": 2, "resource": "pokemon" }
+      ]
+    },
+    {
+      "id": "cascade-evolution",
+      "group": "cascade",
+      "prompt": "Starting from a search for Bulbasaur, follow local relationships through its species to its evolution chain. Name the later species in that chain.",
+      "deadlineMs": 30000,
+      "maxToolCalls": 6,
+      "faults": []
+    },
+    {
+      "id": "cascade-generation-region",
+      "group": "cascade",
+      "prompt": "Find Generation I, follow its main region relationship, and name that region and one Pokédex related to it.",
+      "deadlineMs": 30000,
+      "maxToolCalls": 6,
+      "faults": []
+    },
+    {
+      "id": "failure-rate-limit",
+      "group": "injected-failure",
+      "prompt": "Find Pikachu and report its base experience. Recover from retryable tool errors using their retry advice.",
+      "deadlineMs": 30000,
+      "maxToolCalls": 6,
+      "faults": [
+        { "type": "429", "tool": "pokedex_search", "occurrence": 1, "resource": "pokemon", "retryAfterMs": 5 }
+      ]
+    },
+    {
+      "id": "failure-cascade-500",
+      "group": "injected-failure",
+      "prompt": "Find Charmander, follow its species relationship, and report the species color. Recover from retryable tool failures.",
+      "deadlineMs": 30000,
+      "maxToolCalls": 7,
+      "faults": [
+        { "type": "500", "tool": "pokedex_get", "occurrence": 2, "retryAfterMs": 5 }
+      ]
+    }
+  ]
+}

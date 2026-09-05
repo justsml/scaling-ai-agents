@@ -1,0 +1,72 @@
+{
+  "contractVersion": "1.0.0",
+  "expected": {
+    "ordinary-discovery": {
+      "claims": [
+        { "path": "searchable", "operator": "set-equals", "value": ["ability", "generation", "move", "pokedex", "pokemon", "pokemon-species", "region", "type"] },
+        { "path": "listOnly", "operator": "contains", "value": "evolution-chain" }
+      ],
+      "evidence": { "requiredTools": ["pokedex_list_resources"] }
+    },
+    "ordinary-pikachu": {
+      "claims": [
+        { "path": "name", "operator": "equals", "value": "pikachu" },
+        { "path": "height", "operator": "equals", "value": 4 },
+        { "path": "weight", "operator": "equals", "value": 60 },
+        { "path": "types", "operator": "contains", "value": "electric" }
+      ],
+      "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"] }
+    },
+    "ordinary-ability": {
+      "claims": [
+        { "path": "abilities", "operator": "contains", "value": "overgrow" },
+        { "path": "hiddenAbility", "operator": "equals", "value": "chlorophyll" }
+      ],
+      "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"] }
+    },
+    "ordinary-comparison": {
+      "claims": [
+        { "path": "heavier", "operator": "equals", "value": "charmander" },
+        { "path": "difference", "operator": "equals", "value": 16 }
+      ],
+      "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"], "minimumGets": 2 }
+    },
+    "pagination-resume": {
+      "claims": [
+        { "path": "names", "operator": "set-equals", "value": ["charmander", "charmeleon", "charizard"] }
+      ],
+      "evidence": { "requiredTools": ["pokedex_list"], "minimumPages": 2, "requiresCursor": true }
+    },
+    "pagination-empty-page": {
+      "claims": [
+        { "path": "names", "operator": "set-equals", "value": ["bulbasaur", "ivysaur", "venusaur", "squirtle", "wartortle", "blastoise"] }
+      ],
+      "evidence": { "requiredTools": ["pokedex_list"], "minimumPages": 3, "requiresEmptyPageContinuation": true }
+    },
+    "cascade-evolution": {
+      "claims": [
+        { "path": "laterSpecies", "operator": "set-equals", "value": ["ivysaur", "venusaur"] }
+      ],
+      "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"], "requiredRefs": ["pokemon-species/1", "evolution-chain/1"] }
+    },
+    "cascade-generation-region": {
+      "claims": [
+        { "path": "region", "operator": "equals", "value": "kanto" },
+        { "path": "pokedexes", "operator": "contains", "value": "kanto" }
+      ],
+      "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"], "requiredRefs": ["region/1"] }
+    },
+    "failure-rate-limit": {
+      "claims": [
+        { "path": "baseExperience", "operator": "equals", "value": 112 }
+      ],
+      "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"], "requiredErrors": ["RATE_LIMITED"], "requiresRetry": true }
+    },
+    "failure-cascade-500": {
+      "claims": [
+        { "path": "color", "operator": "equals", "value": "red" }
+      ],
+      "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"], "requiredErrors": ["UPSTREAM_UNAVAILABLE"], "requiresRetry": true }
+    }
+  }
+}

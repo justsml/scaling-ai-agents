@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1.0.0",
+  "maxPageSize": 25,
+  "tools": [
+    {
+      "name": "pokedex_list_resources",
+      "description": "Discover the local Pokédex resource kinds and the operations each supports.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "pokedex_list",
+      "description": "List one page of an allowlisted Pokédex resource. Continue only with the opaque nextCursor returned by this tool.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resource": {
+            "type": "string",
+            "enum": ["ability", "evolution-chain", "generation", "move", "pokedex", "pokemon", "pokemon-species", "region", "type"]
+          },
+          "cursor": { "type": "string", "minLength": 1 },
+          "pageSize": { "type": "integer", "minimum": 1, "maximum": 25, "default": 10 }
+        },
+        "required": ["resource"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "pokedex_search",
+      "description": "Case-insensitively search names in one allowlisted local Pokédex resource. Continue only with the opaque nextCursor returned by this tool.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resource": {
+            "type": "string",
+            "enum": ["ability", "generation", "move", "pokedex", "pokemon", "pokemon-species", "region", "type"]
+          },
+          "query": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "cursor": { "type": "string", "minLength": 1 },
+          "pageSize": { "type": "integer", "minimum": 1, "maximum": 25, "default": 10 }
+        },
+        "required": ["resource", "query"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "pokedex_get",
+      "description": "Read a normalized local reference returned by an earlier Pokédex tool call. URLs and invented references are rejected.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*/[a-z0-9-]+$"
+          }
+        },
+        "required": ["ref"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "errorSchema": {
+    "type": "object",
+    "properties": {
+      "code": { "type": "string" },
+      "message": { "type": "string" },
+      "retryable": { "type": "boolean" },
+      "retryAfterMs": { "type": ["integer", "null"], "minimum": 0 },
+      "requestId": { "type": "string" }
+    },
+    "required": ["code", "message", "retryable", "retryAfterMs", "requestId"],
+    "additionalProperties": false
+  }
+}
