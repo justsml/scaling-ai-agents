@@ -14,7 +14,7 @@
     },
     {
       "name": "pokedex_list",
-      "description": "List one page of an allowlisted Pokédex resource. Continue only with the opaque nextCursor returned by this tool.",
+      "description": "List one page of an allowlisted Pokédex resource. Continue only with the opaque nextCursor returned by this tool. Do not finalize until the requested item count is collected or nextCursor is null; always continue an empty page when nextCursor is non-null.",
       "inputSchema": {
         "type": "object",
         "properties": {
