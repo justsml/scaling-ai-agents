@@ -12,10 +12,12 @@ export default async function pokedexDriverExtension(pi: ExtensionAPI): Promise<
   const repoRoot = requiredEnvironment("POKEDEX_REPO_ROOT");
   const evidenceDirectory = requiredEnvironment("POKEDEX_EVIDENCE_DIR");
   const driverRunId = requiredEnvironment("POKEDEX_DRIVER_RUN_ID");
+  const scenarioId = requiredEnvironment("POKEDEX_SCENARIO_ID");
   const gatewayBaseUrl = requiredEnvironment("POKEDEX_GATEWAY_URL");
   const requestedStacks = parseRequestedStacks(process.env.POKEDEX_REQUESTED_STACKS);
   const tools = new DriverTools({
     driverRunId,
+    scenarioId,
     requestedStacks,
     gatewayBaseUrl,
     catalog: await loadScenarioCatalog(repoRoot),

@@ -10,6 +10,7 @@ describe("Pi Driver tools", () => {
     const configured: unknown[][] = [];
     const tools = new DriverTools({
       driverRunId: "driver-1",
+      scenarioId: "case-1",
       requestedStacks: ["ai-sdk"],
       gatewayBaseUrl: "http://127.0.0.1:3210",
       catalog,
@@ -25,7 +26,11 @@ describe("Pi Driver tools", () => {
       scenarioId: "case-1",
       stopReason: "stop",
     });
+    const listed = await tools.listStacks();
+    expect(listed.stacks.map((item) => item.stack)).toEqual(["ai-sdk", "mastra", "langchain"]);
+    expect(listed.stacks.filter((item) => item.requested).map((item) => item.stack)).toEqual(["ai-sdk"]);
     await expect(tools.readEvidence("not-returned-by-run-scenario")).rejects.toThrow("Unknown evidence id");
+    await expect(tools.runScenario("ai-sdk", "different-case")).rejects.toThrow("Scenario is not requested");
     await expect(tools.runScenario("ai-sdk", "case-1")).rejects.toThrow("Duplicate dispatch");
   });
 });

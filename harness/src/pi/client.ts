@@ -25,12 +25,20 @@ export interface PiRunEvidence {
   sessionStats: unknown;
   frames: unknown[];
   toolCalls: unknown[];
+  dispatch: DispatchVerification;
   finalMessage: unknown;
   stderr: string;
   exitCode: number | null;
   timedOut: boolean;
   protocolErrors: string[];
   latencyMs: number;
+}
+
+export interface DispatchVerification {
+  passed: boolean;
+  expected: StackName[];
+  observed: StackName[];
+  details: string[];
 }
 
 export interface PiClientOptions {
@@ -57,6 +65,9 @@ export async function runPiDriver(
   request: PiDriverRequest,
   options: PiClientOptions = {},
 ): Promise<PiRunEvidence> {
+  if (!/^[A-Za-z0-9._-]{1,64}$/.test(request.driverRunId)) {
+    throw new Error("driverRunId must be 1-64 URL-safe identifier characters");
+  }
   const spawner = options.spawner ?? new BunProcessSpawner();
   const piExecutable = options.piExecutable ?? process.env.PI_BIN ?? "pi";
   const piVersion = await readCompatiblePiVersion(piExecutable, request.repoRoot, spawner);
@@ -81,6 +92,7 @@ export async function runPiDriver(
       POKEDEX_REPO_ROOT: request.repoRoot,
       POKEDEX_EVIDENCE_DIR: request.evidenceDirectory,
       POKEDEX_DRIVER_RUN_ID: request.driverRunId,
+      POKEDEX_SCENARIO_ID: request.scenarioId,
       POKEDEX_GATEWAY_URL: request.gatewayBaseUrl,
       POKEDEX_REQUESTED_STACKS: request.requestedStacks.join(","),
       ...(request.controlSecret ? { POKEDEX_CONTROL_SECRET: request.controlSecret } : {}),
@@ -202,6 +214,7 @@ export async function runPiDriver(
     sessionStats,
     frames,
     toolCalls,
+    dispatch: verifyDriverDispatch(toolCalls, request.scenarioId, request.requestedStacks),
     finalMessage,
     stderr,
     exitCode,
@@ -238,6 +251,36 @@ export async function runPiDriver(
     }
     if (frame.type === "agent_settled") settled.resolve();
   }
+}
+
+export function verifyDriverDispatch(
+  toolCalls: readonly unknown[],
+  scenarioId: string,
+  requestedStacks: readonly StackName[],
+): DispatchVerification {
+  const counts = new Map<string, number>();
+  const details: string[] = [];
+  for (const value of toolCalls) {
+    const event = asRecord(value);
+    if (event.toolName !== "run_scenario") continue;
+    const args = asRecord(event.args);
+    const stack = args.stack;
+    const scenario = args.scenarioId;
+    if (typeof stack !== "string" || typeof scenario !== "string") {
+      details.push("run_scenario had malformed dispatch arguments");
+      continue;
+    }
+    if (scenario !== scenarioId) details.push(`run_scenario dispatched unexpected scenario ${scenario}`);
+    if (!requestedStacks.includes(stack as StackName)) details.push(`run_scenario dispatched unrequested stack ${stack}`);
+    const key = `${scenario}\0${stack}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  for (const stack of requestedStacks) {
+    const count = counts.get(`${scenarioId}\0${stack}`) ?? 0;
+    if (count !== 1) details.push(`expected one ${scenarioId}/${stack} dispatch; observed ${count}`);
+  }
+  const observed = requestedStacks.filter((stack) => (counts.get(`${scenarioId}\0${stack}`) ?? 0) > 0);
+  return { passed: details.length === 0, expected: [...requestedStacks], observed, details };
 }
 
 export async function readCompatiblePiVersion(
@@ -323,4 +366,3 @@ class Deferred<T> {
   resolve(value?: T): void { this.#resolve(value as T); }
   reject(reason?: unknown): void { this.#reject(reason); }
 }
-

@@ -1,7 +1,7 @@
 import type { GatewayControl } from "./gateway-control";
 import type { ScenarioCatalog } from "./catalog";
 import type { StackRunResult, StackRunner } from "./stack-runner";
-import type { CanonicalScenario, StackName } from "./types";
+import { STACKS, type CanonicalScenario, type StackName } from "./types";
 
 export interface EvidenceRepository<T> {
   put(value: T): Promise<string>;
@@ -20,6 +20,7 @@ export interface DriverEvidenceRecord {
 
 export interface DriverToolDependencies {
   driverRunId: string;
+  scenarioId: string;
   requestedStacks: readonly StackName[];
   gatewayBaseUrl: string;
   catalog: ScenarioCatalog;
@@ -45,18 +46,25 @@ export class DriverTools {
   constructor(readonly dependencies: DriverToolDependencies) {}
 
   async listStacks(signal?: AbortSignal): Promise<{
-    stacks: Array<Awaited<ReturnType<StackRunner["health"]>>>;
+    stacks: Array<Awaited<ReturnType<StackRunner["health"]>> & { requested: boolean }>;
     gatewayHealthy: boolean;
   }> {
-    const [gatewayHealthy, ...stacks] = await Promise.all([
+    const [gatewayHealthy, ...health] = await Promise.all([
       this.dependencies.gateway.health(signal),
-      ...this.dependencies.requestedStacks.map((stack) => this.dependencies.stackRunner.health(stack)),
+      ...STACKS.map((stack) => this.dependencies.stackRunner.health(stack)),
     ]);
+    const stacks = health.map((item) => ({
+      ...item,
+      requested: this.dependencies.requestedStacks.includes(item.stack),
+    }));
     return { stacks, gatewayHealthy };
   }
 
   async runScenario(stack: StackName, scenarioId: string, signal?: AbortSignal): Promise<ScenarioRunSummary> {
     if (!this.dependencies.requestedStacks.includes(stack)) throw new Error(`Stack is not requested: ${stack}`);
+    if (scenarioId !== this.dependencies.scenarioId) {
+      throw new Error(`Scenario is not requested: ${scenarioId}`);
+    }
     const scenario = this.dependencies.catalog.get(scenarioId);
     if (!scenario) throw new Error(`Unknown scenario: ${scenarioId}`);
     const dispatchKey = `${scenario.id}\0${stack}`;

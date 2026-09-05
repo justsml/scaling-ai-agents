@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { assertDriverState, buildDriverPrompt, readCompatiblePiVersion, runPiDriver } from "../src/pi/client";
+import { assertDriverState, buildDriverPrompt, readCompatiblePiVersion, runPiDriver, verifyDriverDispatch } from "../src/pi/client";
 import type { ChildProcessHandle, ProcessSpawner, SpawnOptions } from "../src/pi/types";
 
 const encoder = new TextEncoder();
@@ -16,8 +16,10 @@ describe("Pi RPC client", () => {
     });
     expect(spawner.calls[0]?.argv).toEqual(["pi", "--version"]);
     expect(spawner.calls[1]?.argv).toContain("--no-builtin-tools");
+    expect(spawner.calls[1]?.options.env?.POKEDEX_SCENARIO_ID).toBe("case-1");
     expect(result).toMatchObject({ piVersion: "0.85.1", thinkingLevel: "off", exitCode: 0, timedOut: false, protocolErrors: [] });
-    expect(result.toolCalls).toHaveLength(1);
+    expect(result.toolCalls).toHaveLength(4);
+    expect(result.dispatch).toMatchObject({ passed: true, observed: ["ai-sdk", "mastra", "langchain"] });
     expect(result.sessionStats).toMatchObject({ toolCalls: 1 });
     expect(rpc.commands.map((command) => command.type)).toEqual(["get_state", "prompt", "get_state", "get_session_stats"]);
   });
@@ -50,6 +52,15 @@ describe("Pi RPC client", () => {
     expect(prompt).toContain("exactly once for every requested stack");
     expect(prompt).toContain("do not answer it");
     expect(prompt).toContain("only a compact dispatch summary");
+  });
+
+  test("dispatch verification rejects missing, duplicate, and wrong-scenario runs", () => {
+    const tool = (stack: string, scenarioId = "case-1") => ({ toolName: "run_scenario", args: { stack, scenarioId } });
+    const result = verifyDriverDispatch([tool("ai-sdk"), tool("ai-sdk"), tool("mastra", "other")], "case-1", ["ai-sdk", "mastra"]);
+    expect(result.passed).toBeFalse();
+    expect(result.details.join(" ")).toContain("observed 2");
+    expect(result.details.join(" ")).toContain("unexpected scenario other");
+    expect(result.details.join(" ")).toContain("observed 0");
   });
 });
 
@@ -100,6 +111,9 @@ class FakeRpcProcess implements ChildProcessHandle {
       if (this.settle) {
         this.emit({ type: "agent_end", messages: [], willRetry: false });
         this.emit({ type: "tool_execution_start", toolCallId: "call-1", toolName: "list_stacks", args: {} });
+        for (const [index, stack] of ["ai-sdk", "mastra", "langchain"].entries()) {
+          this.emit({ type: "tool_execution_start", toolCallId: `call-${index + 2}`, toolName: "run_scenario", args: { stack, scenarioId: "case-1" } });
+        }
         this.emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "done" }] } });
         this.emit({ type: "agent_settled" });
       }
