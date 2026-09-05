@@ -6,21 +6,23 @@ import type { StackRunResult, StackRunner } from "../src/pi/stack-runner";
 
 describe("Pi Driver tools", () => {
   test("configures faults, invokes a stack once, and stores full evidence", async () => {
-    const evidence = new MemoryEvidence();
     const configured: unknown[][] = [];
+    const actions: string[] = [];
+    const evidence = new MemoryEvidence(actions);
     const tools = new DriverTools({
       driverRunId: "driver-1",
       scenarioId: "case-1",
       requestedStacks: ["ai-sdk"],
       gatewayBaseUrl: "http://127.0.0.1:3210",
       catalog,
-      gateway: gateway(configured),
+      gateway: gateway(configured, actions),
       stackRunner,
       evidence,
     });
     const summary = await tools.runScenario("ai-sdk", "case-1");
     expect(configured[0]?.slice(1)).toEqual(["case-1", [{ type: "429" }]]);
     expect(summary).toMatchObject({ evidenceId: "evidence-1", stack: "ai-sdk", ok: true, toolCallCount: 1 });
+    expect(actions).toEqual(["events", "put", "delete"]);
     expect((await tools.readEvidence(summary.evidenceId)) as object).toMatchObject({
       stack: "ai-sdk",
       scenarioId: "case-1",
@@ -32,6 +34,49 @@ describe("Pi Driver tools", () => {
     await expect(tools.readEvidence("not-returned-by-run-scenario")).rejects.toThrow("Unknown evidence id");
     await expect(tools.runScenario("ai-sdk", "different-case")).rejects.toThrow("Scenario is not requested");
     await expect(tools.runScenario("ai-sdk", "case-1")).rejects.toThrow("Duplicate dispatch");
+  });
+
+  test("uses fresh cleanup signals and persists a cancellation trace before deletion", async () => {
+    const original = new AbortController();
+    original.abort(new Error("cancelled"));
+    const actions: string[] = [];
+    const cleanupSignals: AbortSignal[] = [];
+    const evidence = new MemoryEvidence(actions);
+    const tools = new DriverTools({
+      driverRunId: "driver-1",
+      scenarioId: "case-1",
+      requestedStacks: ["ai-sdk"],
+      gatewayBaseUrl: "http://127.0.0.1:3210",
+      catalog,
+      gateway: {
+        health: async () => true,
+        configureRun: async () => undefined,
+        readEvents: async (_runId, signal) => {
+          actions.push("events");
+          cleanupSignals.push(signal!);
+          return [{ requestId: "partial" }];
+        },
+        deleteRun: async (_runId, signal) => {
+          actions.push("delete");
+          cleanupSignals.push(signal!);
+        },
+      },
+      stackRunner: {
+        health: stackRunner.health,
+        run: async () => { throw original.signal.reason; },
+      },
+      evidence,
+      cleanupTimeoutMs: 100,
+    });
+
+    const summary = await tools.runScenario("ai-sdk", "case-1", original.signal);
+    expect(summary.ok).toBeFalse();
+    expect(summary.stopReason).toContain("cancelled");
+    expect(actions).toEqual(["events", "put", "delete"]);
+    expect(cleanupSignals).toHaveLength(2);
+    expect(cleanupSignals.every((item) => item !== original.signal && !item.aborted)).toBeTrue();
+    expect(evidence.record?.gatewayEvents).toEqual([{ requestId: "partial" }]);
+    expect(evidence.record?.error).toContain("cancelled");
   });
 });
 
@@ -46,16 +91,18 @@ const stackRunner: Pick<StackRunner, "health" | "run"> = {
   run: async () => stackRun,
 };
 
-function gateway(configured: unknown[][]): GatewayControl {
+function gateway(configured: unknown[][], actions: string[]): GatewayControl {
   return {
     health: async () => true,
     configureRun: async (...args) => { configured.push(args.slice(0, 3)); },
-    readEvents: async () => [{ requestId: "gw-1" }],
+    readEvents: async () => { actions.push("events"); return [{ requestId: "gw-1" }]; },
+    deleteRun: async () => { actions.push("delete"); },
   };
 }
 
 class MemoryEvidence implements EvidenceRepository<DriverEvidenceRecord> {
+  constructor(readonly actions?: string[]) {}
   record?: DriverEvidenceRecord;
-  async put(value: DriverEvidenceRecord): Promise<string> { this.record = value; return "evidence-1"; }
+  async put(value: DriverEvidenceRecord): Promise<string> { this.actions?.push("put"); this.record = value; return "evidence-1"; }
   async get(id: string): Promise<DriverEvidenceRecord | undefined> { return id === "evidence-1" ? this.record : undefined; }
 }

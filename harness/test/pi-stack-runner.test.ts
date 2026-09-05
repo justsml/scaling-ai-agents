@@ -27,12 +27,29 @@ describe("Stack subprocess runner", () => {
     expect(result.evidence?.stack).toBe("ai-sdk");
   });
 
-  test("rejects extra stdout documents", async () => {
+  test("preserves the first valid evidence document while reporting extra stdout", async () => {
     const body = JSON.stringify({ stack: "mastra", toolCalls: [], usage: {}, latencyMs: 1, stopReason: "stop" });
     const runner = new StackRunner("/repo", { spawner: new RecordingSpawner(fixedProcess(`${body}\n${body}\n`)) });
     const result = await runner.run("mastra", request);
-    expect(result.evidence).toBeNull();
+    expect(result.evidence?.stack).toBe("mastra");
     expect(result.protocolError).toContain("2 JSONL documents");
+  });
+
+  test("preserves valid parsed evidence alongside a nonzero exit", async () => {
+    const body = JSON.stringify({ stack: "langchain", toolCalls: [], usage: {}, latencyMs: 1, stopReason: "partial" });
+    const runner = new StackRunner("/repo", { spawner: new RecordingSpawner(fixedProcess(`${body}\n`, "failed", 7)) });
+    const result = await runner.run("langchain", request);
+    expect(result.evidence?.stopReason).toBe("partial");
+    expect(result.exitCode).toBe(7);
+    expect(result.protocolError).toContain("exited 7");
+  });
+
+  test("preserves a valid document before malformed trailing protocol output", async () => {
+    const body = JSON.stringify({ stack: "ai-sdk", toolCalls: [], usage: {}, latencyMs: 1, stopReason: "partial" });
+    const runner = new StackRunner("/repo", { spawner: new RecordingSpawner(fixedProcess(`${body}\nnot-json\n`)) });
+    const result = await runner.run("ai-sdk", request);
+    expect(result.evidence?.stopReason).toBe("partial");
+    expect(result.protocolError).toContain("Invalid JSONL frame");
   });
 });
 
@@ -62,4 +79,3 @@ function fixedProcess(stdout: string, stderr = "", exitCode = 0) {
 async function* chunks(value: string): AsyncIterable<Uint8Array> {
   if (value) yield encoder.encode(value);
 }
-

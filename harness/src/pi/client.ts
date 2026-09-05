@@ -24,7 +24,7 @@ export interface PiRunEvidence {
   thinkingLevel: unknown;
   sessionStats: unknown;
   frames: unknown[];
-  toolCalls: unknown[];
+  toolCalls: CorrelatedToolExecution[];
   dispatch: DispatchVerification;
   finalMessage: unknown;
   stderr: string;
@@ -32,6 +32,21 @@ export interface PiRunEvidence {
   timedOut: boolean;
   protocolErrors: string[];
   latencyMs: number;
+}
+
+export interface CorrelatedToolExecution {
+  toolCallId: string;
+  toolName: string;
+  args: unknown;
+  start: unknown;
+  end: unknown | null;
+  successful: boolean;
+  result: unknown | null;
+}
+
+export interface CorrelatedToolTrace {
+  executions: CorrelatedToolExecution[];
+  errors: string[];
 }
 
 export interface DispatchVerification {
@@ -100,7 +115,6 @@ export async function runPiDriver(
   });
 
   const frames: unknown[] = [];
-  const toolCalls: unknown[] = [];
   const protocolErrors: string[] = [];
   const responses = new Map<string, Deferred<RpcResponse>>();
   const settled = new Deferred<void>();
@@ -213,8 +227,8 @@ export async function runPiDriver(
     thinkingLevel,
     sessionStats,
     frames,
-    toolCalls,
-    dispatch: verifyDriverDispatch(toolCalls, request.scenarioId, request.requestedStacks),
+    toolCalls: correlateToolExecutions(frames).executions,
+    dispatch: verifyDriverDispatch(frames, request.scenarioId, request.requestedStacks),
     finalMessage,
     stderr,
     exitCode,
@@ -244,7 +258,6 @@ export async function runPiDriver(
         else pending.reject(new Error(`Pi ${response.command} failed: ${response.error ?? "unknown error"}`));
       }
     }
-    if (frame.type === "tool_execution_start") toolCalls.push(frame);
     if (frame.type === "message_end") {
       const message = asRecord(frame.message);
       if (message.role === "assistant") finalMessage = message;
@@ -254,33 +267,129 @@ export async function runPiDriver(
 }
 
 export function verifyDriverDispatch(
-  toolCalls: readonly unknown[],
+  frames: readonly unknown[],
   scenarioId: string,
   requestedStacks: readonly StackName[],
 ): DispatchVerification {
+  const trace = correlateToolExecutions(frames);
+  const details = [...trace.errors];
+  const relevant = trace.executions.filter((call) =>
+    ["list_stacks", "run_scenario", "read_evidence"].includes(call.toolName)
+  );
+  for (const call of relevant) {
+    if (!call.successful) details.push(`${call.toolName} ${call.toolCallId} did not complete successfully`);
+  }
+
+  const listCalls = relevant.filter((call) => call.toolName === "list_stacks");
+  if (listCalls.length !== 1) details.push(`expected one list_stacks call; observed ${listCalls.length}`);
+  if (listCalls.filter((call) => call.successful).length !== 1) {
+    details.push(`expected one successful list_stacks call; observed ${listCalls.filter((call) => call.successful).length}`);
+  }
+
   const counts = new Map<string, number>();
-  const details: string[] = [];
-  for (const value of toolCalls) {
-    const event = asRecord(value);
-    if (event.toolName !== "run_scenario") continue;
-    const args = asRecord(event.args);
+  const returnedEvidenceIds: string[] = [];
+  for (const call of relevant.filter((item) => item.toolName === "run_scenario")) {
+    const args = asRecord(call.args);
     const stack = args.stack;
     const scenario = args.scenarioId;
     if (typeof stack !== "string" || typeof scenario !== "string") {
-      details.push("run_scenario had malformed dispatch arguments");
+      details.push(`run_scenario ${call.toolCallId} had malformed dispatch arguments`);
       continue;
     }
     if (scenario !== scenarioId) details.push(`run_scenario dispatched unexpected scenario ${scenario}`);
     if (!requestedStacks.includes(stack as StackName)) details.push(`run_scenario dispatched unrequested stack ${stack}`);
     const key = `${scenario}\0${stack}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
+    if (call.successful) {
+      const evidenceId = asRecord(asRecord(call.result).details).evidenceId;
+      if (typeof evidenceId !== "string" || evidenceId.length === 0) {
+        details.push(`run_scenario ${call.toolCallId} returned no evidenceId`);
+      } else {
+        if (returnedEvidenceIds.includes(evidenceId)) details.push(`run_scenario returned duplicate evidenceId ${evidenceId}`);
+        returnedEvidenceIds.push(evidenceId);
+      }
+    }
   }
   for (const stack of requestedStacks) {
     const count = counts.get(`${scenarioId}\0${stack}`) ?? 0;
     if (count !== 1) details.push(`expected one ${scenarioId}/${stack} dispatch; observed ${count}`);
   }
-  const observed = requestedStacks.filter((stack) => (counts.get(`${scenarioId}\0${stack}`) ?? 0) > 0);
+
+  const evidenceCounts = new Map<string, number>();
+  for (const call of relevant.filter((item) => item.toolName === "read_evidence")) {
+    const evidenceId = asRecord(call.args).evidenceId;
+    if (typeof evidenceId !== "string" || evidenceId.length === 0) {
+      details.push(`read_evidence ${call.toolCallId} had malformed arguments`);
+      continue;
+    }
+    evidenceCounts.set(evidenceId, (evidenceCounts.get(evidenceId) ?? 0) + 1);
+    if (!returnedEvidenceIds.includes(evidenceId)) details.push(`read_evidence requested unreturned evidenceId ${evidenceId}`);
+  }
+  for (const evidenceId of returnedEvidenceIds) {
+    const count = evidenceCounts.get(evidenceId) ?? 0;
+    if (count !== 1) details.push(`expected one read_evidence call for ${evidenceId}; observed ${count}`);
+  }
+
+  const observed = requestedStacks.filter((stack) => {
+    const matching = relevant.filter((call) => {
+      const args = asRecord(call.args);
+      return call.toolName === "run_scenario" && call.successful && args.scenarioId === scenarioId && args.stack === stack;
+    });
+    return matching.length > 0;
+  });
   return { passed: details.length === 0, expected: [...requestedStacks], observed, details };
+}
+
+export function correlateToolExecutions(frames: readonly unknown[]): CorrelatedToolTrace {
+  const starts = new Map<string, Record<string, unknown>>();
+  const ends = new Map<string, Record<string, unknown>>();
+  const endsBeforeStart = new Set<string>();
+  const order: string[] = [];
+  const errors: string[] = [];
+  for (const value of frames) {
+    const frame = asRecord(value);
+    if (frame.type !== "tool_execution_start" && frame.type !== "tool_execution_end") continue;
+    const id = frame.toolCallId;
+    if (typeof id !== "string" || id.length === 0) {
+      errors.push(`${String(frame.type)} missing toolCallId`);
+      continue;
+    }
+    if (frame.type === "tool_execution_start") {
+      if (starts.has(id)) errors.push(`duplicate tool_execution_start for ${id}`);
+      else {
+        starts.set(id, frame);
+        order.push(id);
+      }
+    } else {
+      if (ends.has(id)) errors.push(`duplicate tool_execution_end for ${id}`);
+      else {
+        if (!starts.has(id)) endsBeforeStart.add(id);
+        ends.set(id, frame);
+      }
+    }
+  }
+  for (const id of ends.keys()) {
+    if (!starts.has(id)) errors.push(`tool_execution_end for unknown ${id}`);
+    else if (endsBeforeStart.has(id)) errors.push(`tool_execution_end preceded tool_execution_start for ${id}`);
+  }
+  const executions = order.map((id): CorrelatedToolExecution => {
+    const start = starts.get(id)!;
+    const end = ends.get(id) ?? null;
+    const toolName = typeof start.toolName === "string" ? start.toolName : "";
+    if (!end) errors.push(`missing tool_execution_end for ${id}`);
+    else if (end.toolName !== toolName) errors.push(`tool name mismatch for ${id}`);
+    const successful = end !== null && end.toolName === toolName && end.isError === false;
+    return {
+      toolCallId: id,
+      toolName,
+      args: start.args,
+      start,
+      end,
+      successful,
+      result: end ? end.result ?? null : null,
+    };
+  });
+  return { executions, errors };
 }
 
 export async function readCompatiblePiVersion(

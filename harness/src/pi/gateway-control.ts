@@ -2,6 +2,7 @@ export interface GatewayControl {
   health(signal?: AbortSignal): Promise<boolean>;
   configureRun(runId: string, scenarioId: string, faults: unknown[], signal?: AbortSignal): Promise<void>;
   readEvents(runId: string, signal?: AbortSignal): Promise<unknown[]>;
+  deleteRun(runId: string, signal?: AbortSignal): Promise<void>;
 }
 
 export class HttpGatewayControl implements GatewayControl {
@@ -55,5 +56,13 @@ export class HttpGatewayControl implements GatewayControl {
     if (!Array.isArray(body.events)) throw new Error("Gateway returned malformed events");
     return body.events;
   }
-}
 
+  async deleteRun(runId: string, signal?: AbortSignal): Promise<void> {
+    const response = await this.fetcher(`${this.#baseUrl}/control/runs/${encodeURIComponent(runId)}`, {
+      method: "DELETE",
+      headers: { "x-pokedex-control-secret": this.controlSecret },
+      signal,
+    });
+    if (!response.ok) throw new Error(`Gateway run deletion failed (${response.status})`);
+  }
+}

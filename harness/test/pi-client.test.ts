@@ -18,7 +18,7 @@ describe("Pi RPC client", () => {
     expect(spawner.calls[1]?.argv).toContain("--no-builtin-tools");
     expect(spawner.calls[1]?.options.env?.POKEDEX_SCENARIO_ID).toBe("case-1");
     expect(result).toMatchObject({ piVersion: "0.85.1", thinkingLevel: "off", exitCode: 0, timedOut: false, protocolErrors: [] });
-    expect(result.toolCalls).toHaveLength(4);
+    expect(result.toolCalls).toHaveLength(7);
     expect(result.dispatch).toMatchObject({ passed: true, observed: ["ai-sdk", "mastra", "langchain"] });
     expect(result.sessionStats).toMatchObject({ toolCalls: 1 });
     expect(rpc.commands.map((command) => command.type)).toEqual(["get_state", "prompt", "get_state", "get_session_stats"]);
@@ -54,13 +54,47 @@ describe("Pi RPC client", () => {
     expect(prompt).toContain("only a compact dispatch summary");
   });
 
-  test("dispatch verification rejects missing, duplicate, and wrong-scenario runs", () => {
-    const tool = (stack: string, scenarioId = "case-1") => ({ toolName: "run_scenario", args: { stack, scenarioId } });
-    const result = verifyDriverDispatch([tool("ai-sdk"), tool("ai-sdk"), tool("mastra", "other")], "case-1", ["ai-sdk", "mastra"]);
+  test("dispatch verification rejects missing ends, duplicates, and wrong-scenario runs", () => {
+    const frames = [
+      ...completedTool("list", "list_stacks", {}, {}),
+      ...completedTool("run-1", "run_scenario", { stack: "ai-sdk", scenarioId: "case-1" }, { evidenceId: "ev-1" }),
+      ...completedTool("run-2", "run_scenario", { stack: "ai-sdk", scenarioId: "case-1" }, { evidenceId: "ev-2" }),
+      { type: "tool_execution_start", toolCallId: "run-3", toolName: "run_scenario", args: { stack: "mastra", scenarioId: "other" } },
+      ...completedTool("read-1", "read_evidence", { evidenceId: "ev-1" }, {}),
+      ...completedTool("read-2", "read_evidence", { evidenceId: "ev-2" }, {}),
+    ];
+    const result = verifyDriverDispatch(frames, "case-1", ["ai-sdk", "mastra"]);
     expect(result.passed).toBeFalse();
     expect(result.details.join(" ")).toContain("observed 2");
     expect(result.details.join(" ")).toContain("unexpected scenario other");
     expect(result.details.join(" ")).toContain("observed 0");
+    expect(result.details.join(" ")).toContain("missing tool_execution_end for run-3");
+  });
+
+  test("dispatch verification requires successful reads for exactly the returned evidence IDs", () => {
+    const frames = [
+      ...completedTool("list", "list_stacks", {}, {}),
+      ...completedTool("run", "run_scenario", { stack: "ai-sdk", scenarioId: "case-1" }, { evidenceId: "ev-1" }),
+      ...completedTool("wrong-read", "read_evidence", { evidenceId: "ev-other" }, {}, true),
+    ];
+    const result = verifyDriverDispatch(frames, "case-1", ["ai-sdk"]);
+    expect(result.passed).toBeFalse();
+    expect(result.details.join(" ")).toContain("did not complete successfully");
+    expect(result.details.join(" ")).toContain("unreturned evidenceId ev-other");
+    expect(result.details.join(" ")).toContain("for ev-1; observed 0");
+  });
+
+  test("dispatch verification rejects an end event that precedes its start", () => {
+    const listFrames = completedTool("list", "list_stacks", {}, {});
+    const frames = [
+      listFrames[1],
+      listFrames[0],
+      ...completedTool("run", "run_scenario", { stack: "ai-sdk", scenarioId: "case-1" }, { evidenceId: "ev-1" }),
+      ...completedTool("read", "read_evidence", { evidenceId: "ev-1" }, {}),
+    ];
+    const result = verifyDriverDispatch(frames, "case-1", ["ai-sdk"]);
+    expect(result.passed).toBeFalse();
+    expect(result.details).toContain("tool_execution_end preceded tool_execution_start for list");
   });
 });
 
@@ -110,9 +144,11 @@ class FakeRpcProcess implements ChildProcessHandle {
       this.emit({ id: command.id, type: "response", command: "prompt", success: true });
       if (this.settle) {
         this.emit({ type: "agent_end", messages: [], willRetry: false });
-        this.emit({ type: "tool_execution_start", toolCallId: "call-1", toolName: "list_stacks", args: {} });
+        this.emitMany(completedTool("call-1", "list_stacks", {}, {}));
         for (const [index, stack] of ["ai-sdk", "mastra", "langchain"].entries()) {
-          this.emit({ type: "tool_execution_start", toolCallId: `call-${index + 2}`, toolName: "run_scenario", args: { stack, scenarioId: "case-1" } });
+          const evidenceId = `ev-${index + 1}`;
+          this.emitMany(completedTool(`call-${index + 2}`, "run_scenario", { stack, scenarioId: "case-1" }, { evidenceId }));
+          this.emitMany(completedTool(`read-${index + 1}`, "read_evidence", { evidenceId }, {}));
         }
         this.emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "done" }] } });
         this.emit({ type: "agent_settled" });
@@ -135,6 +171,23 @@ class FakeRpcProcess implements ChildProcessHandle {
   emit(frame: unknown): void {
     this.stdout.push(encoder.encode(`${JSON.stringify(frame)}\n`));
   }
+
+  emitMany(frames: readonly unknown[]): void {
+    for (const frame of frames) this.emit(frame);
+  }
+}
+
+function completedTool(
+  toolCallId: string,
+  toolName: string,
+  args: unknown,
+  details: unknown,
+  isError = false,
+): unknown[] {
+  return [
+    { type: "tool_execution_start", toolCallId, toolName, args },
+    { type: "tool_execution_end", toolCallId, toolName, result: { content: [], details }, isError },
+  ];
 }
 
 class PushStream implements AsyncIterable<Uint8Array> {

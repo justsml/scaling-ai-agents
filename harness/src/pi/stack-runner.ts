@@ -97,8 +97,10 @@ export class StackRunner {
     }
 
     try {
-      evidence = await stdoutPromise;
-      validateEvidence(evidence, stack);
+      const parsed = await stdoutPromise;
+      validateEvidence(parsed.evidence, stack);
+      evidence = parsed.evidence;
+      protocolError ??= parsed.protocolError;
     } catch (error) {
       protocolError ??= error instanceof Error ? error.message : String(error);
     }
@@ -111,7 +113,7 @@ export class StackRunner {
     if (exitCode !== 0) protocolError ??= `stack subprocess exited ${exitCode ?? "without a status"}`;
 
     return {
-      evidence: protocolError ? null : evidence,
+      evidence,
       argv,
       cwd,
       exitCode,
@@ -125,16 +127,38 @@ export class StackRunner {
     return { cwd: resolve(this.repoRoot, stack), entrypoint: "src/snippets/08-pokedex.ts" };
   }
 
-  async #readEvidence(stream: AsyncIterable<Uint8Array>): Promise<StackInvestigationEvidence> {
+  async #readEvidence(stream: AsyncIterable<Uint8Array>): Promise<{
+    evidence: StackInvestigationEvidence;
+    protocolError?: string;
+  }> {
     const decoder = new JsonlDecoder<unknown>({
       maximumFrameBytes: this.#maximumOutputBytes,
       maximumTotalBytes: this.#maximumOutputBytes,
     });
     const frames: unknown[] = [];
-    for await (const chunk of stream) frames.push(...decoder.push(chunk));
-    frames.push(...decoder.finish());
-    if (frames.length !== 1) throw new Error(`stack stdout contained ${frames.length} JSONL documents; expected exactly one`);
-    return frames[0] as StackInvestigationEvidence;
+    let decodeError: string | undefined;
+    try {
+      for await (const chunk of stream) {
+        let offset = 0;
+        for (let index = 0; index < chunk.byteLength; index += 1) {
+          if (chunk[index] !== 0x0a) continue;
+          frames.push(...decoder.push(chunk.subarray(offset, index + 1)));
+          offset = index + 1;
+        }
+        if (offset < chunk.byteLength) frames.push(...decoder.push(chunk.subarray(offset)));
+      }
+      frames.push(...decoder.finish());
+    } catch (error) {
+      decodeError = error instanceof Error ? error.message : String(error);
+    }
+    if (frames.length === 0) throw new Error(decodeError ?? "stack stdout contained 0 JSONL documents; expected exactly one");
+    const documentError = frames.length === 1
+      ? undefined
+      : `stack stdout contained ${frames.length} JSONL documents; expected exactly one`;
+    return {
+      evidence: frames[0] as StackInvestigationEvidence,
+      ...((decodeError ?? documentError) ? { protocolError: decodeError ?? documentError } : {}),
+    };
   }
 }
 
@@ -163,4 +187,3 @@ function combineSignals(first?: AbortSignal, second?: AbortSignal): AbortSignal 
   const signals = [first, second].filter((item): item is AbortSignal => item !== undefined);
   return signals.length === 1 ? signals[0]! : AbortSignal.any(signals);
 }
-

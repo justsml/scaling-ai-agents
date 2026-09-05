@@ -27,6 +27,7 @@ export interface DriverToolDependencies {
   gateway: GatewayControl;
   stackRunner: Pick<StackRunner, "health" | "run">;
   evidence: EvidenceRepository<DriverEvidenceRecord>;
+  cleanupTimeoutMs?: number;
 }
 
 export interface ScenarioRunSummary {
@@ -93,7 +94,7 @@ export class DriverTools {
       error = cause instanceof Error ? cause.message : String(cause);
     } finally {
       try {
-        gatewayEvents = await this.dependencies.gateway.readEvents(stackRunId, signal);
+        gatewayEvents = await this.dependencies.gateway.readEvents(stackRunId, cleanupSignal(this.dependencies.cleanupTimeoutMs));
       } catch (cause) {
         error ??= cause instanceof Error ? cause.message : String(cause);
       }
@@ -110,6 +111,11 @@ export class DriverTools {
     };
     const evidenceId = await this.dependencies.evidence.put(record);
     this.#evidenceIds.add(evidenceId);
+    try {
+      await this.dependencies.gateway.deleteRun(stackRunId, cleanupSignal(this.dependencies.cleanupTimeoutMs));
+    } catch (cause) {
+      error ??= cause instanceof Error ? cause.message : String(cause);
+    }
     const agentEvidence = stackRun?.evidence;
     return {
       evidenceId,
@@ -139,6 +145,10 @@ export class DriverTools {
       calls: Array.isArray(evidence?.toolCalls) ? evidence.toolCalls.map(compactToolCall) : [],
     };
   }
+}
+
+function cleanupSignal(timeoutMs = 2_000): AbortSignal {
+  return AbortSignal.timeout(timeoutMs);
 }
 
 function compactToolCall(value: unknown): unknown {
