@@ -16,6 +16,7 @@
     "snippet:06": "bun run src/snippets/06-remote-a2a.ts",
     "snippet:07": "bun run src/snippets/07-batching.ts",
     "snippet:08": "bun run src/snippets/08-pokedex.ts",
+    "snippet:09": "bun run src/snippets/09-model-router.ts",
     "all": "bun run src/run-all.ts"
   },
   "dependencies": {
