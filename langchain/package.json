@@ -1,0 +1,37 @@
+{
+  "name": "agentic-parallelism-langchain",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20.0.0", "bun": ">=1.2.1" },
+  "scripts": {
+    "setup": "bun run src/scripts/setup.ts",
+    "check": "tsc --noEmit",
+    "test": "bun test test/",
+    "all": "bun run src/scripts/all.ts",
+    "snippet:00": "bun run src/snippets/00-router.ts",
+    "snippet:01": "bun run src/snippets/01-compete.ts",
+    "snippet:02": "bun run src/snippets/02-decompose.ts",
+    "snippet:03": "bun run src/snippets/03-constrain.ts",
+    "snippet:04": "bun run src/snippets/04-distribute.ts",
+    "snippet:05": "bun run src/snippets/05-compile.ts",
+    "snippet:06": "bun run src/snippets/06-remote.ts",
+    "snippet:07": "bun run src/snippets/07-batching.ts"
+  },
+  "dependencies": {
+    "@langchain/core": "latest",
+    "@langchain/langgraph": "latest",
+    "@langchain/langgraph-checkpoint": "latest",
+    "@langchain/langgraph-checkpoint-sqlite": "latest",
+    "@langchain/langgraph-sdk": "latest",
+    "@langchain/openai": "latest",
+    "deepagents": "latest",
+    "langchain": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@langchain/langgraph-cli": "latest",
+    "@types/bun": "latest",
+    "@types/node": "latest",
+    "typescript": "latest"
+  }
+}

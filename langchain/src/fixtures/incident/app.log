@@ -1,0 +1,9 @@
+2026-09-04T10:00:01Z ws-app  session=s-41 event=connect user=u-9
+2026-09-04T10:00:01Z ws-app  session=s-41 heartbeat.interval_ms=90000 (config: WS_HEARTBEAT_MS unset, default 90000)
+2026-09-04T10:01:01Z ws-app  session=s-41 event=close code=1006 reason=abnormal
+2026-09-04T10:01:03Z ws-app  session=s-42 event=reconnect user=u-9 attempt=1 backoff_ms=2000
+2026-09-04T10:02:03Z ws-app  session=s-42 event=close code=1006 reason=abnormal
+2026-09-04T10:02:05Z ws-app  session=s-43 event=reconnect user=u-9 attempt=2 backoff_ms=2000
+2026-09-04T10:02:47Z ws-app  session=s-43 event=client_ping
+2026-09-04T10:03:47Z ws-app  session=s-43 event=close code=1006 reason=abnormal
+2026-09-04T10:03:47Z ws-app  reconnect.state user=u-9 attempts=3 subscriptions_restored=false

@@ -1,0 +1,9 @@
+{
+  "node_version": "20",
+  "dependencies": ["."],
+  "graphs": {
+    "competitor-remote": "./src/graphs/remote-worker.ts:competitorRemote",
+    "researcher": "./src/graphs/remote-worker.ts:researcher"
+  },
+  "env": ".env"
+}
