@@ -42,6 +42,13 @@ describe('Pokédex investigation seam', () => {
     expect(repaired?.claims).toEqual([{ path: 'laterSpecies', value: ['ivysaur', 'venusaur'], requestIds: ['gw-good'] }])
     expect(normalizeInvestigationAnswer({ summary: 'x', claims: [{ path: 'name', value: 'Kanto', requestIds: ['gw-other'] }] }, 'Follow its main region relationship', calls)?.claims[0]).toMatchObject({ path: 'region', value: 'kanto', requestIds: ['gw-other'] })
   })
+  test('treats both comparison conclusions as one two-read inference', () => {
+    const answer = normalizeInvestigationAnswer({ summary: 'x', claims: [
+      { path: 'heavier', value: 'charmander', requestIds: ['charmander-read'] },
+      { path: 'difference', value: 16, requestIds: ['bulbasaur-read', 'charmander-read'] },
+    ] }, 'Which weighs more, Bulbasaur or Charmander, and by how much?')
+    expect(answer?.claims.every(claim => claim.requestIds.join(',') === 'charmander-read,bulbasaur-read')).toBeTrue()
+  })
   test('enforces the call budget and rejects unsupported citations', async () => {
     const server = Bun.serve({ port: 0, fetch() { return Response.json({ requestId: 'gw-1' }) } }); servers.push(server)
     const session = new PokedexGatewaySession(request(String(server.url), 1), 'ai-sdk'); await session.call('pokedex_list_resources', {}); const stopped = await session.call('pokedex_list_resources', {}); session.close()

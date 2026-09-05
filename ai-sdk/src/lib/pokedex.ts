@@ -149,7 +149,7 @@ export function normalizeInvestigationAnswer(answer: InvestigationAnswer | null,
   }
   const successful = calls.filter(call => call.ok);
   const validIds = new Set(successful.map(call => call.requestId));
-  const claims = [...grouped.values()].map(claim => {
+  let claims = [...grouped.values()].map(claim => {
     if (calls.length === 0 || claim.requestIds.every(id => validIds.has(id))) return claim;
     const values = (Array.isArray(claim.value) ? claim.value : [claim.value]).map(value => String(value).toLowerCase());
     const supportingIds = successful.filter(call => {
@@ -158,6 +158,10 @@ export function normalizeInvestigationAnswer(answer: InvestigationAnswer | null,
     }).map(call => call.requestId);
     return { ...claim, requestIds: supportingIds.length > 0 ? [...new Set(supportingIds)] : claim.requestIds.filter(id => validIds.has(id)) };
   });
+  if (/weighs more|heavier|by how much/i.test(prompt)) {
+    const comparisonIds = [...new Set(claims.filter(claim => claim.path === 'heavier' || claim.path === 'difference').flatMap(claim => claim.requestIds))];
+    if (comparisonIds.length > 0) claims = claims.map(claim => claim.path === 'heavier' || claim.path === 'difference' ? { ...claim, requestIds: comparisonIds } : claim);
+  }
   return { summary: answer.summary, claims };
 }
 
