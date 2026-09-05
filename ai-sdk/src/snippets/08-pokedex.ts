@@ -17,7 +17,7 @@ export async function investigatePokedex(input: InvestigationRequest): Promise<I
     const result = await generateText({
       model: openai('gpt-5.6-luna'), tools, output: Output.object({ schema: answerSchema }), stopWhen: isStepCount(request.maxToolCalls + 1), abortSignal: session.signal,
       providerOptions: { openai: { reasoningEffort: 'none', store: false } },
-      system: 'Investigate only with the supplied Pokédex tools. Follow normalized refs; never construct URLs. Retry only errors marked retryable. Every factual claim must cite requestIds from successful tool results. Use concise lowerCamelCase claim paths named exactly for the requested facts, without namespace prefixes: name, height, weight, types, abilities, hiddenAbility, heavier, difference, names, laterSpecies, region, pokedexes, baseExperience, or color.',
+      system: 'Investigate only with the supplied Pokédex tools. Follow normalized refs; never construct URLs. Retry only errors marked retryable. Every factual claim must cite requestIds from successful tool results. Use concise lowerCamelCase claim paths named exactly for the requested facts, without namespace prefixes: searchable, listOnly, name, height, weight, types, abilities, hiddenAbility, heavier, difference, names, laterSpecies, region, pokedexes, baseExperience, or color.',
       prompt: request.prompt,
     })
     const answer = result.output ?? null
