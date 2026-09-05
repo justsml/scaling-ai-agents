@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { POKEDEX_TOOLS, PokedexGatewaySession, loadPokedexToolContract, validateCitations, type InvestigationRequest } from '../src/lib/pokedex'
+import { POKEDEX_TOOLS, PokedexGatewaySession, investigationRequestSchema, loadPokedexToolContract, validateCitations, type InvestigationRequest } from '../src/lib/pokedex'
+import { createPokedexTools } from '../src/snippets/08-pokedex'
 import { readFile } from 'node:fs/promises'
 
 const servers: ReturnType<typeof Bun.serve>[] = []
@@ -8,7 +9,9 @@ const request = (url: string, maxToolCalls = 2): InvestigationRequest => ({ runI
 
 describe('Pokédex investigation seam', () => {
   test('loads all four schemas from the copied canonical contract', async () => { expect(Object.keys(await loadPokedexToolContract())).toEqual([...POKEDEX_TOOLS]) })
-  test('the local tool contract is byte-for-byte in sync', async () => { expect(await readFile(new URL('../src/fixtures/pokedex-tools.schema.json', import.meta.url), 'utf8')).toBe(await readFile(new URL('../../shared/fixtures/pokedex-tools.schema.json', import.meta.url), 'utf8')) })
+  test('all copied conformance fixtures are byte-for-byte in sync', async () => { for (const name of ['pokedex-tools.schema.json', 'pokedex-scenarios.json', 'pokedex-expected.json', 'readiness.reference.ts']) expect(await readFile(new URL(`../src/fixtures/${name}`, import.meta.url), 'utf8')).toBe(await readFile(new URL(`../../shared/fixtures/${name}`, import.meta.url), 'utf8')) })
+  test('constructs and executes AI SDK tools from raw canonical JSON Schema', async () => { const server = Bun.serve({ port: 0, fetch() { return Response.json({ requestId: 'gw-schema' }) } }); servers.push(server); const session = new PokedexGatewaySession(request(String(server.url)), 'ai-sdk'); const tools = createPokedexTools(await loadPokedexToolContract(), session); expect(Object.keys(tools)).toEqual([...POKEDEX_TOOLS]); expect(await tools.pokedex_list_resources!.execute!({}, {} as never)).toMatchObject({ requestId: 'gw-schema' }); session.close() })
+  test('rejects non-loopback, credentialed, and TLS gateway destinations', () => { for (const gatewayBaseUrl of ['https://localhost:4111', 'http://user:pass@localhost:4111', 'http://example.com:4111', 'http://127.0.0.2:4111']) expect(investigationRequestSchema.safeParse({ ...request('http://localhost:4111'), gatewayBaseUrl }).success).toBeFalse(); expect(investigationRequestSchema.safeParse(request('http://[::1]:4111')).success).toBeTrue() })
   test('attaches hidden context and records request IDs', async () => {
     let headers: Headers | undefined
     const server = Bun.serve({ port: 0, fetch(req) { headers = req.headers; return Response.json({ requestId: 'gw-1', resources: [] }) } }); servers.push(server)
@@ -18,6 +21,6 @@ describe('Pokédex investigation seam', () => {
   test('enforces the call budget and rejects unsupported citations', async () => {
     const server = Bun.serve({ port: 0, fetch() { return Response.json({ requestId: 'gw-1' }) } }); servers.push(server)
     const session = new PokedexGatewaySession(request(String(server.url), 1), 'ai-sdk'); await session.call('pokedex_list_resources', {}); const stopped = await session.call('pokedex_list_resources', {}); session.close()
-    expect(stopped).toMatchObject({ code: 'MAX_TOOL_CALLS', retryable: false }); expect(session.evidence).toHaveLength(1); expect(validateCitations({ summary: 'x', claims: [{ claim: 'x', requestIds: ['invented'] }] }, session.evidence)).toBeFalse()
+    expect(stopped).toMatchObject({ code: 'MAX_TOOL_CALLS', retryable: false }); expect(session.evidence).toHaveLength(2); expect(session.evidence[1]).toMatchObject({ disposition: 'blocked' }); expect(validateCitations({ summary: 'x', claims: [{ path: 'name', value: 'x', requestIds: ['invented'] }] }, session.evidence)).toBeFalse()
   })
 })

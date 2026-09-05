@@ -6,21 +6,22 @@ export type PokedexToolName = (typeof POKEDEX_TOOLS)[number];
 export type StackName = "ai-sdk" | "mastra" | "langchain";
 
 export const investigationRequestSchema = z.object({
-  runId: z.string().min(1), scenarioId: z.string().min(1), prompt: z.string().min(1), gatewayBaseUrl: z.string().url(),
+  runId: z.string().min(1), scenarioId: z.string().min(1), prompt: z.string().min(1), gatewayBaseUrl: loopbackUrlSchema(),
   deadlineMs: z.number().int().positive(), maxToolCalls: z.number().int().positive(),
   model: z.literal("openai/gpt-5.6-luna"), reasoningEffort: z.literal("none"),
 });
 export type InvestigationRequest = z.infer<typeof investigationRequestSchema>;
 export const answerSchema = z.object({
   summary: z.string(),
-  claims: z.array(z.object({ claim: z.string(), requestIds: z.array(z.string()).min(1) })),
+  claims: z.array(z.object({ path: z.string().min(1), value: z.unknown(), requestIds: z.array(z.string()).min(1) })),
 });
 export type InvestigationAnswer = z.infer<typeof answerSchema>;
 
-export interface ToolCallEvidence { tool: PokedexToolName; arguments: unknown; requestId: string; ok: boolean; latencyMs: number; error?: unknown }
+export interface ToolCallEvidence { tool: PokedexToolName; arguments: unknown; requestId: string; ok: boolean; latencyMs: number; disposition: 'gateway' | 'blocked'; error?: unknown }
 export interface InvestigationEvidence {
   stack: 'ai-sdk'; answer: InvestigationAnswer | null; toolCalls: ToolCallEvidence[];
   usage: { inputTokens: number; outputTokens: number; reasoningTokens?: number }; latencyMs: number; stopReason: string;
+  stopMetadata: { finishReason?: string; error?: string; toolCallAttempts: number; maxToolCalls: number; deadlineMs: number };
 }
 export interface ToolDefinition { description: string; inputSchema: Record<string, unknown> }
 
@@ -58,6 +59,7 @@ export class PokedexGatewaySession {
     if (++this.#calls > this.request.maxToolCalls) {
       this.limitExceeded = true;
       const error = { code: "MAX_TOOL_CALLS", message: "tool-call budget exhausted", retryable: false, retryAfterMs: null, requestId: `local-${this.request.runId}-${this.#calls}` };
+      this.evidence.push({ tool, arguments: args, requestId: error.requestId, ok: false, latencyMs: 0, disposition: 'blocked', error });
       return error;
     }
     try {
@@ -68,15 +70,24 @@ export class PokedexGatewaySession {
       const body = await response.json() as Record<string, unknown>;
       const requestId = String(body.requestId ?? (body.error as Record<string, unknown> | undefined)?.requestId ?? response.headers.get("x-request-id") ?? `missing-${this.#calls}`);
       const ok = response.ok && body.ok !== false;
-      this.evidence.push({ tool, arguments: args, requestId, ok, latencyMs: Date.now() - started, ...(ok ? {} : { error: body.error ?? body }) });
+      this.evidence.push({ tool, arguments: args, requestId, ok, latencyMs: Date.now() - started, disposition: 'gateway', ...(ok ? {} : { error: body.error ?? body }) });
       return body;
     } catch (cause) {
       const requestId = `local-${this.request.runId}-${this.#calls}`;
       const error = { code: this.signal.aborted ? "DEADLINE" : "GATEWAY_UNAVAILABLE", message: cause instanceof Error ? cause.message : String(cause), retryable: !this.signal.aborted, retryAfterMs: null, requestId };
-      this.evidence.push({ tool, arguments: args, requestId, ok: false, latencyMs: Date.now() - started, error });
+      this.evidence.push({ tool, arguments: args, requestId, ok: false, latencyMs: Date.now() - started, disposition: 'gateway', error });
       return error;
     }
   }
+}
+
+function loopbackUrlSchema() {
+  return z.string().url().superRefine((value, ctx) => {
+    const url = new URL(value)
+    if (url.protocol !== 'http:' || url.username || url.password || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'gatewayBaseUrl must be credential-free HTTP on localhost, 127.0.0.1, or [::1]' })
+    }
+  })
 }
 
 export function validateCitations(answer: InvestigationAnswer | null, calls: ToolCallEvidence[]): boolean {
