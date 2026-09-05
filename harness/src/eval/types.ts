@@ -81,6 +81,11 @@ export interface ModelPrice {
   reasoningUsdPerMillion?: number;
 }
 
+export interface DriverMetricSample {
+  latencyMs: number;
+  sessionStats: unknown;
+}
+
 export interface EvalReport {
   contractVersion: string;
   generatedAt: string;
@@ -93,6 +98,13 @@ export interface EvalReport {
     costStatus: "available" | "unavailable-no-price";
     latencyMs: { p50: number | null; p95: number | null };
     toolLatencyMs: { p50: number | null; p95: number | null };
+    driver: {
+      runs: number;
+      tokens: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number } | null;
+      reportedCostUsd: number | null;
+      costStatus: "reported" | "unavailable";
+      latencyMs: { p50: number | null; p95: number | null };
+    };
   };
   passed: boolean;
 }

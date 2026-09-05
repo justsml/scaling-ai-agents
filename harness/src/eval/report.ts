@@ -1,10 +1,11 @@
-import { STACKS, type EvalReport, type GateName, type ModelPrice, type ScoredRun, type StackName } from "./types";
+import { STACKS, type DriverMetricSample, type EvalReport, type GateName, type ModelPrice, type ScoredRun, type StackName } from "./types";
 
 const GATES: GateName[] = ["schema", "safety", "dispatch", "factual", "evidence", "pagination", "cascade", "retry", "budget"];
 
-export function buildReport(contractVersion: string, runs: ScoredRun[], price?: ModelPrice, generatedAt = new Date().toISOString()): EvalReport {
+export function buildReport(contractVersion: string, runs: ScoredRun[], price?: ModelPrice, generatedAt = new Date().toISOString(), driverSamples: DriverMetricSample[] = []): EvalReport {
   const observed = [...new Set(runs.map((run) => run.evidence.stack))].sort() as StackName[];
-  const dispatchPassed = dispatchIsBalanced(runs);
+  const explicitDispatch = runs.map((run) => run.gates.find((gate) => gate.gate === "dispatch")).filter((gate) => gate !== undefined);
+  const dispatchPassed = dispatchIsBalanced(runs) && (explicitDispatch.length === 0 || (explicitDispatch.length === runs.length && explicitDispatch.every((gate) => gate.passed)));
   const gates = Object.fromEntries(GATES.map((name) => {
     if (name === "dispatch") return [name, { passed: dispatchPassed, passedRuns: dispatchPassed ? runs.length : 0, totalRuns: runs.length }];
     const results = runs.map((run) => run.gates.find((gate) => gate.gate === name)).filter((gate) => gate !== undefined);
@@ -35,9 +36,34 @@ export function buildReport(contractVersion: string, runs: ScoredRun[], price?: 
       costStatus: price ? "available" : "unavailable-no-price",
       latencyMs: distribution(runs.map((run) => run.evidence.latencyMs)),
       toolLatencyMs: distribution(runs.flatMap((run) => run.evidence.toolCalls.map((call) => call.latencyMs))),
+      driver: summarizeDriver(driverSamples),
     },
     passed: Object.values(gates).every((gate) => gate.passed),
   };
+}
+
+function summarizeDriver(samples: DriverMetricSample[]): EvalReport["metrics"]["driver"] {
+  const parsed = samples.map((sample) => ({ sample, stats: asRecord(sample.sessionStats), tokens: asRecord(asRecord(sample.sessionStats).tokens) }));
+  const tokenFields = ["input", "output", "cacheRead", "cacheWrite", "total"] as const;
+  const tokensAvailable = parsed.length > 0 && parsed.every(({ tokens }) => tokenFields.every((field) => isNonnegativeFiniteNumber(tokens[field])));
+  const tokens = tokensAvailable ? Object.fromEntries(tokenFields.map((field) => [field, parsed.reduce((sum, item) => sum + (item.tokens[field] as number), 0)])) as EvalReport["metrics"]["driver"]["tokens"] : null;
+  const costs = parsed.map(({ stats }) => stats.cost);
+  const costsAvailable = costs.length > 0 && costs.every(isNonnegativeFiniteNumber);
+  return {
+    runs: samples.length,
+    tokens,
+    reportedCostUsd: costsAvailable ? (costs as number[]).reduce((sum, cost) => sum + cost, 0) : null,
+    costStatus: costsAvailable ? "reported" : "unavailable",
+    latencyMs: distribution(samples.map((sample) => sample.latencyMs)),
+  };
+}
+
+function isNonnegativeFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 export function distribution(values: number[]): { p50: number | null; p95: number | null } {
