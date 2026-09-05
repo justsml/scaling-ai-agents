@@ -1,0 +1,9 @@
+{
+  "_note": "Maps sha256(buggy readiness.ts source) -> the compiled tool that already won a Compete tournament for that exact input. Populated once, offline, after 01-compete.ts picks a winner; 05-compile.ts only reads it.",
+  "ecdcd2ebc8410539cf40f102e060e21362e1c2e733afd3cec5cad69d1d4f412a": {
+    "tool": "compiledReadiness",
+    "compiledPath": "src/compiled/readiness.ts",
+    "testPath": "src/compiled/readiness.test.ts",
+    "wonTournamentOn": "2026-09-05"
+  }
+}

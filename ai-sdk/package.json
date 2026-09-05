@@ -1,0 +1,33 @@
+{
+  "name": "agentic-parallelism-ai-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "bun install",
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "bun test --timeout 20000 test/",
+    "snippet:00": "bun run src/snippets/00-router.ts",
+    "snippet:01": "bun run src/snippets/01-compete.ts",
+    "snippet:02": "bun run src/snippets/02-decompose.ts",
+    "snippet:03": "bun run src/snippets/03-constrain.ts",
+    "snippet:04": "bun run src/snippets/04-distribute.ts",
+    "snippet:05": "bun run src/snippets/05-compile.ts",
+    "snippet:06": "bun run src/snippets/06-remote-a2a.ts",
+    "snippet:07": "bun run src/snippets/07-batching.ts",
+    "all": "bun run src/run-all.ts"
+  },
+  "dependencies": {
+    "ai": "^7.0.93",
+    "@ai-sdk/openai": "^4.0.59",
+    "@ai-sdk/openai-compatible": "^3.0.44",
+    "@ai-sdk/otel": "^1.0.93",
+    "@opentelemetry/sdk-trace-base": "^2.1.0",
+    "@opentelemetry/sdk-trace-node": "^2.1.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  }
+}
