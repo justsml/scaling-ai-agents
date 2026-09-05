@@ -64,6 +64,7 @@ export class PokedexGatewaySession {
       const error = { code: "MAX_TOOL_CALLS", message: "tool-call budget exhausted", retryable: false, retryAfterMs: null, requestId: `local-${this.request.runId}-${sequence}` };
       const endedAt = Date.now();
       this.evidence.push({ sequence, tool, arguments: args, requestId: error.requestId, ok: false, startedAt: started, endedAt, latencyMs: endedAt - started, disposition: 'blocked', error });
+      this.evidence.sort((a, b) => a.sequence - b.sequence);
       return error;
     }
     try {
@@ -76,12 +77,14 @@ export class PokedexGatewaySession {
       const ok = response.ok && body.ok !== false;
       const endedAt = Date.now();
       this.evidence.push({ sequence, tool, arguments: args, requestId, ok, startedAt: started, endedAt, latencyMs: endedAt - started, disposition: 'gateway', ...(ok ? { result: boundedResult(body) } : { error: body.error ?? body }) });
+      this.evidence.sort((a, b) => a.sequence - b.sequence);
       return body;
     } catch (cause) {
       const requestId = `local-${this.request.runId}-${sequence}`;
       const error = { code: this.signal.aborted ? "DEADLINE" : "GATEWAY_UNAVAILABLE", message: cause instanceof Error ? cause.message : String(cause), retryable: !this.signal.aborted, retryAfterMs: null, requestId };
       const endedAt = Date.now();
       this.evidence.push({ sequence, tool, arguments: args, requestId, ok: false, startedAt: started, endedAt, latencyMs: endedAt - started, disposition: 'gateway', error });
+      this.evidence.sort((a, b) => a.sequence - b.sequence);
       return error;
     }
   }

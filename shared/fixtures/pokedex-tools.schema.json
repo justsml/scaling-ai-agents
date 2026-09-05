@@ -22,7 +22,7 @@
             "type": "string",
             "enum": ["ability", "evolution-chain", "generation", "move", "pokedex", "pokemon", "pokemon-species", "region", "type"]
           },
-          "cursor": { "type": "string", "minLength": 1 },
+          "cursor": { "type": "string", "minLength": 1, "description": "Omit this property entirely for the first page. For a later page, copy the exact nextCursor returned by the immediately preceding call; never invent or edit it." },
           "pageSize": { "type": "integer", "minimum": 1, "maximum": 25, "default": 10 }
         },
         "required": ["resource"],
@@ -40,7 +40,7 @@
             "enum": ["ability", "generation", "move", "pokedex", "pokemon", "pokemon-species", "region", "type"]
           },
           "query": { "type": "string", "minLength": 1, "maxLength": 100 },
-          "cursor": { "type": "string", "minLength": 1 },
+          "cursor": { "type": "string", "minLength": 1, "description": "Omit this property entirely for the first page. For a later page, copy the exact nextCursor returned by the immediately preceding call for the same resource and query; never invent or edit it." },
           "pageSize": { "type": "integer", "minimum": 1, "maximum": 25, "default": 10 }
         },
         "required": ["resource", "query"],
