@@ -1,0 +1,21 @@
+{
+  "name": "agentic-parallelism-conformance-harness",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "bun test test/",
+    "test:gateway": "POKEDEX_INTEGRATION=1 bun test test/gateway.integration.test.ts",
+    "test:local": "bun run src/compose/lifecycle.ts test",
+    "up": "bun run src/compose/lifecycle.ts up",
+    "ci:up": "bun run src/compose/lifecycle.ts ci-up",
+    "down": "bun run src/compose/lifecycle.ts down",
+    "clean": "bun run src/compose/lifecycle.ts clean",
+    "reset": "bun run src/compose/lifecycle.ts reset"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  }
+}
