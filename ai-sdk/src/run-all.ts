@@ -53,7 +53,9 @@ async function main() {
     console.log(`\n${failed.length} snippet(s) failed: ${failed.map((f) => f.snippet).join(", ")}`);
     process.exitCode = 1;
   } else {
-    console.log("\nAll snippets ran (a snippet may still have printed its own 'skipped: <reason>' internally, e.g. for gateway-only features).");
+    console.log(
+      "\nAll snippets ran (a snippet may still have printed its own 'skipped: <reason>' internally, e.g. for gateway-only features).",
+    );
   }
 }
 

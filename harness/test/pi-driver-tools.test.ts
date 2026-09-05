@@ -63,7 +63,9 @@ describe("Pi Driver tools", () => {
       },
       stackRunner: {
         health: stackRunner.health,
-        run: async () => { throw original.signal.reason; },
+        run: async () => {
+          throw original.signal.reason;
+        },
       },
       evidence,
       cleanupTimeoutMs: 100,
@@ -81,10 +83,21 @@ describe("Pi Driver tools", () => {
 });
 
 const scenario = { id: "case-1", prompt: "prompt", deadlineMs: 100, maxToolCalls: 2, faults: [{ type: "429" }] };
-const catalog: ScenarioCatalog = { get: (id) => id === scenario.id ? scenario : undefined, list: () => [scenario] };
+const catalog: ScenarioCatalog = { get: (id) => (id === scenario.id ? scenario : undefined), list: () => [scenario] };
 const stackRun: StackRunResult = {
-  evidence: { stack: "ai-sdk", answer: {}, toolCalls: [{ tool: "pokedex_get" }], usage: { inputTokens: 1, outputTokens: 2 }, latencyMs: 3, stopReason: "stop" },
-  argv: [], cwd: "/repo/ai-sdk", exitCode: 0, stderr: "", timedOut: false,
+  evidence: {
+    stack: "ai-sdk",
+    answer: {},
+    toolCalls: [{ tool: "pokedex_get" }],
+    usage: { inputTokens: 1, outputTokens: 2 },
+    latencyMs: 3,
+    stopReason: "stop",
+  },
+  argv: [],
+  cwd: "/repo/ai-sdk",
+  exitCode: 0,
+  stderr: "",
+  timedOut: false,
 };
 const stackRunner: Pick<StackRunner, "health" | "run"> = {
   health: async (stack) => ({ stack, entrypoint: "entry", entrypointExists: true, bunAvailable: true }),
@@ -94,15 +107,28 @@ const stackRunner: Pick<StackRunner, "health" | "run"> = {
 function gateway(configured: unknown[][], actions: string[]): GatewayControl {
   return {
     health: async () => true,
-    configureRun: async (...args) => { configured.push(args.slice(0, 3)); },
-    readEvents: async () => { actions.push("events"); return [{ requestId: "gw-1" }]; },
-    deleteRun: async () => { actions.push("delete"); },
+    configureRun: async (...args) => {
+      configured.push(args.slice(0, 3));
+    },
+    readEvents: async () => {
+      actions.push("events");
+      return [{ requestId: "gw-1" }];
+    },
+    deleteRun: async () => {
+      actions.push("delete");
+    },
   };
 }
 
 class MemoryEvidence implements EvidenceRepository<DriverEvidenceRecord> {
   constructor(readonly actions?: string[]) {}
   record?: DriverEvidenceRecord;
-  async put(value: DriverEvidenceRecord): Promise<string> { this.actions?.push("put"); this.record = value; return "evidence-1"; }
-  async get(id: string): Promise<DriverEvidenceRecord | undefined> { return id === "evidence-1" ? this.record : undefined; }
+  async put(value: DriverEvidenceRecord): Promise<string> {
+    this.actions?.push("put");
+    this.record = value;
+    return "evidence-1";
+  }
+  async get(id: string): Promise<DriverEvidenceRecord | undefined> {
+    return id === "evidence-1" ? this.record : undefined;
+  }
 }

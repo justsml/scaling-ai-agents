@@ -118,18 +118,13 @@ async function main() {
   // -------------------------------------------------------------------------
   // DISTRIBUTE / the filter. This runs BEFORE any model is constructed.
   // -------------------------------------------------------------------------
-  const requests = JSON.parse(
-    await readFile(join(FIXTURES, "requests.json"), "utf8"),
-  ) as RequestRow[];
+  const requests = JSON.parse(await readFile(join(FIXTURES, "requests.json"), "utf8")) as RequestRow[];
 
   section("routing every request through the filter (no calls made yet)");
   table(
     ["id", "region", "dataClass", "chosen", "dropped, and why"],
     requests.map((r) => {
-      const d = selectProvider(
-        { region: r.region, dataClass: r.dataClass },
-        { localAvailable: localUp },
-      );
+      const d = selectProvider({ region: r.region, dataClass: r.dataClass }, { localAvailable: localUp });
       const dropped = d.considered
         .filter((c) => !c.kept)
         .map((c) => `${c.id}: ${c.why}`)
@@ -231,10 +226,7 @@ async function main() {
 
   const ctx: AttemptContext = { caps, ledger, callbacks: tracing.callbacks };
 
-  const distributedAttempt = async (
-    profileName: string,
-    buggySource: string,
-  ): Promise<AttemptResult> => {
+  const distributedAttempt = async (profileName: string, buggySource: string): Promise<AttemptResult> => {
     // The remote competitor is a different KIND of worker, so it is handled first.
     if (profileName === "remote-worker") {
       if (!remote) {
@@ -250,7 +242,7 @@ async function main() {
       placements.push({
         profile: profileName,
         providerId: "remote-agent-server",
-        modelId: "openai:gpt-5.4-mini (in the other process)",
+        modelId: "openai:gpt-5.6-luna (in the other process)",
         kind: "remote",
         reason: `runs on ${remote.baseUrl}; this process only sees a Runnable`,
       });
@@ -284,7 +276,7 @@ async function main() {
           )) as { patch?: string; messages?: unknown[] };
           // The remote server bills its own provider; we cannot see its usage_metadata from
           // here, so its cost is attributed as an estimate and labelled as one.
-          const costUsd = estimateCostUsd("openai:gpt-5.4-mini", {
+          const costUsd = estimateCostUsd("openai:gpt-5.6-luna", {
             inputTokens: 700,
             outputTokens: 600,
           });
@@ -361,7 +353,7 @@ async function main() {
     callbacks: tracing.callbacks,
     request: novel.text,
     profileNames: ["minimal-diff", "performance", "frontier", "remote-worker"],
-  // The remote competitor is not a `Profile`, so the attempt function has to handle it.
+    // The remote competitor is not a `Profile`, so the attempt function has to handle it.
     attempt: distributedAttempt,
   });
 
@@ -370,13 +362,13 @@ async function main() {
     placements.map((p) => [p.profile, p.providerId, p.kind, p.modelId, p.reason]),
   );
   console.log("");
-  table(
-    ["profile", "tests", "rubric", "cost", "ms", "note"],
-    candidateRows(result.candidates, result.winner),
-  );
+  table(["profile", "tests", "rubric", "cost", "ms", "note"], candidateRows(result.candidates, result.winner));
   if (result.skipped.length > 0) {
     console.log("");
-    table(["did not run", "reason"], result.skipped.map((s) => [s.profile, s.reason]));
+    table(
+      ["did not run", "reason"],
+      result.skipped.map((s) => [s.profile, s.reason]),
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -395,7 +387,7 @@ async function main() {
 
   const fallbackAgent = createAgent({
     // A model id the API will reject with a 404.
-    model: new ChatOpenAI({ model: "gpt-5.4-does-not-exist", maxRetries: 0 }),
+    model: new ChatOpenAI({ model: "model-does-not-exist", maxRetries: 0 }),
     tools: [],
     middleware: [modelFallbackMiddleware(JUDGE_MODEL)],
   });
@@ -433,7 +425,7 @@ async function main() {
 
   if (fallbackRun.value) {
     const last = (fallbackRun.value.messages as { content: unknown }[]).at(-1);
-    kv("primary", "gpt-5.4-does-not-exist (404 from the API)");
+    kv("primary", "model-does-not-exist (404 from the API)");
     kv("fallback", JUDGE_MODEL);
     kv("answer", String(last?.content ?? "").slice(0, 120));
     kv("cost", usd(fallbackRun.span.costUsd));

@@ -69,7 +69,9 @@ export class Ledger {
     }
     if (this.spentUsd > this.budgetUsd && this.exceededAt === undefined) {
       this.exceededAt = Date.now();
-      this.abortController.abort(new Error(`ledger exceeded budget: spent ${this.spentUsd.toFixed(4)} > ${this.budgetUsd}`));
+      this.abortController.abort(
+        new Error(`ledger exceeded budget: spent ${this.spentUsd.toFixed(4)} > ${this.budgetUsd}`),
+      );
     }
     return actual;
   }

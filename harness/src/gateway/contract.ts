@@ -15,11 +15,7 @@ export const RESOURCE_CAPABILITIES = {
 } as const;
 
 export type Resource = keyof typeof RESOURCE_CAPABILITIES;
-export type ToolName =
-  | "pokedex_list_resources"
-  | "pokedex_list"
-  | "pokedex_search"
-  | "pokedex_get";
+export type ToolName = "pokedex_list_resources" | "pokedex_list" | "pokedex_search" | "pokedex_get";
 
 export function isResource(value: unknown): value is Resource {
   return typeof value === "string" && value in RESOURCE_CAPABILITIES;

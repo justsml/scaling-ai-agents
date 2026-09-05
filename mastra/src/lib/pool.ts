@@ -7,84 +7,84 @@
  * nicely not to log", not "prompted to be careful". If nothing is eligible,
  * the request fails with a reason rather than silently downgrading.
  */
-import { FRONTIER_MODEL, JUDGE_MODEL, LOCAL_MODEL_ID, WORKER_MODEL, localSlotAvailable } from './models.js'
+import { FRONTIER_MODEL, JUDGE_MODEL, LOCAL_MODEL_ID, WORKER_MODEL, localSlotAvailable } from "./models.js";
 
-export type Region = 'us' | 'eu'
-export type DataClass = 'public' | 'internal' | 'restricted'
+export type Region = "us" | "eu";
+export type DataClass = "public" | "internal" | "restricted";
 
 export interface ProviderEntry {
-  id: string
-  model: string
-  priceKey: string
-  regions: Region[]
-  dataClasses: DataClass[]
-  kind: 'cloud' | 'local'
+  id: string;
+  model: string;
+  priceKey: string;
+  regions: Region[];
+  dataClasses: DataClass[];
+  kind: "cloud" | "local";
   /** Lower is preferred when several providers are eligible. */
-  rank: number
+  rank: number;
   /** True when the entry needs an env var that may not be set. */
-  available: () => boolean
-  why: string
+  available: () => boolean;
+  why: string;
 }
 
 export const POOL: ProviderEntry[] = [
   {
-    id: 'openai-primary',
+    id: "openai-primary",
     model: WORKER_MODEL,
     priceKey: WORKER_MODEL,
-    regions: ['us', 'eu'],
-    dataClasses: ['public', 'internal'],
-    kind: 'cloud',
+    regions: ["us", "eu"],
+    dataClasses: ["public", "internal"],
+    kind: "cloud",
     rank: 0,
     available: () => Boolean(process.env.OPENAI_API_KEY),
-    why: 'default worker: cheapest cloud model that is good enough for a patch proposal',
+    why: "default worker: cheapest cloud model that is good enough for a patch proposal",
   },
   {
-    id: 'openai-fallback',
+    id: "openai-fallback",
     model: FRONTIER_MODEL,
     priceKey: FRONTIER_MODEL,
-    regions: ['us', 'eu'],
-    dataClasses: ['public', 'internal'],
-    kind: 'cloud',
+    regions: ["us", "eu"],
+    dataClasses: ["public", "internal"],
+    kind: "cloud",
     rank: 1,
     available: () => Boolean(process.env.OPENAI_API_KEY),
-    why: 'fallback when the primary errors; more expensive, so never first',
+    why: "fallback when the primary errors; more expensive, so never first",
   },
   {
-    id: 'openai-cheap-judge',
+    id: "openai-cheap-judge",
     model: JUDGE_MODEL,
     priceKey: JUDGE_MODEL,
-    regions: ['us', 'eu'],
-    dataClasses: ['public', 'internal'],
-    kind: 'cloud',
+    regions: ["us", "eu"],
+    dataClasses: ["public", "internal"],
+    kind: "cloud",
     rank: 2,
     available: () => Boolean(process.env.OPENAI_API_KEY),
-    why: 'judge-tier slot; cheap enough to run on every survivor',
+    why: "judge-tier slot; cheap enough to run on every survivor",
   },
   {
-    id: 'local-slot',
+    id: "local-slot",
     model: LOCAL_MODEL_ID,
-    priceKey: 'local/*',
-    regions: ['us', 'eu'],
+    priceKey: "local/*",
+    regions: ["us", "eu"],
     // The only entry cleared for restricted data, because the weights and the
     // data never leave the machine.
-    dataClasses: ['public', 'internal', 'restricted'],
-    kind: 'local',
+    dataClasses: ["public", "internal", "restricted"],
+    kind: "local",
     rank: 3,
     available: localSlotAvailable,
-    why: 'on-premise OpenAI-compatible endpoint; the only slot eligible for restricted data',
+    why: "on-premise OpenAI-compatible endpoint; the only slot eligible for restricted data",
   },
-]
+];
 
 export interface Requirement {
-  region: Region
-  dataClass: DataClass
+  region: Region;
+  dataClass: DataClass;
 }
 
 export interface Resolution {
-  provider: ProviderEntry | null
+  provider: ProviderEntry | null;
   /** Every entry considered, with the reason it was kept or dropped. */
-  considered: Array<{ id: string; eligible: boolean; reason: string }>
-  reason: string
+  considered: Array<{ id: string; eligible: boolean; reason: string }>;
+  reason: string;
 }
 
 /**
@@ -92,41 +92,41 @@ export interface Resolution {
  * is exactly why it can be trusted to enforce a data-residency rule.
  */
 export function resolveProvider(req: Requirement, opts: { exclude?: string[] } = {}): Resolution {
-  const exclude = new Set(opts.exclude ?? [])
-  const considered: Resolution['considered'] = []
-  const eligible: ProviderEntry[] = []
+  const exclude = new Set(opts.exclude ?? []);
+  const considered: Resolution["considered"] = [];
+  const eligible: ProviderEntry[] = [];
 
   for (const p of POOL) {
     if (exclude.has(p.id)) {
-      considered.push({ id: p.id, eligible: false, reason: 'excluded by the caller (already tried)' })
-      continue
+      considered.push({ id: p.id, eligible: false, reason: "excluded by the caller (already tried)" });
+      continue;
     }
     if (!p.regions.includes(req.region)) {
-      considered.push({ id: p.id, eligible: false, reason: `not cleared for region ${req.region}` })
-      continue
+      considered.push({ id: p.id, eligible: false, reason: `not cleared for region ${req.region}` });
+      continue;
     }
     if (!p.dataClasses.includes(req.dataClass)) {
-      considered.push({ id: p.id, eligible: false, reason: `not cleared for dataClass ${req.dataClass}` })
-      continue
+      considered.push({ id: p.id, eligible: false, reason: `not cleared for dataClass ${req.dataClass}` });
+      continue;
     }
     if (!p.available()) {
-      considered.push({ id: p.id, eligible: false, reason: 'configured but unavailable (missing env)' })
-      continue
+      considered.push({ id: p.id, eligible: false, reason: "configured but unavailable (missing env)" });
+      continue;
     }
-    considered.push({ id: p.id, eligible: true, reason: p.why })
-    eligible.push(p)
+    considered.push({ id: p.id, eligible: true, reason: p.why });
+    eligible.push(p);
   }
 
-  eligible.sort((a, b) => a.rank - b.rank)
-  const provider = eligible[0] ?? null
+  eligible.sort((a, b) => a.rank - b.rank);
+  const provider = eligible[0] ?? null;
   return {
     provider,
     considered,
     reason: provider
       ? `${provider.id} (${provider.why})`
       : `no provider is cleared for region=${req.region} dataClass=${req.dataClass}` +
-        (req.dataClass === 'restricted' ? '; set LOCAL_OPENAI_BASE_URL to enable the on-premise slot' : ''),
-  }
+        (req.dataClass === "restricted" ? "; set LOCAL_OPENAI_BASE_URL to enable the on-premise slot" : ""),
+  };
 }
 
 /**
@@ -142,23 +142,23 @@ export async function withFallback<T>(
   attempt: (provider: ProviderEntry) => Promise<T>,
   opts: { maxAttempts?: number } = {},
 ): Promise<{ value: T | null; served: ProviderEntry | null; trail: Array<{ id: string; error?: string }> }> {
-  const maxAttempts = opts.maxAttempts ?? 2
-  const trail: Array<{ id: string; error?: string }> = []
-  const tried: string[] = []
+  const maxAttempts = opts.maxAttempts ?? 2;
+  const trail: Array<{ id: string; error?: string }> = [];
+  const tried: string[] = [];
 
   for (let i = 0; i < maxAttempts; i++) {
-    const { provider } = resolveProvider(req, { exclude: tried })
-    if (!provider) break
-    tried.push(provider.id)
+    const { provider } = resolveProvider(req, { exclude: tried });
+    if (!provider) break;
+    tried.push(provider.id);
     try {
-      const value = await attempt(provider)
-      trail.push({ id: provider.id })
-      return { value, served: provider, trail }
+      const value = await attempt(provider);
+      trail.push({ id: provider.id });
+      return { value, served: provider, trail };
     } catch (err) {
-      trail.push({ id: provider.id, error: err instanceof Error ? err.message : String(err) })
+      trail.push({ id: provider.id, error: err instanceof Error ? err.message : String(err) });
     }
   }
-  return { value: null, served: null, trail }
+  return { value: null, served: null, trail };
 }
 
 /**
@@ -171,19 +171,19 @@ export async function boundedPool<TIn, TOut>(
   limit: number,
   worker: (item: TIn, index: number) => Promise<TOut>,
 ): Promise<Array<PromiseSettledResult<TOut>>> {
-  const results = new Array<PromiseSettledResult<TOut>>(items.length)
-  let cursor = 0
+  const results = new Array<PromiseSettledResult<TOut>>(items.length);
+  let cursor = 0;
   const runners = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
     while (true) {
-      const index = cursor++
-      if (index >= items.length) return
+      const index = cursor++;
+      if (index >= items.length) return;
       try {
-        results[index] = { status: 'fulfilled', value: await worker(items[index]!, index) }
+        results[index] = { status: "fulfilled", value: await worker(items[index]!, index) };
       } catch (reason) {
-        results[index] = { status: 'rejected', reason }
+        results[index] = { status: "rejected", reason };
       }
     }
-  })
-  await Promise.all(runners)
-  return results
+  });
+  await Promise.all(runners);
+  return results;
 }

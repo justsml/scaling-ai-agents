@@ -63,19 +63,25 @@ async function runParallelToolCalls(deadlineMs: number) {
     telemetry: { functionId: "batching-parallel-tools" },
   });
 
-  return withWorkerSpan({ profile: "parallel-tool-calls", whyItExisted: "one agent step emits N tool calls, capped at concurrency 3" }, async () => {
-    const genStart = Date.now();
-    const result = await agent.generate({ prompt: `Check the health of: ${services.join(", ")}.`, abortSignal: deadlineSignal(deadlineMs) });
-    const latencyMs = Date.now() - genStart;
-    const toolCallCount = result.steps.flatMap((s) => s.toolCalls).length;
-    const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.4-mini", result.usage);
-    return {
-      result: { toolCallCount, timeline, costUsd: spend, latencyMs },
-      costUsd: spend,
-      latencyMs,
-      outcome: `${toolCallCount} tool calls, concurrency capped at 3`,
-    };
-  });
+  return withWorkerSpan(
+    { profile: "parallel-tool-calls", whyItExisted: "one agent step emits N tool calls, capped at concurrency 3" },
+    async () => {
+      const genStart = Date.now();
+      const result = await agent.generate({
+        prompt: `Check the health of: ${services.join(", ")}.`,
+        abortSignal: deadlineSignal(deadlineMs),
+      });
+      const latencyMs = Date.now() - genStart;
+      const toolCallCount = result.steps.flatMap((s) => s.toolCalls).length;
+      const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.6-luna", result.usage);
+      return {
+        result: { toolCallCount, timeline, costUsd: spend, latencyMs },
+        costUsd: spend,
+        latencyMs,
+        outcome: `${toolCallCount} tool calls, concurrency capped at 3`,
+      };
+    },
+  );
 }
 
 // ---- (b) bounded pool fan-out over the fixture list, no model call -------
@@ -113,7 +119,11 @@ async function runProviderBatch() {
     return { ran: false };
   }
 
-  const { experimental_startTextBatch: startTextBatch, experimental_getBatchStatus: getBatchStatus, experimental_getBatchResults: getBatchResults } = await import("ai");
+  const {
+    experimental_startTextBatch: startTextBatch,
+    experimental_getBatchStatus: getBatchStatus,
+    experimental_getBatchResults: getBatchResults,
+  } = await import("ai");
   let gatewayModel: (id: string) => Parameters<typeof startTextBatch>[0]["model"];
   try {
     const gatewayModule = (await import(/* @vite-ignore */ "@ai-sdk/gateway")) as { gateway: typeof gatewayModel };
@@ -123,7 +133,7 @@ async function runProviderBatch() {
     return { ran: false };
   }
 
-  const model = gatewayModel("openai/gpt-5.4-nano");
+  const model = gatewayModel("openai/gpt-5.6-luna");
   const started = await startTextBatch({
     model,
     requests: [
@@ -152,7 +162,11 @@ async function main() {
   printKV("caps", { budgetUsd, deadlineMs });
 
   const parallelToolResult = await runParallelToolCalls(deadlineMs);
-  printKV("(a) parallel tool calls in one step", { toolCallCount: parallelToolResult.toolCallCount, costUsd: formatUsd(parallelToolResult.costUsd), latencyMs: parallelToolResult.latencyMs });
+  printKV("(a) parallel tool calls in one step", {
+    toolCallCount: parallelToolResult.toolCallCount,
+    costUsd: formatUsd(parallelToolResult.costUsd),
+    latencyMs: parallelToolResult.latencyMs,
+  });
   printTable(
     "(a) timeline",
     parallelToolResult.timeline

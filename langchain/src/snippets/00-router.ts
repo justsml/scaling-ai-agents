@@ -29,7 +29,7 @@
  *   returns, so a path that overspends its own contract is caught rather than averaged away.
  *
  * WHAT IT COSTS
- *   lookup: $0. routine: one gpt-5.4-mini call, ~$0.001. novel: a full tournament, ~$0.02.
+ *   lookup: $0. routine: one gpt-5.6-luna call, ~$0.001. novel: a full tournament, ~$0.02.
  *   consequential: one small call before the gate fires. With `--no-tournament`, under $0.01.
  *
  * SKIPS
@@ -40,15 +40,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import * as z from "zod";
-import {
-  Command,
-  END,
-  MemorySaver,
-  START,
-  StateGraph,
-  StateSchema,
-  interrupt,
-} from "@langchain/langgraph";
+import { Command, END, MemorySaver, START, StateGraph, StateSchema, interrupt } from "@langchain/langgraph";
 import type { BaseCheckpointSaver } from "@langchain/langgraph";
 import { createAgent, tool } from "langchain";
 import { HumanMessage } from "@langchain/core/messages";
@@ -120,8 +112,7 @@ export interface RequestRow {
 // disagreement is visible rather than hidden.
 // ---------------------------------------------------------------------------
 
-const CONSEQUENTIAL_VERBS =
-  /\b(apply|push|deploy|merge|delete|drop|revoke|rotate|refund|charge|email|send)\b/i;
+const CONSEQUENTIAL_VERBS = /\b(apply|push|deploy|merge|delete|drop|revoke|rotate|refund|charge|email|send)\b/i;
 const LOOKUP_SHAPE = /^(what is|what's|who is|status of|current status|show|list|get)\b/i;
 const ROUTINE_SHAPE = /\b(summari[sz]e|list the last|report on|count|format|extract)\b/i;
 
@@ -199,9 +190,7 @@ export function validateContract(
 ): { ok: boolean; violations: string[] } {
   const violations: string[] = [];
   if (actual.costUsd > contract.maxCostUsd + 1e-9) {
-    violations.push(
-      `cost ${usd(actual.costUsd)} exceeded contract cap ${usd(contract.maxCostUsd)}`,
-    );
+    violations.push(`cost ${usd(actual.costUsd)} exceeded contract cap ${usd(contract.maxCostUsd)}`);
   }
   if (actual.latencyMs > contract.maxLatencyMs) {
     violations.push(`latency ${actual.latencyMs}ms exceeded contract cap ${contract.maxLatencyMs}ms`);
@@ -238,14 +227,11 @@ const SERVICE_STATUS: Record<string, string> = {
 };
 
 function buildRouterGraph(deps: RouterDeps, checkpointer: BaseCheckpointSaver) {
-  const serviceStatus = tool(
-    ({ service }) => SERVICE_STATUS[service] ?? `unknown service '${service}'`,
-    {
-      name: "service_status",
-      description: "Current status of a named service.",
-      schema: z.object({ service: z.string() }),
-    },
-  );
+  const serviceStatus = tool(({ service }) => SERVICE_STATUS[service] ?? `unknown service '${service}'`, {
+    name: "service_status",
+    description: "Current status of a named service.",
+    schema: z.object({ service: z.string() }),
+  });
 
   const recentEvents = tool(
     async ({ user }) => {
@@ -266,8 +252,7 @@ function buildRouterGraph(deps: RouterDeps, checkpointer: BaseCheckpointSaver) {
   const routine = createAgent({
     model: WORKER_MODEL,
     tools: [recentEvents],
-    systemPrompt:
-      "Answer using only the recent_events tool. Be specific and brief. Cite the timestamps.",
+    systemPrompt: "Answer using only the recent_events tool. Be specific and brief. Cite the timestamps.",
   });
 
   const applyPatch = tool(() => "pushed", {
@@ -276,144 +261,144 @@ function buildRouterGraph(deps: RouterDeps, checkpointer: BaseCheckpointSaver) {
     schema: z.object({ summary: z.string() }),
   });
 
-  return new StateGraph(RouterState)
-    // -----------------------------------------------------------------------
-    // classify: deterministic, free, and the only decision that picks a path.
-    // -----------------------------------------------------------------------
-    .addNode("classify", (state) => ({ contract: classify(state.request) }))
+  return (
+    new StateGraph(RouterState)
+      // -----------------------------------------------------------------------
+      // classify: deterministic, free, and the only decision that picks a path.
+      // -----------------------------------------------------------------------
+      .addNode("classify", (state) => ({ contract: classify(state.request) }))
 
-    // -----------------------------------------------------------------------
-    // lookupTool: NO MODEL. This path exists so the router has somewhere cheap
-    // to send the majority of traffic.
-    // -----------------------------------------------------------------------
-    .addNode("lookupTool", async (state) => {
-      const service =
-        Object.keys(SERVICE_STATUS).find((s) => state.request.text.includes(s)) ?? "ws-app";
-      const answer = (await serviceStatus.invoke(
-        { service },
-        { callbacks: deps.callbacks as never, runName: "lookup:service_status" },
-      )) as string;
-      return { answer, pathTaken: "lookupTool", costUsd: 0, modelCalls: 0, detail: "table lookup" };
-    })
+      // -----------------------------------------------------------------------
+      // lookupTool: NO MODEL. This path exists so the router has somewhere cheap
+      // to send the majority of traffic.
+      // -----------------------------------------------------------------------
+      .addNode("lookupTool", async (state) => {
+        const service = Object.keys(SERVICE_STATUS).find((s) => state.request.text.includes(s)) ?? "ws-app";
+        const answer = (await serviceStatus.invoke(
+          { service },
+          { callbacks: deps.callbacks as never, runName: "lookup:service_status" },
+        )) as string;
+        return { answer, pathTaken: "lookupTool", costUsd: 0, modelCalls: 0, detail: "table lookup" };
+      })
 
-    // -----------------------------------------------------------------------
-    // routineAgent: one agent, one tool, a hard recursion limit. Known shape.
-    // -----------------------------------------------------------------------
-    .addNode("routineAgent", async (state) => {
-      const result = await routine.invoke(
-        { messages: [new HumanMessage(state.request.text)] },
-        {
-          signal: deps.caps.signal,
-          callbacks: deps.callbacks as never,
-          // A routine request that needs seven model calls is not routine. The limit is the
-          // assertion, and blowing it is a signal to reclassify — not to raise the limit.
-          recursionLimit: 6,
-          metadata: {
-            profile: "routine-agent",
-            whyItExisted: "known shape, one tool, one pass; no reason to run four of them",
-            outcome: "pending",
-            costUsd: 0,
-            latencyMs: 0,
+      // -----------------------------------------------------------------------
+      // routineAgent: one agent, one tool, a hard recursion limit. Known shape.
+      // -----------------------------------------------------------------------
+      .addNode("routineAgent", async (state) => {
+        const result = await routine.invoke(
+          { messages: [new HumanMessage(state.request.text)] },
+          {
+            signal: deps.caps.signal,
+            callbacks: deps.callbacks as never,
+            // A routine request that needs seven model calls is not routine. The limit is the
+            // assertion, and blowing it is a signal to reclassify — not to raise the limit.
+            recursionLimit: 6,
+            metadata: {
+              profile: "routine-agent",
+              whyItExisted: "known shape, one tool, one pass; no reason to run four of them",
+              outcome: "pending",
+              costUsd: 0,
+              latencyMs: 0,
+            },
+            runName: "routineAgent",
           },
-          runName: "routineAgent",
-        },
-      );
-      const messages = result.messages as { content: unknown }[];
-      const costUsd = estimateCostUsd(WORKER_MODEL, sumUsage(messages));
-      deps.ledger.charge(costUsd);
-      deps.caps.charge(costUsd);
-      return {
-        answer: String(messages.at(-1)?.content ?? ""),
-        pathTaken: "routineAgent",
-        costUsd,
-        modelCalls: messages.filter((m) => (m as { getType?: () => string }).getType?.() === "ai")
-          .length,
-        detail: "one agent, recursionLimit 6",
-      };
-    })
-
-    // -----------------------------------------------------------------------
-    // tournament: the COMPETE graph from snippet 01, mounted as one node.
-    // -----------------------------------------------------------------------
-    .addNode("tournament", async (state) => {
-      if (!deps.runTournamentPath) {
+        );
+        const messages = result.messages as { content: unknown }[];
+        const costUsd = estimateCostUsd(WORKER_MODEL, sumUsage(messages));
+        deps.ledger.charge(costUsd);
+        deps.caps.charge(costUsd);
         return {
-          answer: "(tournament not run: --no-tournament)",
+          answer: String(messages.at(-1)?.content ?? ""),
+          pathTaken: "routineAgent",
+          costUsd,
+          modelCalls: messages.filter((m) => (m as { getType?: () => string }).getType?.() === "ai").length,
+          detail: "one agent, recursionLimit 6",
+        };
+      })
+
+      // -----------------------------------------------------------------------
+      // tournament: the COMPETE graph from snippet 01, mounted as one node.
+      // -----------------------------------------------------------------------
+      .addNode("tournament", async (state) => {
+        if (!deps.runTournamentPath) {
+          return {
+            answer: "(tournament not run: --no-tournament)",
+            pathTaken: "tournament",
+            detail: "skipped by flag",
+          };
+        }
+        const before = deps.ledger.charged;
+        const result = await runTournament({
+          caps: deps.caps,
+          ledger: deps.ledger,
+          callbacks: deps.callbacks,
+          request: state.request.text,
+          // The router's contract caps this request; a two-competitor tournament fits it.
+          profileNames: ["minimal-diff", "performance"],
+        });
+        const costUsd = deps.ledger.charged - before;
+        return {
+          answer: result.winner
+            ? `winner=${result.winner.profile} tests=${result.winner.sandbox?.passed}/${result.winner.sandbox?.total}`
+            : "no winner",
           pathTaken: "tournament",
-          detail: "skipped by flag",
+          costUsd,
+          modelCalls: result.candidates.length,
+          detail: `${result.candidates.length} candidates, ${result.skipped.length} skipped`,
         };
-      }
-      const before = deps.ledger.charged;
-      const result = await runTournament({
-        caps: deps.caps,
-        ledger: deps.ledger,
-        callbacks: deps.callbacks,
-        request: state.request.text,
-        // The router's contract caps this request; a two-competitor tournament fits it.
-        profileNames: ["minimal-diff", "performance"],
-      });
-      const costUsd = deps.ledger.charged - before;
-      return {
-        answer: result.winner
-          ? `winner=${result.winner.profile} tests=${result.winner.sandbox?.passed}/${result.winner.sandbox?.total}`
-          : "no winner",
-        pathTaken: "tournament",
-        costUsd,
-        modelCalls: result.candidates.length,
-        detail: `${result.candidates.length} candidates, ${result.skipped.length} skipped`,
-      };
-    })
+      })
 
-    // -----------------------------------------------------------------------
-    // consequential: interrupt(). The graph stops here until a human answers,
-    // and the answer below is a denial.
-    // -----------------------------------------------------------------------
-    .addNode("consequential", (state) => {
-      // `interrupt` throws a GraphInterrupt on the first pass and returns the resume value
-      // on the second. Everything above this line runs twice; everything below runs once.
-      const decision = interrupt({
-        action: "applyPatch",
-        tool: "apply_patch_to_main",
-        request: state.request.text,
-        contract: {
-          maxCostUsd: state.contract.maxCostUsd,
-          requiresHuman: state.contract.requiresHuman,
-        },
-        why: "irreversible: pushes to main. Budget and urgency do not override this.",
-      }) as { approved: boolean; reason: string };
+      // -----------------------------------------------------------------------
+      // consequential: interrupt(). The graph stops here until a human answers,
+      // and the answer below is a denial.
+      // -----------------------------------------------------------------------
+      .addNode("consequential", (state) => {
+        // `interrupt` throws a GraphInterrupt on the first pass and returns the resume value
+        // on the second. Everything above this line runs twice; everything below runs once.
+        const decision = interrupt({
+          action: "applyPatch",
+          tool: "apply_patch_to_main",
+          request: state.request.text,
+          contract: {
+            maxCostUsd: state.contract.maxCostUsd,
+            requiresHuman: state.contract.requiresHuman,
+          },
+          why: "irreversible: pushes to main. Budget and urgency do not override this.",
+        }) as { approved: boolean; reason: string };
 
-      if (!decision.approved) {
+        if (!decision.approved) {
+          return {
+            answer: `refused: ${decision.reason}`,
+            pathTaken: "consequential",
+            humanDecision: "denied",
+            costUsd: 0,
+            detail: "the tool was never invoked",
+          };
+        }
+        // Not reached in this snippet; present so the approved branch is visible.
         return {
-          answer: `refused: ${decision.reason}`,
+          answer: `approved; would call ${applyPatch.name}`,
           pathTaken: "consequential",
-          humanDecision: "denied",
-          costUsd: 0,
-          detail: "the tool was never invoked",
+          humanDecision: "approved",
+          detail: "would invoke the tool",
         };
-      }
-      // Not reached in this snippet; present so the approved branch is visible.
-      return {
-        answer: `approved; would call ${applyPatch.name}`,
-        pathTaken: "consequential",
-        humanDecision: "approved",
-        detail: "would invoke the tool",
-      };
-    })
+      })
 
-    .addEdge(START, "classify")
-    // Conditional entry into the four paths. The routing function reads the contract the
-    // classifier just wrote; it does not re-decide anything.
-    .addConditionalEdges("classify", (state) => state.contract.path, [
-      "lookupTool",
-      "routineAgent",
-      "tournament",
-      "consequential",
-    ])
-    .addEdge("lookupTool", END)
-    .addEdge("routineAgent", END)
-    .addEdge("tournament", END)
-    .addEdge("consequential", END)
-    .compile({ checkpointer });
+      .addEdge(START, "classify")
+      // Conditional entry into the four paths. The routing function reads the contract the
+      // classifier just wrote; it does not re-decide anything.
+      .addConditionalEdges("classify", (state) => state.contract.path, [
+        "lookupTool",
+        "routineAgent",
+        "tournament",
+        "consequential",
+      ])
+      .addEdge("lookupTool", END)
+      .addEdge("routineAgent", END)
+      .addEdge("tournament", END)
+      .addEdge("consequential", END)
+      .compile({ checkpointer })
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -443,9 +428,7 @@ async function main() {
     `caps: ${caps.describe()}   checkpointer: ${checkpointerName}   tracing: ${tracing.destination}`,
   );
 
-  const requests = JSON.parse(
-    await readFile(join(FIXTURES, "requests.json"), "utf8"),
-  ) as RequestRow[];
+  const requests = JSON.parse(await readFile(join(FIXTURES, "requests.json"), "utf8")) as RequestRow[];
 
   const only = typeof caps.flags.request === "string" ? caps.flags.request : null;
   const selected = only ? requests.filter((r) => r.id === only) : requests;
@@ -512,17 +495,14 @@ async function main() {
         if (interrupts && interrupts.length > 0) {
           console.log("");
           section(`human gate — ${request.id}`);
-          console.log(`  interrupt payload: ${JSON.stringify(interrupts[0]!.value, null, 2)
-            .split("\n")
-            .join("\n  ")}`);
+          console.log(`  interrupt payload: ${JSON.stringify(interrupts[0]!.value, null, 2).split("\n").join("\n  ")}`);
           note("this pause is not conditional on budget: there is budget left, and it paused anyway");
 
           final = await graph.invoke(
             new Command({
               resume: {
                 approved: false,
-                reason:
-                  "this repository requires a reviewed pull request; direct pushes to main are not permitted",
+                reason: "this repository requires a reviewed pull request; direct pushes to main are not permitted",
               },
             }),
             config,

@@ -6,7 +6,7 @@ describe("Ledger", () => {
     const ledger = new Ledger(0.05);
     expect(ledger.reserve("w1", 0.01)).toBe(true);
     expect(ledger.reserve("w2", 0.01)).toBe(true);
-    ledger.settle("w1", "openai/gpt-5.4-mini", { inputTokens: 1000, outputTokens: 500 });
+    ledger.settle("w1", "openai/gpt-5.6-luna", { inputTokens: 1000, outputTokens: 500 });
     expect(ledger.exceeded).toBe(false);
     expect(ledger.spentUsd).toBeGreaterThan(0);
   });
@@ -22,7 +22,7 @@ describe("Ledger", () => {
     ledger.reserve("w1", 0.0001);
     let aborted = false;
     ledger.signal.addEventListener("abort", () => (aborted = true));
-    ledger.settle("w1", "openai/gpt-5.4", { inputTokens: 100_000, outputTokens: 100_000 });
+    ledger.settle("w1", "openai/gpt-5.6-luna", { inputTokens: 100_000, outputTokens: 100_000 });
     expect(ledger.exceeded).toBe(true);
     expect(aborted).toBe(true);
     expect(ledger.summary().billedAnyway).toBeGreaterThan(0);

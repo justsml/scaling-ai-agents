@@ -52,7 +52,10 @@ export interface EvidenceRules {
   requiredErrors?: string[];
   requiresRetry?: boolean;
 }
-export interface ScenarioExpectation { claims: ExpectedClaim[]; evidence: EvidenceRules }
+export interface ScenarioExpectation {
+  claims: ExpectedClaim[];
+  evidence: EvidenceRules;
+}
 
 export interface Scenario {
   id: string;
@@ -63,7 +66,10 @@ export interface Scenario {
   faults: unknown[];
 }
 
-export interface ToolDefinition { name: PokedexToolName; inputSchema: Record<string, unknown> }
+export interface ToolDefinition {
+  name: PokedexToolName;
+  inputSchema: Record<string, unknown>;
+}
 export interface EvalCatalog {
   contractVersion: string;
   scenarios: Scenario[];
@@ -71,9 +77,30 @@ export interface EvalCatalog {
   tools: ToolDefinition[];
 }
 
-export type GateName = "schema" | "safety" | "dispatch" | "factual" | "evidence" | "pagination" | "cascade" | "retry" | "budget";
-export interface GateResult { gate: GateName; passed: boolean; details: string[]; scored?: number; possible?: number }
-export interface ScoredRun { runId: string; scenario: Scenario; evidence: InvestigationEvidence; gates: GateResult[]; passed: boolean }
+export type GateName =
+  | "schema"
+  | "safety"
+  | "dispatch"
+  | "factual"
+  | "evidence"
+  | "pagination"
+  | "cascade"
+  | "retry"
+  | "budget";
+export interface GateResult {
+  gate: GateName;
+  passed: boolean;
+  details: string[];
+  scored?: number;
+  possible?: number;
+}
+export interface ScoredRun {
+  runId: string;
+  scenario: Scenario;
+  evidence: InvestigationEvidence;
+  gates: GateResult[];
+  passed: boolean;
+}
 
 export interface ModelPrice {
   inputUsdPerMillion: number;

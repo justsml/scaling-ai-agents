@@ -29,9 +29,8 @@ snippet; see `src/run-all.ts` for the values `bun run all` uses). Set
 `.env.example` lists `OPENAI_API_KEY` (required), `AI_GATEWAY_API_KEY` and
 `LOCAL_OPENAI_BASE_URL` (both optional — features that need them print
 `skipped: <reason>` and exit 0 when absent), and `MODEL_WORKER` /
-`MODEL_JUDGE` / `MODEL_FRONTIER` overrides (default `gpt-5.4-mini`,
-`gpt-5.4-nano`, `gpt-5.4`; all three were confirmed reachable with a live
-call before anything else was built on them).
+`MODEL_JUDGE` / `MODEL_FRONTIER` overrides. All three default to
+`gpt-5.6-luna`.
 
 ## What each snippet prints
 
@@ -135,7 +134,7 @@ call before anything else was built on them).
 5. **Provider registry separator is `:`, not `/`.** PLAN.md's pool sketch
    implied slash-separated ids; `createProviderRegistry`'s default
    `SEPARATOR` is `':'`, so `src/lib/pool.ts`'s `ProviderSlot.registryId`
-   uses `"openai:gpt-5.4-mini"` / `"local:local-model"`.
+   uses `"openai:gpt-5.6-luna"` / `"local:local-model"`.
 6. **Annotating `createProviderRegistry(...)`'s return type as
    `ReturnType<typeof createProviderRegistry>` collapses `.languageModel(id)`'s
    parameter to `never`.** The generic provider-map type only survives when

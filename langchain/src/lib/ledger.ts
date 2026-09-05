@@ -41,9 +41,7 @@ export class BudgetExhausted extends Error {
     readonly attempted: number,
     readonly remaining: number,
   ) {
-    super(
-      `BudgetExhausted: needed ${usd(attempted)} but only ${usd(remaining)} remains`,
-    );
+    super(`BudgetExhausted: needed ${usd(attempted)} but only ${usd(remaining)} remains`);
     this.name = "BudgetExhausted";
   }
 }

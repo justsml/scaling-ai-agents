@@ -18,7 +18,6 @@ describe("Pi evidence store", () => {
     expect(id).toMatch(/^[0-9a-f-]{36}$/);
     expect(await store.get(id)).toEqual({ answer: 42 });
     expect(await store.get("../outside")).toBeUndefined();
-    expect((await readdir(directory))).toEqual([`${id}.json`]);
+    expect(await readdir(directory)).toEqual([`${id}.json`]);
   });
 });
-

@@ -2,7 +2,9 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { EvalCatalog, Scenario, ScenarioExpectation, ToolDefinition } from "./types";
 
-export async function loadCatalog(fixturesDirectory = resolve(import.meta.dir, "../../../shared/fixtures")): Promise<EvalCatalog> {
+export async function loadCatalog(
+  fixturesDirectory = resolve(import.meta.dir, "../../../shared/fixtures"),
+): Promise<EvalCatalog> {
   const [toolFile, scenarioFile, expectedFile] = await Promise.all([
     readJson(resolve(fixturesDirectory, "pokedex-tools.schema.json")),
     readJson(resolve(fixturesDirectory, "pokedex-scenarios.json")),
@@ -11,7 +13,11 @@ export async function loadCatalog(fixturesDirectory = resolve(import.meta.dir, "
   const tools = (toolFile.tools as ToolDefinition[] | undefined) ?? [];
   const scenarios = (scenarioFile.scenarios as Scenario[] | undefined) ?? [];
   const expected = (expectedFile.expected as Record<string, ScenarioExpectation> | undefined) ?? {};
-  if (typeof toolFile.contractVersion !== "string" || toolFile.contractVersion !== scenarioFile.contractVersion || toolFile.contractVersion !== expectedFile.contractVersion) {
+  if (
+    typeof toolFile.contractVersion !== "string" ||
+    toolFile.contractVersion !== scenarioFile.contractVersion ||
+    toolFile.contractVersion !== expectedFile.contractVersion
+  ) {
     throw new Error("Pokédex fixture contract versions do not match");
   }
   const ids = new Set<string>();

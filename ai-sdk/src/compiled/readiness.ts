@@ -8,9 +8,7 @@
 //   1. EACCES stops immediately instead of retrying forever.
 //   2. A deadline is enforced; overrunning it returns a partial, explained result.
 //   3. Backoff is exponential (base * 2^n), capped at the remaining deadline.
-export type ProbeResult =
-  | { ok: true }
-  | { ok: false; code: "ECONNREFUSED" | "EACCES" | "ETIMEDOUT" };
+export type ProbeResult = { ok: true } | { ok: false; code: "ECONNREFUSED" | "EACCES" | "ETIMEDOUT" };
 
 export type Probe = () => Promise<ProbeResult>;
 

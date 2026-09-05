@@ -80,21 +80,28 @@ export class DriverTools {
     let error: string | undefined;
     try {
       await this.dependencies.gateway.configureRun(stackRunId, scenario.id, scenario.faults, signal);
-      stackRun = await this.dependencies.stackRunner.run(stack, {
-        runId: stackRunId,
-        scenarioId: scenario.id,
-        prompt: scenario.prompt,
-        gatewayBaseUrl: this.dependencies.gatewayBaseUrl,
-        deadlineMs: scenario.deadlineMs,
-        maxToolCalls: scenario.maxToolCalls,
-        model: "openai/gpt-5.6-luna",
-        reasoningEffort: "none",
-      }, signal);
+      stackRun = await this.dependencies.stackRunner.run(
+        stack,
+        {
+          runId: stackRunId,
+          scenarioId: scenario.id,
+          prompt: scenario.prompt,
+          gatewayBaseUrl: this.dependencies.gatewayBaseUrl,
+          deadlineMs: scenario.deadlineMs,
+          maxToolCalls: scenario.maxToolCalls,
+          model: "openai/gpt-5.6-luna",
+          reasoningEffort: "none",
+        },
+        signal,
+      );
     } catch (cause) {
       error = cause instanceof Error ? cause.message : String(cause);
     } finally {
       try {
-        gatewayEvents = await this.dependencies.gateway.readEvents(stackRunId, cleanupSignal(this.dependencies.cleanupTimeoutMs));
+        gatewayEvents = await this.dependencies.gateway.readEvents(
+          stackRunId,
+          cleanupSignal(this.dependencies.cleanupTimeoutMs),
+        );
       } catch (cause) {
         error ??= cause instanceof Error ? cause.message : String(cause);
       }

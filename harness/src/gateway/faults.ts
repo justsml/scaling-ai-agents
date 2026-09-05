@@ -31,10 +31,16 @@ export function validateFaults(value: unknown): FaultRule[] {
     if (!Number.isSafeInteger(rule.occurrence) || (rule.occurrence ?? 0) < 1) {
       throw new Error(`faults[${index}].occurrence must be a positive integer`);
     }
-    if (rule.delayMs !== undefined && (!Number.isSafeInteger(rule.delayMs) || rule.delayMs < 0 || rule.delayMs > 10_000)) {
+    if (
+      rule.delayMs !== undefined &&
+      (!Number.isSafeInteger(rule.delayMs) || rule.delayMs < 0 || rule.delayMs > 10_000)
+    ) {
       throw new Error(`faults[${index}].delayMs is invalid`);
     }
-    if (rule.retryAfterMs !== undefined && (!Number.isSafeInteger(rule.retryAfterMs) || rule.retryAfterMs < 0 || rule.retryAfterMs > 60_000)) {
+    if (
+      rule.retryAfterMs !== undefined &&
+      (!Number.isSafeInteger(rule.retryAfterMs) || rule.retryAfterMs < 0 || rule.retryAfterMs > 60_000)
+    ) {
       throw new Error(`faults[${index}].retryAfterMs is invalid`);
     }
     return { ...rule } as FaultRule;

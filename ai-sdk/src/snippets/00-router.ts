@@ -101,7 +101,7 @@ async function runRoutine(request: RoutableRequest, budgetUsd: number, deadlineM
 }
 
 function workerModelIdSafe(): string {
-  return process.env.MODEL_WORKER ?? "openai/gpt-5.4-mini";
+  return process.env.MODEL_WORKER ?? "openai/gpt-5.6-luna";
 }
 
 // ---- consequential path: always requires human approval ------------------
@@ -133,7 +133,8 @@ async function runConsequential(request: RoutableRequest) {
   return {
     path: "consequential" as const,
     approvalRequested: approvalRequests.length > 0,
-    decision: "denied: no human approver connected in this snippet; run 03-constrain.ts for the full ledger + approval flow",
+    decision:
+      "denied: no human approver connected in this snippet; run 03-constrain.ts for the full ledger + approval flow",
   };
 }
 

@@ -62,7 +62,9 @@ const compiledReadinessTool = tool({
     const probe: Probe = async () => {
       const code = probeSequence[Math.min(i, probeSequence.length - 1)];
       i++;
-      return code === "ok" ? { ok: true } : { ok: false, code: code === "econnrefused" ? "ECONNREFUSED" : code === "eacces" ? "EACCES" : "ETIMEDOUT" };
+      return code === "ok"
+        ? { ok: true }
+        : { ok: false, code: code === "econnrefused" ? "ECONNREFUSED" : code === "eacces" ? "EACCES" : "ETIMEDOUT" };
     };
     const options: ReadinessOptions = { deadlineMs: 2000, baseDelayMs: 5, now: () => 0, sleep: async () => {} };
     return runWhenReady(probe, async () => {}, options);
@@ -79,7 +81,12 @@ interface RequestOutcome {
   outcome: string;
 }
 
-async function handleRequest(label: string, source: string, budgetUsd: number, deadlineMs: number): Promise<RequestOutcome> {
+async function handleRequest(
+  label: string,
+  source: string,
+  budgetUsd: number,
+  deadlineMs: number,
+): Promise<RequestOutcome> {
   const hash = hashOf(source);
   const entry = registry[hash];
 
@@ -93,7 +100,15 @@ async function handleRequest(label: string, source: string, budgetUsd: number, d
       { toolCallId: "compiled", messages: [], abortSignal: undefined, context: undefined as never },
     );
     const latencyMs = Date.now() - start;
-    return { label, hash, registryHit: true, modelCalls: 0, costUsd: 0, latencyMs, outcome: `compiled tool ran directly: ${JSON.stringify(result)}` };
+    return {
+      label,
+      hash,
+      registryHit: true,
+      modelCalls: 0,
+      costUsd: 0,
+      latencyMs,
+      outcome: `compiled tool ran directly: ${JSON.stringify(result)}`,
+    };
   }
 
   // Registry miss: fall through to a model call. A routine ToolLoopAgent is
@@ -114,15 +129,29 @@ async function handleRequest(label: string, source: string, budgetUsd: number, d
   });
 
   return withWorkerSpan(
-    { profile: `compile-${label}`, whyItExisted: `registry miss for ${label}: hash ${hash.slice(0, 8)} not certified, must go through the model path` },
+    {
+      profile: `compile-${label}`,
+      whyItExisted: `registry miss for ${label}: hash ${hash.slice(0, 8)} not certified, must go through the model path`,
+    },
     async () => {
       const start = Date.now();
-      const result = await agent.generate({ prompt: "This input is not in the compiled registry.", abortSignal: deadlineSignal(deadlineMs) });
+      const result = await agent.generate({
+        prompt: "This input is not in the compiled registry.",
+        abortSignal: deadlineSignal(deadlineMs),
+      });
       const latencyMs = Date.now() - start;
-      const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.4-mini", result.usage);
+      const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.6-luna", result.usage);
       const outcome = `model path: ${result.output.explanation.slice(0, 80)}`;
       return {
-        result: { label, hash, registryHit: false, modelCalls: 1, costUsd: spend, latencyMs, outcome } satisfies RequestOutcome,
+        result: {
+          label,
+          hash,
+          registryHit: false,
+          modelCalls: 1,
+          costUsd: spend,
+          latencyMs,
+          outcome,
+        } satisfies RequestOutcome,
         costUsd: spend,
         latencyMs,
         outcome,
@@ -143,13 +172,31 @@ async function main() {
   const negativeSource = `${buggySource}\n// negative case: a trailing comment nobody has certified\n`;
 
   const outcomes: RequestOutcome[] = [];
-  outcomes.push(await handleRequest("request-1 (unregistered variant, shows the tournament path)", variantSource, budgetUsd, deadlineMs));
-  outcomes.push(await handleRequest("request-2 (exact certified input, zero model calls)", buggySource, budgetUsd, deadlineMs));
-  outcomes.push(await handleRequest("negative case (different bytes, must still miss)", negativeSource, budgetUsd, deadlineMs));
+  outcomes.push(
+    await handleRequest(
+      "request-1 (unregistered variant, shows the tournament path)",
+      variantSource,
+      budgetUsd,
+      deadlineMs,
+    ),
+  );
+  outcomes.push(
+    await handleRequest("request-2 (exact certified input, zero model calls)", buggySource, budgetUsd, deadlineMs),
+  );
+  outcomes.push(
+    await handleRequest("negative case (different bytes, must still miss)", negativeSource, budgetUsd, deadlineMs),
+  );
 
   printTable(
     "requests",
-    outcomes.map((o) => ({ label: o.label, hash: o.hash.slice(0, 12), registryHit: o.registryHit, modelCalls: o.modelCalls, costUsd: o.costUsd, latencyMs: o.latencyMs })),
+    outcomes.map((o) => ({
+      label: o.label,
+      hash: o.hash.slice(0, 12),
+      registryHit: o.registryHit,
+      modelCalls: o.modelCalls,
+      costUsd: o.costUsd,
+      latencyMs: o.latencyMs,
+    })),
   );
 
   const totalCostUsd = outcomes.reduce((s, o) => s + o.costUsd, 0);
@@ -165,7 +212,11 @@ async function main() {
   // fixture tests, copied next to it and run here in-process.
   const compiledSource = await readFile(new URL("../compiled/readiness.ts", import.meta.url), "utf8");
   const sandbox = await runSandbox(compiledSource, 6000);
-  printKV("compiled contract check (src/compiled/readiness.test.ts)", { passed: sandbox.passed, total: sandbox.total, ok: sandbox.ok });
+  printKV("compiled contract check (src/compiled/readiness.test.ts)", {
+    passed: sandbox.passed,
+    total: sandbox.total,
+    ok: sandbox.ok,
+  });
 
   const { exporter } = initTelemetry();
   printTable("worker spans", dumpWorkerSpans(exporter));

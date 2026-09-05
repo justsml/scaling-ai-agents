@@ -7,11 +7,8 @@ export function printTable(title: string, rows: Record<string, unknown>[]): void
     return;
   }
   const columns = Object.keys(rows[0]!);
-  const widths = columns.map((c) =>
-    Math.max(c.length, ...rows.map((r) => formatCell(r[c]).length)),
-  );
-  const line = (cells: string[]) =>
-    cells.map((cell, i) => cell.padEnd(widths[i]!)).join("  ");
+  const widths = columns.map((c) => Math.max(c.length, ...rows.map((r) => formatCell(r[c]).length)));
+  const line = (cells: string[]) => cells.map((cell, i) => cell.padEnd(widths[i]!)).join("  ");
   console.log(line(columns));
   console.log(widths.map((w) => "-".repeat(w)).join("  "));
   for (const row of rows) {

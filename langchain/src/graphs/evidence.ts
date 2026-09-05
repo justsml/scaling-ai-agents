@@ -16,13 +16,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as z from "zod";
-import {
-  END,
-  ReducedValue,
-  START,
-  StateGraph,
-  StateSchema,
-} from "@langchain/langgraph";
+import { END, ReducedValue, START, StateGraph, StateSchema } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { tool } from "langchain";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
@@ -88,24 +82,21 @@ export const WORKERS: WorkerSpec[] = [
   {
     source: "network",
     file: "incident/network.log",
-    question:
-      "What does the proxy do to these connections, and on what timer? Quote the exact lines.",
+    question: "What does the proxy do to these connections, and on what timer? Quote the exact lines.",
     exitCondition: "the proxy's close reason and its threshold are quoted, or absent from the log",
     whyItExisted: "owns the network boundary; nothing else can see the proxy's own decisions",
   },
   {
     source: "app",
     file: "incident/app.log",
-    question:
-      "What does the application do on connect, on close, and on reconnect? Quote any configured intervals.",
+    question: "What does the application do on connect, on close, and on reconnect? Quote any configured intervals.",
     exitCondition: "the heartbeat interval and the reconnect outcome are quoted, or absent",
     whyItExisted: "owns the application's view; the only place configuration defaults show up",
   },
   {
     source: "state",
     file: "incident/state.json",
-    question:
-      "What is the session's subscription state after reconnect, and does it match what is expected?",
+    question: "What is the session's subscription state after reconnect, and does it match what is expected?",
     exitCondition: "expected vs restored subscriptions are compared, or the file does not say",
     whyItExisted: "owns durable state; a log can show a reconnect succeeded and still hide this",
   },
@@ -117,9 +108,12 @@ export const DecomposeState = new StateSchema({
    * Keyed by evidence source. Three parallel workers write it in the same superstep, so it
    * needs a reducer — and the reducer is where the "one writer per artifact" rule lives.
    */
-  artifacts: new ReducedValue(z.record(z.string(), z.custom<Artifact>()).default(() => ({})), {
-    reducer: mergeArtifacts,
-  }),
+  artifacts: new ReducedValue(
+    z.record(z.string(), z.custom<Artifact>()).default(() => ({})),
+    {
+      reducer: mergeArtifacts,
+    },
+  ),
   verdict: z.string().default(""),
   contraryEvidence: z.array(z.string()).default(() => []),
   causesFound: z.array(z.string()).default(() => []),
@@ -139,18 +133,24 @@ export const DecomposeState = new StateSchema({
  */
 const WorkerState = new StateSchema({
   incident: z.string(),
-  artifacts: new ReducedValue(z.record(z.string(), z.custom<Artifact>()).default(() => ({})), {
-    reducer: mergeArtifacts,
-  }),
+  artifacts: new ReducedValue(
+    z.record(z.string(), z.custom<Artifact>()).default(() => ({})),
+    {
+      reducer: mergeArtifacts,
+    },
+  ),
   raw: z.string().default(""),
 });
 
 const WorkerInput = new StateSchema({ incident: z.string() });
 
 const WorkerOutput = new StateSchema({
-  artifacts: new ReducedValue(z.record(z.string(), z.custom<Artifact>()).default(() => ({})), {
-    reducer: mergeArtifacts,
-  }),
+  artifacts: new ReducedValue(
+    z.record(z.string(), z.custom<Artifact>()).default(() => ({})),
+    {
+      reducer: mergeArtifacts,
+    },
+  ),
 });
 
 export interface EvidenceDeps {
@@ -234,8 +234,7 @@ export function buildWorkerSubgraph(spec: WorkerSpec, deps: EvidenceDeps) {
       const usage = readUsage(response);
       const costUsd = estimateCostUsd(deps.modelId, usage);
       deps.onCost?.(costUsd);
-      const finding =
-        typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+      const finding = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
 
       return {
         artifacts: {
@@ -290,68 +289,66 @@ export function buildDecomposeGraph(deps: ReviewerDeps) {
       .addNode("worker_app", buildWorkerSubgraph(appSpec, deps))
       .addNode("worker_state", buildWorkerSubgraph(stateSpec, deps))
       .addNode("reviewer", async (state) => {
-      const started = Date.now();
-      const artifacts = Object.values(state.artifacts);
-      const response = await deps.llm.invoke(
-        [
-          new SystemMessage(
-            [
-              `You are reviewing three independent evidence reports on one incident.`,
-              ``,
-              `The favored hypothesis is: "${deps.favoredHypothesis}"`,
-              ``,
-              `Your job is NOT to confirm it. Your job is to look for evidence that the favored`,
-              `hypothesis is incomplete or wrong. Specifically:`,
-              `  1. List every DISTINCT root cause the reports support. There may be more than one.`,
-              `  2. For each, name the report and the quoted line that supports it.`,
-              `  3. State plainly whether the favored hypothesis alone would fix the incident.`,
-              ``,
-              `Answer in this shape:`,
-              `CAUSES: <short label>; <short label>; ...`,
-              `CONTRARY: <one line per piece of evidence that the favored hypothesis is incomplete>`,
-              `VERDICT: <three sentences>`,
-            ].join("\n"),
-          ),
-          new HumanMessage(
-            [
-              `Incident: ${state.incident}`,
-              ``,
-              ...artifacts.map((a) =>
-                [`=== report: ${a.source} ===`, `question: ${a.question}`, a.finding, ``].join("\n"),
-              ),
-            ].join("\n"),
-          ),
-        ],
-        {
-          signal: deps.signal,
-          callbacks: deps.callbacks as never,
-          metadata: {
-            profile: "reviewer",
-            whyItExisted:
-              "reads all three artifacts and hunts for evidence against the favored hypothesis",
-            outcome: "pending",
-            costUsd: 0,
-            latencyMs: 0,
+        const started = Date.now();
+        const artifacts = Object.values(state.artifacts);
+        const response = await deps.llm.invoke(
+          [
+            new SystemMessage(
+              [
+                `You are reviewing three independent evidence reports on one incident.`,
+                ``,
+                `The favored hypothesis is: "${deps.favoredHypothesis}"`,
+                ``,
+                `Your job is NOT to confirm it. Your job is to look for evidence that the favored`,
+                `hypothesis is incomplete or wrong. Specifically:`,
+                `  1. List every DISTINCT root cause the reports support. There may be more than one.`,
+                `  2. For each, name the report and the quoted line that supports it.`,
+                `  3. State plainly whether the favored hypothesis alone would fix the incident.`,
+                ``,
+                `Answer in this shape:`,
+                `CAUSES: <short label>; <short label>; ...`,
+                `CONTRARY: <one line per piece of evidence that the favored hypothesis is incomplete>`,
+                `VERDICT: <three sentences>`,
+              ].join("\n"),
+            ),
+            new HumanMessage(
+              [
+                `Incident: ${state.incident}`,
+                ``,
+                ...artifacts.map((a) =>
+                  [`=== report: ${a.source} ===`, `question: ${a.question}`, a.finding, ``].join("\n"),
+                ),
+              ].join("\n"),
+            ),
+          ],
+          {
+            signal: deps.signal,
+            callbacks: deps.callbacks as never,
+            metadata: {
+              profile: "reviewer",
+              whyItExisted: "reads all three artifacts and hunts for evidence against the favored hypothesis",
+              outcome: "pending",
+              costUsd: 0,
+              latencyMs: 0,
+            },
+            tags: ["decompose", "reviewer"],
+            runName: "reviewer",
           },
-          tags: ["decompose", "reviewer"],
-          runName: "reviewer",
-        },
-      );
+        );
 
-      const usage = readUsage(response);
-      const costUsd = estimateCostUsd(deps.modelId, usage);
-      deps.onCost?.(costUsd);
-      const text =
-        typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+        const usage = readUsage(response);
+        const costUsd = estimateCostUsd(deps.modelId, usage);
+        deps.onCost?.(costUsd);
+        const text = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
 
-      return {
-        verdict: text,
-        causesFound: parseList(text, "CAUSES"),
-        contraryEvidence: parseLines(text, "CONTRARY"),
-        reviewCostUsd: costUsd,
-        // latency is recorded by the caller's span; this keeps the node pure-ish
-        ...(started ? {} : {}),
-      };
+        return {
+          verdict: text,
+          causesFound: parseList(text, "CAUSES"),
+          contraryEvidence: parseLines(text, "CONTRARY"),
+          reviewCostUsd: costUsd,
+          // latency is recorded by the caller's span; this keeps the node pure-ish
+          ...(started ? {} : {}),
+        };
       })
       // Parallel edges from START: three workers, one superstep.
       .addEdge(START, "worker_network")
@@ -407,17 +404,10 @@ export async function scoreAgainstGroundTruth(
   // opened here.
   await readFile(join(FIXTURES, "incident/ground-truth.md"), "utf8");
 
-  const haystack = [
-    reviewerText,
-    ...Object.values(artifacts).map((a) => a.finding),
-  ]
-    .join("\n")
-    .toLowerCase();
+  const haystack = [reviewerText, ...Object.values(artifacts).map((a) => a.finding)].join("\n").toLowerCase();
 
-  const foundProxyTimeout =
-    /idle[_\s-]?timeout|60s|heartbeat/.test(haystack) && /proxy|heartbeat/.test(haystack);
-  const foundSubscriptionReplay =
-    /subscription|subscribe|restored_after_reconnect|replay/.test(haystack);
+  const foundProxyTimeout = /idle[_\s-]?timeout|60s|heartbeat/.test(haystack) && /proxy|heartbeat/.test(haystack);
+  const foundSubscriptionReplay = /subscription|subscribe|restored_after_reconnect|replay/.test(haystack);
 
   const found = [foundProxyTimeout, foundSubscriptionReplay].filter(Boolean).length;
   return {

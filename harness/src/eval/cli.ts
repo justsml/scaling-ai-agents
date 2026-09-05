@@ -19,13 +19,15 @@ try {
     ...(option("--run-id") ? { runId: option("--run-id")! } : {}),
     ...(process.env.POKEDEX_CONTROL_SECRET ? { controlSecret: process.env.POKEDEX_CONTROL_SECRET } : {}),
   });
-  console.log(JSON.stringify({
-    runId: result.manifest.runId,
-    artifactDirectory: result.artifactDirectory,
-    passed: result.report.passed,
-    piVersions: result.manifest.piVersions,
-    runs: result.report.runs.length,
-  }));
+  console.log(
+    JSON.stringify({
+      runId: result.manifest.runId,
+      artifactDirectory: result.artifactDirectory,
+      passed: result.report.passed,
+      piVersions: result.manifest.piVersions,
+      runs: result.report.runs.length,
+    }),
+  );
   process.exitCode = result.report.passed ? 0 : 1;
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);

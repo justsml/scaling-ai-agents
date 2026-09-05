@@ -77,10 +77,7 @@ function ledgerMiddleware(onUsage: (costUsd: number, note: string) => void, mode
       // middleware layer). usage_metadata is on it.
       const usage = readUsage((response as { result?: unknown[] }).result?.[0] ?? response);
       const costUsd = estimateCostUsd(modelId, usage);
-      onUsage(
-        costUsd,
-        `${usage.inputTokens}in/${usage.outputTokens}out in ${Date.now() - started}ms`,
-      );
+      onUsage(costUsd, `${usage.inputTokens}in/${usage.outputTokens}out in ${Date.now() - started}ms`);
       return response;
     },
   });
@@ -116,16 +113,9 @@ function reservingAttempt(
 
     let reservation: Reservation;
     try {
-      reservation = ctx.ledger.reserve(
-        `attempt:${profileName}`,
-        profileName,
-        profile.estimateUsd,
-      );
+      reservation = ctx.ledger.reserve(`attempt:${profileName}`, profileName, profile.estimateUsd);
     } catch (error) {
-      const reason =
-        error instanceof BudgetExhausted
-          ? `refused before dispatch: ${error.message}`
-          : String(error);
+      const reason = error instanceof BudgetExhausted ? `refused before dispatch: ${error.message}` : String(error);
       records.push({
         profile: profileName,
         reservedUsd: profile.estimateUsd,
@@ -308,8 +298,7 @@ async function consequentialPath(caps: Caps, ledger: Ledger, callbacks: unknown[
     // A checkpointer is REQUIRED for human-in-the-loop: the interrupt has to survive the
     // pause between the two invocations below.
     checkpointer,
-    systemPrompt:
-      "You apply approved patches. When asked to apply a patch, call apply_patch_to_main once.",
+    systemPrompt: "You apply approved patches. When asked to apply a patch, call apply_patch_to_main once.",
     middleware: [
       // Built-in caps. Verified names in langchain@1.5.10.
       modelCallLimitMiddleware({ runLimit: 3, threadLimit: 6, exitBehavior: "end" }),
@@ -324,8 +313,7 @@ async function consequentialPath(caps: Caps, ledger: Ledger, callbacks: unknown[
         interruptOn: {
           apply_patch_to_main: {
             allowedDecisions: ["approve", "edit", "reject"],
-            description:
-              "Applying a patch to main is irreversible from the agent's side. A human decides.",
+            description: "Applying a patch to main is irreversible from the agent's side. A human decides.",
           },
         },
       }),
@@ -397,8 +385,7 @@ async function consequentialPath(caps: Caps, ledger: Ledger, callbacks: unknown[
         decisions: [
           {
             type: "reject",
-            message:
-              "Denied: this repository requires a reviewed pull request. Open one instead of pushing to main.",
+            message: "Denied: this repository requires a reviewed pull request. Open one instead of pushing to main.",
           },
         ],
       },
@@ -485,8 +472,7 @@ async function main() {
     ]),
   );
 
-  const total =
-    runA.ledger.charged + runB.ledger.charged + runC.ledger.charged + outerLedger.charged;
+  const total = runA.ledger.charged + runB.ledger.charged + runC.ledger.charged + outerLedger.charged;
   // This snippet prints its own summary instead of `ledgerTable`, so it records its spend
   // for `bun run all` explicitly.
   recordSpend(total);

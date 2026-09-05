@@ -48,11 +48,7 @@ import { candidateRows } from "../lib/judge.ts";
 import { runCandidate, TOTAL_FIXTURE_TESTS } from "../lib/sandbox.ts";
 import { startTracing } from "../lib/trace.ts";
 import { runTournament } from "./01-compete.ts";
-import {
-  COMPILED_PATCH,
-  compiledCacheKey,
-  matchesCompiledFix,
-} from "../compiled/readiness-fix.ts";
+import { COMPILED_PATCH, compiledCacheKey, matchesCompiledFix } from "../compiled/readiness-fix.ts";
 import { header, kv, ledgerTable, note, section, skip, stopLine, table } from "../lib/print.ts";
 
 const REQUEST_ONE = "Fix runWhenReady so all readiness tests pass.";
@@ -147,8 +143,7 @@ function buildCompileGraph(deps: CompileDeps) {
             // NOTE: `keyFunc` is typed `(args: unknown[]) => string`, not
             // `(state) => string`. It receives the node's argument list, so the state is
             // `args[0]`. Getting this wrong silently keys the cache on the wrong thing.
-            keyFunc: (args: unknown[]) =>
-              compiledCacheKey((args[0] as { request?: string })?.request ?? ""),
+            keyFunc: (args: unknown[]) => compiledCacheKey((args[0] as { request?: string })?.request ?? ""),
             ttl: 300,
           },
         },
@@ -184,11 +179,10 @@ function buildCompileGraph(deps: CompileDeps) {
       // The compiled node either answers (END) or hands over. This is the whole shape of the
       // axis: the cheap deterministic path gets first refusal, the expensive path is the
       // fallback, and there is no third option.
-      .addConditionalEdges(
-        "compiledLookup",
-        (state) => (state.path === "compiled" ? END : "tournament"),
-        ["tournament", END],
-      )
+      .addConditionalEdges("compiledLookup", (state) => (state.path === "compiled" ? END : "tournament"), [
+        "tournament",
+        END,
+      ])
       .addEdge("tournament", END)
       // The cache lives on the compiled graph, not on the node definition.
       .compile({ cache: new InMemoryCache() })
@@ -237,10 +231,7 @@ async function main() {
       profileNames: ["minimal-diff", "best-practices"],
     });
     tournamentCost = ledger.charged - before;
-    table(
-      ["profile", "tests", "rubric", "cost", "ms", "note"],
-      candidateRows(result.candidates, result.winner),
-    );
+    table(["profile", "tests", "rubric", "cost", "ms", "note"], candidateRows(result.candidates, result.winner));
     kv("model calls", `${result.candidates.length}`);
     kv("cost", usd(tournamentCost));
     kv("winner", result.winner?.profile ?? "none");
@@ -267,21 +258,13 @@ async function main() {
         "src/compiled/readiness-fix.ts :: COMPILED_PATCH",
         `re-run against the fixtures every time: ${contractCheck.passed}/${TOTAL_FIXTURE_TESTS}`,
       ],
-      [
-        "the tool",
-        "05-compile.ts :: readinessFixTool",
-        "refuses anything the matcher does not claim",
-      ],
+      ["the tool", "05-compile.ts :: readinessFixTool", "refuses anything the matcher does not claim"],
       [
         "the matcher",
         "src/compiled/readiness-fix.ts :: matchesCompiledFix",
         "narrow by construction; negative cases are asserted in test/compiled.test.ts",
       ],
-      [
-        "the contract",
-        "src/fixtures/readiness.test.ts",
-        "the same file that picked the winner still gates it",
-      ],
+      ["the contract", "src/fixtures/readiness.test.ts", "the same file that picked the winner still gates it"],
     ],
   );
   note(
@@ -344,8 +327,7 @@ async function main() {
     u.some((c) => (c as Record<string, unknown>).__metadata__ !== undefined)
       ? JSON.stringify(
           u.find((c) => (c as Record<string, unknown>).__metadata__)! &&
-            (u.find((c) => (c as Record<string, unknown>).__metadata__) as Record<string, unknown>)
-              .__metadata__,
+            (u.find((c) => (c as Record<string, unknown>).__metadata__) as Record<string, unknown>).__metadata__,
         )
       : "(none)";
   table(

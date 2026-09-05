@@ -15,13 +15,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import * as z from "zod";
-import {
-  END,
-  MessagesValue,
-  START,
-  StateGraph,
-  StateSchema,
-} from "@langchain/langgraph";
+import { END, MessagesValue, START, StateGraph, StateSchema } from "@langchain/langgraph";
 import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { initChatModel } from "langchain";
 
@@ -78,12 +72,9 @@ export const competitorRemote = new StateGraph(CompetitorState)
   .addNode("propose", async (state) => {
     const buggy = await readFile(join(FIXTURES, "readiness.ts"), "utf8");
     const ask = lastHumanText(state.messages as never) || "Fix runWhenReady.";
-    const llm = await initChatModel(process.env.REMOTE_WORKER_MODEL ?? "openai:gpt-5.4-mini");
+    const llm = await initChatModel(process.env.REMOTE_WORKER_MODEL ?? "openai:gpt-5.6-luna");
     const response = await llm.invoke(
-      [
-        new SystemMessage(REMOTE_SYSTEM_PROMPT),
-        new HumanMessage(`${ask}\n\n=== CURRENT readiness.ts ===\n${buggy}`),
-      ],
+      [new SystemMessage(REMOTE_SYSTEM_PROMPT), new HumanMessage(`${ask}\n\n=== CURRENT readiness.ts ===\n${buggy}`)],
       {
         metadata: {
           profile: "remote-worker",
@@ -133,8 +124,7 @@ export const researcher = new StateGraph(ResearcherState)
     // One worker, one file. The allow-list is the exit condition: a worker that is asked
     // for evidence it does not own says so rather than reaching for another file.
     const ask = lastHumanText(state.messages as never);
-    const source =
-      Object.keys(ALLOWED_SOURCES).find((k) => ask.toLowerCase().includes(k)) ?? state.source;
+    const source = Object.keys(ALLOWED_SOURCES).find((k) => ask.toLowerCase().includes(k)) ?? state.source;
     const rel = ALLOWED_SOURCES[source];
     if (!rel) {
       return {
@@ -143,7 +133,7 @@ export const researcher = new StateGraph(ResearcherState)
       };
     }
     const evidence = await readFile(join(FIXTURES, rel), "utf8");
-    const llm = await initChatModel(process.env.REMOTE_WORKER_MODEL ?? "openai:gpt-5.4-mini");
+    const llm = await initChatModel(process.env.REMOTE_WORKER_MODEL ?? "openai:gpt-5.6-luna");
     const response = await llm.invoke(
       [
         new SystemMessage(
@@ -166,8 +156,7 @@ export const researcher = new StateGraph(ResearcherState)
         tags: ["decompose", "remote"],
       },
     );
-    const finding =
-      typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+    const finding = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
     return { source, finding, messages: [new AIMessage(finding)] };
   })
   .addEdge(START, "read")

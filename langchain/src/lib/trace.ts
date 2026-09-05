@@ -19,13 +19,7 @@ import type { LLMResult } from "@langchain/core/outputs";
 import { hasLangSmith } from "./models.ts";
 import { readUsage } from "./prices.ts";
 
-export const STANDARD_KEYS = [
-  "profile",
-  "costUsd",
-  "latencyMs",
-  "outcome",
-  "whyItExisted",
-] as const;
+export const STANDARD_KEYS = ["profile", "costUsd", "latencyMs", "outcome", "whyItExisted"] as const;
 
 export interface TraceNode {
   runId: string;
@@ -138,9 +132,7 @@ export class LocalSpanTree extends BaseCallbackHandler {
         node.inputTokens += usage.inputTokens;
         node.outputTokens += usage.outputTokens;
       }
-      const raw = output.llmOutput?.tokenUsage as
-        | { promptTokens?: number; completionTokens?: number }
-        | undefined;
+      const raw = output.llmOutput?.tokenUsage as { promptTokens?: number; completionTokens?: number } | undefined;
       if (node.inputTokens === 0 && raw) {
         node.inputTokens += raw.promptTokens ?? 0;
         node.outputTokens += raw.completionTokens ?? 0;
@@ -192,8 +184,7 @@ export class LocalSpanTree extends BaseCallbackHandler {
     const line = (n: TraceNode, depth: number) => {
       if (depth > maxDepth) return;
       const ms = n.endedAt ? n.endedAt - n.startedAt : -1;
-      const tok =
-        n.inputTokens || n.outputTokens ? ` tok=${n.inputTokens}/${n.outputTokens}` : "";
+      const tok = n.inputTokens || n.outputTokens ? ` tok=${n.inputTokens}/${n.outputTokens}` : "";
       const labels = STANDARD_KEYS.filter((k) => n.metadata[k] !== undefined)
         .map((k) => `${k}=${String(n.metadata[k])}`)
         .join(" ");

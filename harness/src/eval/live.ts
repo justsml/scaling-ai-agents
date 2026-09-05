@@ -193,7 +193,10 @@ function evidenceFromRecord(
 ): InvestigationEvidence {
   const evidence = record?.stackRun?.evidence;
   if (isInvestigationEvidence(evidence, stack)) return evidence;
-  const failure = record?.error ?? record?.stackRun?.protocolError ?? (driverErrors(driver).join("; ") || "missing Driver evidence record");
+  const failure =
+    record?.error ??
+    record?.stackRun?.protocolError ??
+    (driverErrors(driver).join("; ") || "missing Driver evidence record");
   return {
     stack,
     answer: null,
@@ -219,7 +222,8 @@ function dispatchGate(
   if (!record) details.push(`missing extension evidence for ${stack}`);
   else {
     details.push(...recordFailureDetails(record));
-    if (record.stackRun?.evidence === null || record.stackRun === null) details.push(`${stack} produced no valid evidence`);
+    if (record.stackRun?.evidence === null || record.stackRun === null)
+      details.push(`${stack} produced no valid evidence`);
   }
   return { gate: "dispatch", passed: details.length === 0, details };
 }
@@ -239,13 +243,23 @@ export function corroborateGatewayTrace(record: DriverEvidenceRecord, evidence: 
   if (events.length !== calls.length) {
     details.push(`gateway trace count mismatch: stack reported ${calls.length}, gateway recorded ${events.length}`);
   }
-  addDuplicateRequestIdDetails(details, "stack trace", calls.map((call) => call.requestId));
-  addDuplicateRequestIdDetails(details, "gateway trace", events.map((event) => asRecord(event).requestId));
+  addDuplicateRequestIdDetails(
+    details,
+    "stack trace",
+    calls.map((call) => call.requestId),
+  );
+  addDuplicateRequestIdDetails(
+    details,
+    "gateway trace",
+    events.map((event) => asRecord(event).requestId),
+  );
   addSequenceDetails(details, calls);
-  const eventsByRequestId = new Map(events.map((event) => {
-    const parsed = asRecord(event);
-    return [parsed.requestId, parsed] as const;
-  }));
+  const eventsByRequestId = new Map(
+    events.map((event) => {
+      const parsed = asRecord(event);
+      return [parsed.requestId, parsed] as const;
+    }),
+  );
   for (let index = 0; index < calls.length; index++) {
     const call = calls[index]!;
     const event = eventsByRequestId.get(call.requestId);
@@ -262,25 +276,33 @@ export function corroborateGatewayTrace(record: DriverEvidenceRecord, evidence: 
     }
     const expectedClass = call.ok ? "success" : "error";
     const actualClass = event.resultClass;
-    const classMatches = expectedClass === "success"
-      ? actualClass === "success"
-      : actualClass === "tool-error" || actualClass === "gateway-error";
-    if (!classMatches) details.push(`gateway call ${index + 1} result class mismatch: expected ${expectedClass}, received ${String(actualClass)}`);
+    const classMatches =
+      expectedClass === "success"
+        ? actualClass === "success"
+        : actualClass === "tool-error" || actualClass === "gateway-error";
+    if (!classMatches)
+      details.push(
+        `gateway call ${index + 1} result class mismatch: expected ${expectedClass}, received ${String(actualClass)}`,
+      );
     if (call.status !== undefined && event.status !== call.status) {
-      details.push(`gateway call ${index + 1} status mismatch: expected ${call.status}, received ${String(event.status)}`);
+      details.push(
+        `gateway call ${index + 1} status mismatch: expected ${call.status}, received ${String(event.status)}`,
+      );
     }
   }
   const callIds = new Set(calls.map((call) => call.requestId));
   for (const [index, value] of events.entries()) {
     const event = asRecord(value);
-    if (!callIds.has(String(event.requestId))) details.push(`gateway event ${index + 1} has no corresponding stack call`);
+    if (!callIds.has(String(event.requestId)))
+      details.push(`gateway event ${index + 1} has no corresponding stack call`);
   }
   return details;
 }
 
 function recordFailureDetails(record: DriverEvidenceRecord): string[] {
   const details: string[] = [];
-  if ("error" in record) details.push(`Driver evidence error for ${record.stack}: ${String(record.error ?? "unknown error")}`);
+  if ("error" in record)
+    details.push(`Driver evidence error for ${record.stack}: ${String(record.error ?? "unknown error")}`);
   const stackRun = record.stackRun;
   if (stackRun?.protocolError) details.push(`${record.stack} protocol failure: ${stackRun.protocolError}`);
   if (stackRun?.timedOut) details.push(`${record.stack} process timed out`);
@@ -324,14 +346,20 @@ function appendGateDetails(gates: GateResult[], gateName: GateResult["gate"], de
 }
 
 function compare(details: string[], index: number, field: string, actual: unknown, expected: unknown): void {
-  if (actual !== expected) details.push(`gateway call ${index + 1} ${field} mismatch: expected ${String(expected)}, received ${String(actual)}`);
+  if (actual !== expected)
+    details.push(
+      `gateway call ${index + 1} ${field} mismatch: expected ${String(expected)}, received ${String(actual)}`,
+    );
 }
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   if (value !== null && typeof value === "object") {
     const item = value as Record<string, unknown>;
-    return `{${Object.keys(item).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(item[key])}`).join(",")}}`;
+    return `{${Object.keys(item)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(item[key])}`)
+      .join(",")}}`;
   }
   return JSON.stringify(value) ?? "undefined";
 }
@@ -347,7 +375,14 @@ function driverErrors(driver: PiRunEvidence | DriverFailure): string[] {
 function isInvestigationEvidence(value: unknown, stack: StackName): value is InvestigationEvidence {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const item = value as Record<string, unknown>;
-  return item.stack === stack && Array.isArray(item.toolCalls) && typeof item.stopReason === "string" && typeof item.latencyMs === "number" && item.usage !== null && typeof item.usage === "object";
+  return (
+    item.stack === stack &&
+    Array.isArray(item.toolCalls) &&
+    typeof item.stopReason === "string" &&
+    typeof item.latencyMs === "number" &&
+    item.usage !== null &&
+    typeof item.usage === "object"
+  );
 }
 
 const FRAMEWORK_PACKAGES: Record<StackName, readonly string[]> = {
@@ -357,22 +392,28 @@ const FRAMEWORK_PACKAGES: Record<StackName, readonly string[]> = {
 };
 
 async function readFrameworkVersions(repoRoot: string): Promise<LiveEvalManifest["frameworkVersions"]> {
-  const entries = await Promise.all(STACKS.map(async (stack) => {
-    const packages = await Promise.all(FRAMEWORK_PACKAGES[stack].map(async (packageName) => {
-      try {
-        const packageJson = JSON.parse(await readFile(resolve(repoRoot, stack, "node_modules", packageName, "package.json"), "utf8")) as { version?: unknown };
-        return [packageName, typeof packageJson.version === "string" ? packageJson.version : null] as const;
-      } catch {
-        return [packageName, null] as const;
-      }
-    }));
-    return [stack, Object.fromEntries(packages)] as const;
-  }));
+  const entries = await Promise.all(
+    STACKS.map(async (stack) => {
+      const packages = await Promise.all(
+        FRAMEWORK_PACKAGES[stack].map(async (packageName) => {
+          try {
+            const packageJson = JSON.parse(
+              await readFile(resolve(repoRoot, stack, "node_modules", packageName, "package.json"), "utf8"),
+            ) as { version?: unknown };
+            return [packageName, typeof packageJson.version === "string" ? packageJson.version : null] as const;
+          } catch {
+            return [packageName, null] as const;
+          }
+        }),
+      );
+      return [stack, Object.fromEntries(packages)] as const;
+    }),
+  );
   return Object.fromEntries(entries) as LiveEvalManifest["frameworkVersions"];
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 async function fixtureHashes(directory: string): Promise<LiveEvalManifest["fixtureHashes"]> {
@@ -394,7 +435,7 @@ async function writeJsonAtomic(path: string, value: unknown): Promise<void> {
 async function readGitSha(repoRoot: string): Promise<string | null> {
   try {
     const child = Bun.spawn(["git", "rev-parse", "HEAD"], { cwd: repoRoot, stdout: "pipe", stderr: "ignore" });
-    if (await child.exited !== 0) return null;
+    if ((await child.exited) !== 0) return null;
     const sha = (await new Response(child.stdout).text()).trim();
     return /^[0-9a-f]{40}$/i.test(sha) ? sha : null;
   } catch {
@@ -404,8 +445,10 @@ async function readGitSha(repoRoot: string): Promise<string | null> {
 
 function validateOptions(options: LiveEvalOptions): void {
   if (options.model !== LIVE_MODEL) throw new Error(`Only ${LIVE_MODEL} is supported`);
-  if (options.reasoningEffort !== LIVE_REASONING_EFFORT) throw new Error(`Only reasoning effort ${LIVE_REASONING_EFFORT} is supported`);
-  if (!Number.isSafeInteger(options.repetitions) || options.repetitions < 1) throw new Error("repetitions must be a positive integer");
+  if (options.reasoningEffort !== LIVE_REASONING_EFFORT)
+    throw new Error(`Only reasoning effort ${LIVE_REASONING_EFFORT} is supported`);
+  if (!Number.isSafeInteger(options.repetitions) || options.repetitions < 1)
+    throw new Error("repetitions must be a positive integer");
 }
 
 function defaultRunId(now: Date): string {

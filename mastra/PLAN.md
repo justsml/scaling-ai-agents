@@ -7,7 +7,7 @@ Implements `../shared/TASK.md` on Mastra. APIs below were checked against `@mast
 - `@mastra/core`, `@mastra/libsql`, `@mastra/memory`, `@mastra/evals`, `@mastra/client-js`, `mastra` (CLI), `zod`
 - Storage: `LibSQLStore({ id: 'lab', url: 'file:./mastra.db' })`, gitignored
 - Observability: `new Observability({ configs: { default: { serviceName: 'agentic-parallelism-mastra', requestContextKeys: ['requestId','profile','region','dataClass'], exporters: [new MastraStorageExporter()] } } })`
-- Models via the router string form. Default `openai/gpt-5.4-mini` for workers, `openai/gpt-5.4-nano` for the cheap judge steps, `openai/gpt-5.4` as the one "frontier" competitor. Read `MODEL_*` env overrides. Local slot: `LOCAL_OPENAI_BASE_URL`; when unset the local competitor is skipped and the ledger says so.
+- Models use the router string form. Workers, judges, and the frontier-role competitor default to `openai/gpt-5.6-luna`. Read `MODEL_*` env overrides. Local slot: `LOCAL_OPENAI_BASE_URL`; when unset the local competitor is skipped and the ledger says so.
 - tsconfig: ES2022, module ES2022, moduleResolution bundler. Bun runs the scripts directly.
 
 ## Layout

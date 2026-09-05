@@ -63,19 +63,13 @@ interface Result {
 
 async function main() {
   const args = parseArgs();
-  const only =
-    typeof args.flags.only === "string"
-      ? new Set(args.flags.only.split(",").map((s) => s.trim()))
-      : null;
+  const only = typeof args.flags.only === "string" ? new Set(args.flags.only.split(",").map((s) => s.trim())) : null;
 
   const dir = await mkdtemp(join(tmpdir(), "agentic-parallelism-all-"));
   const spendFile = join(dir, "spend.tsv");
   await writeFile(spendFile, "", "utf8");
 
-  header(
-    "agentic-parallelism / langchain — all snippets",
-    `run started ${new Date().toISOString()}`,
-  );
+  header("agentic-parallelism / langchain — all snippets", `run started ${new Date().toISOString()}`);
 
   if (!process.env.OPENAI_API_KEY) {
     kv("warning", "OPENAI_API_KEY is not set — most snippets will print `skipped` and exit 0");
@@ -88,8 +82,7 @@ async function main() {
 
     section(`${snippet.id} ${snippet.title}`);
     const budget = typeof args.flags["budget-usd"] === "string" ? args.budgetUsd : snippet.budgetUsd;
-    const deadline =
-      typeof args.flags["deadline-ms"] === "string" ? args.deadlineMs : snippet.deadlineMs;
+    const deadline = typeof args.flags["deadline-ms"] === "string" ? args.deadlineMs : snippet.deadlineMs;
 
     console.log(`  $ bun run ${snippet.file} --budget-usd ${budget} --deadline-ms ${deadline}`);
     const started = Date.now();
@@ -169,14 +162,7 @@ async function main() {
   section("summary");
   table(
     ["id", "snippet", "status", "wall clock", "charged", "detail"],
-    results.map((r) => [
-      r.id,
-      r.title,
-      r.status,
-      `${(r.wallMs / 1000).toFixed(1)}s`,
-      usd(r.chargedUsd),
-      r.detail,
-    ]),
+    results.map((r) => [r.id, r.title, r.status, `${(r.wallMs / 1000).toFixed(1)}s`, usd(r.chargedUsd), r.detail]),
   );
 
   const total = results.reduce((a, r) => a + r.chargedUsd, 0);
@@ -184,9 +170,7 @@ async function main() {
 
   console.log("");
   console.log(`TOTAL SPEND: ${usd(total)} across ${results.length} snippet(s)`);
-  console.log(
-    `TOTAL TIME:  ${(results.reduce((a, r) => a + r.wallMs, 0) / 1000).toFixed(1)}s`,
-  );
+  console.log(`TOTAL TIME:  ${(results.reduce((a, r) => a + r.wallMs, 0) / 1000).toFixed(1)}s`);
   console.log(
     failures.length === 0
       ? "ALL SNIPPETS EXITED 0 (a `skipped:` snippet counts as a pass)"

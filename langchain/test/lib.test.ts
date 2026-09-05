@@ -43,8 +43,8 @@ describe("caps: caps are inputs", () => {
 
 describe("prices: estimates from usage_metadata and a static table", () => {
   test("resolves initChatModel-style ids", () => {
-    expect(priceFor("openai:gpt-5.4-mini").input).toBe(0.4);
-    expect(priceFor("openai/gpt-5.4-nano").output).toBe(0.4);
+    expect(priceFor("openai:gpt-5.6-luna").input).toBe(0.4);
+    expect(priceFor("openai/gpt-5.6-luna").output).toBe(1.6);
   });
 
   test("falls back to the provider wildcard for the local slot", () => {
@@ -52,7 +52,7 @@ describe("prices: estimates from usage_metadata and a static table", () => {
   });
 
   test("costs per 1M tokens", () => {
-    const cost = estimateCostUsd("openai:gpt-5.4-mini", {
+    const cost = estimateCostUsd("openai:gpt-5.6-luna", {
       inputTokens: 1_000_000,
       outputTokens: 0,
     });
@@ -133,16 +133,10 @@ describe("ledger: reserve then reconcile", () => {
 
 describe("pool: region and dataClass filter providers before any call", () => {
   test("restricted data can only ever reach the local slot", () => {
-    const withLocal = selectProvider(
-      { region: "eu", dataClass: "restricted" },
-      { localAvailable: true },
-    );
+    const withLocal = selectProvider({ region: "eu", dataClass: "restricted" }, { localAvailable: true });
     expect(withLocal.provider?.id).toBe("local-slot");
 
-    const withoutLocal = selectProvider(
-      { region: "eu", dataClass: "restricted" },
-      { localAvailable: false },
-    );
+    const withoutLocal = selectProvider({ region: "eu", dataClass: "restricted" }, { localAvailable: false });
     expect(withoutLocal.provider).toBeNull();
     expect(withoutLocal.reason).toContain("no provider qualifies");
   });
@@ -153,10 +147,7 @@ describe("pool: region and dataClass filter providers before any call", () => {
   });
 
   test("eu internal drops the us-only providers", () => {
-    const decision = selectProvider(
-      { region: "eu", dataClass: "internal" },
-      { localAvailable: false },
-    );
+    const decision = selectProvider({ region: "eu", dataClass: "internal" }, { localAvailable: false });
     expect(decision.provider?.id).toBe("openai-nano");
     const dropped = decision.considered.filter((c) => !c.kept).map((c) => c.id);
     expect(dropped).toContain("openai-primary");
@@ -171,7 +162,7 @@ describe("pool: region and dataClass filter providers before any call", () => {
 describe("judge: deterministic first, and a deterministic tie-break", () => {
   const base = (over: Partial<Candidate>): Candidate => ({
     profile: "p",
-    modelId: "openai:gpt-5.4-mini",
+    modelId: "openai:gpt-5.6-luna",
     patch: "x",
     rationale: "r",
     costUsd: 0.001,
@@ -270,7 +261,9 @@ describe("sandbox: disqualifiers and output parsing", () => {
   });
 
   test("parses bun's pass/fail summary", () => {
-    const parsed = parseBunTestOutput(["(fail) runWhenReady > denied", "", " 2 pass", " 0 skip", " 3 fail", ""].join("\n"));
+    const parsed = parseBunTestOutput(
+      ["(fail) runWhenReady > denied", "", " 2 pass", " 0 skip", " 3 fail", ""].join("\n"),
+    );
     expect(parsed.passed).toBe(2);
     expect(parsed.failed).toBe(3);
     expect(parsed.green).toBe(false);

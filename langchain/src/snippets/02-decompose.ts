@@ -26,7 +26,7 @@
  *   run is scored on whether it found both.
  *
  * WHAT IT COSTS
- *   Four gpt-5.4-mini calls (three workers plus one reviewer), about $0.005. The Deep Agents
+ *   Four gpt-5.6-luna calls (three workers plus one reviewer), about $0.005. The Deep Agents
  *   variant adds a supervisor loop, roughly $0.01 more.
  *
  * SKIPS
@@ -55,8 +55,7 @@ const INCIDENT =
   "Intermittent WebSocket disconnects: sessions for user u-9 keep closing with code 1006 " +
   "and reconnects do not restore normal behaviour.";
 
-const FAVORED_HYPOTHESIS =
-  "the proxy's idle timeout closes the connection, so raising the timeout fixes the incident";
+const FAVORED_HYPOTHESIS = "the proxy's idle timeout closes the connection, so raising the timeout fixes the incident";
 
 async function main() {
   const caps = Caps.fromArgv();
@@ -216,9 +215,7 @@ async function main() {
     await asyncSubagentVariant(caps, ledger, tracing.callbacks);
   } else {
     section("async subagents variant");
-    console.log(
-      "  not run. Add --async-subagents to delegate to the Agent Protocol server from snippet 06.",
-    );
+    console.log("  not run. Add --async-subagents to delegate to the Agent Protocol server from snippet 06.");
   }
 
   section(`trace (${tracing.destination})`);
@@ -245,9 +242,7 @@ async function deepAgentVariant(caps: Caps, ledger: Ledger, callbacks: unknown[]
   try {
     ({ createDeepAgent } = await import("deepagents"));
   } catch (error) {
-    console.log(
-      `  skipped: deepagents is not importable (${error instanceof Error ? error.message : error})`,
-    );
+    console.log(`  skipped: deepagents is not importable (${error instanceof Error ? error.message : error})`);
     return;
   }
 
@@ -386,7 +381,7 @@ async function asyncSubagentVariant(caps: Caps, ledger: Ledger, callbacks: unkno
         `2. Then POLL. Call check_async_task on each task id, repeatedly, until every task`,
         `   reports success and you have its result text. Do not answer before then.`,
         `3. Only once you hold all three findings, answer with:`,
-        `   CAUSES: <label>; <label>` ,
+        `   CAUSES: <label>; <label>`,
         `   followed by a three-sentence verdict.`,
         ``,
         `Launching is non-blocking: start_async_task returns a task id immediately, not an`,
@@ -399,8 +394,7 @@ async function asyncSubagentVariant(caps: Caps, ledger: Ledger, callbacks: unkno
       {
         id: "async-subagents",
         profile: "async-subagent-supervisor",
-        whyItExisted:
-          "workers on another process, launched non-blocking over the Agent Protocol",
+        whyItExisted: "workers on another process, launched non-blocking over the Agent Protocol",
       },
       async () => {
         const result = await agent.invoke(
@@ -444,10 +438,7 @@ async function asyncSubagentVariant(caps: Caps, ledger: Ledger, callbacks: unkno
     kv("cost", usd(run.span.costUsd));
     kv("latency", `${run.span.latencyMs}ms`);
     console.log("");
-    for (const line of wrap(
-      typeof last?.content === "string" ? last.content : JSON.stringify(last?.content),
-      86,
-    )) {
+    for (const line of wrap(typeof last?.content === "string" ? last.content : JSON.stringify(last?.content), 86)) {
       console.log(`  ${line}`);
     }
     note(

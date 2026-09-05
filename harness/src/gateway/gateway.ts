@@ -137,20 +137,33 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
       record(context, tool, args, "success", response.status, start, fault);
       return response;
     } catch (error) {
-      const toolError = error instanceof ToolError
-        ? error
-        : new ToolError(500, {
-            code: "GATEWAY_ERROR",
-            message: error instanceof Error ? error.message : "Unknown gateway error",
-            retryable: false,
-            retryAfterMs: null,
-          });
+      const toolError =
+        error instanceof ToolError
+          ? error
+          : new ToolError(500, {
+              code: "GATEWAY_ERROR",
+              message: error instanceof Error ? error.message : "Unknown gateway error",
+              retryable: false,
+              retryAfterMs: null,
+            });
       const requestId = context?.requestId ?? crypto.randomUUID();
       const body: ToolErrorBody = { ...toolError.body, requestId };
-      if (context) record(context, tool, args, error instanceof ToolError ? "tool-error" : "gateway-error", toolError.status, start, fault);
+      if (context)
+        record(
+          context,
+          tool,
+          args,
+          error instanceof ToolError ? "tool-error" : "gateway-error",
+          toolError.status,
+          start,
+          fault,
+        );
       return Response.json(body, {
         status: toolError.status,
-        headers: toolError.body.retryAfterMs === null ? undefined : { "retry-after": String(toolError.body.retryAfterMs / 1000) },
+        headers:
+          toolError.body.retryAfterMs === null
+            ? undefined
+            : { "retry-after": String(toolError.body.retryAfterMs / 1000) },
       });
     }
   }
@@ -159,7 +172,11 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
     const runId = request.headers.get("x-pokedex-run-id") ?? "";
     const scenarioId = request.headers.get("x-pokedex-scenario-id") ?? "";
     const stack = request.headers.get("x-pokedex-stack") ?? "";
-    if (!/^[A-Za-z0-9._:-]{1,128}$/.test(runId) || !/^[A-Za-z0-9._:-]{1,128}$/.test(scenarioId) || !/^[a-z-]{2,32}$/.test(stack)) {
+    if (
+      !/^[A-Za-z0-9._:-]{1,128}$/.test(runId) ||
+      !/^[A-Za-z0-9._:-]{1,128}$/.test(scenarioId) ||
+      !/^[a-z-]{2,32}$/.test(stack)
+    ) {
       throw new ToolError(400, {
         code: "MISSING_RUN_CONTEXT",
         message: "The harness must supply valid run, scenario, and stack headers",
@@ -185,7 +202,10 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
         assertExactKeys(args, []);
         return {
           contractVersion: CONTRACT_VERSION,
-          resources: Object.entries(RESOURCE_CAPABILITIES).map(([resource, capabilities]) => ({ resource, ...capabilities })),
+          resources: Object.entries(RESOURCE_CAPABILITIES).map(([resource, capabilities]) => ({
+            resource,
+            ...capabilities,
+          })),
           requestId: context.requestId,
         };
       }
@@ -203,24 +223,31 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
     if (!isResource(args.resource)) invalidResource();
     const resource = args.resource;
     const pageSize = parsePageSize(args.pageSize);
-    const offset = args.cursor === undefined
-      ? 0
-      : decodeCursor(args.cursor, { operation: "list", resource }, options.cursorSecret).offset;
+    const offset =
+      args.cursor === undefined
+        ? 0
+        : decodeCursor(args.cursor, { operation: "list", resource }, options.cursorSecret).offset;
     const data = await upstreamJson<ListResponse>(`api/v2/${resource}/?limit=${pageSize}&offset=${offset}`);
-    const items = data.results.map((item) => normalizeNamedResource(item, resource, new URL(options.upstreamBaseUrl).origin));
+    const items = data.results.map((item) =>
+      normalizeNamedResource(item, resource, new URL(options.upstreamBaseUrl).origin),
+    );
     const nextOffset = data.next ? offset + pageSize : null;
     return {
       resource,
       items,
       totalCount: Number.isSafeInteger(data.count) ? data.count : null,
-      nextCursor: nextOffset === null ? null : encodeCursor({ v: 1, operation: "list", resource, offset: nextOffset }, options.cursorSecret),
+      nextCursor:
+        nextOffset === null
+          ? null
+          : encodeCursor({ v: 1, operation: "list", resource, offset: nextOffset }, options.cursorSecret),
       requestId: context.requestId,
     };
   }
 
   async function search(args: Record<string, unknown>, context: RequestContext): Promise<unknown> {
     assertExactKeys(args, ["resource", "query", "cursor", "pageSize"]);
-    if (!isResource(args.resource) || !RESOURCE_CAPABILITIES[args.resource].search) invalidResource("Resource is not searchable");
+    if (!isResource(args.resource) || !RESOURCE_CAPABILITIES[args.resource].search)
+      invalidResource("Resource is not searchable");
     if (typeof args.query !== "string" || args.query.trim().length < 1 || args.query.length > 100) {
       throw new ToolError(400, {
         code: "INVALID_QUERY",
@@ -230,11 +257,15 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
       });
     }
     const resource = args.resource;
-    const query = args.query.trim().toLocaleLowerCase("en-US").replace(/[\s_]+/g, "-");
+    const query = args.query
+      .trim()
+      .toLocaleLowerCase("en-US")
+      .replace(/[\s_]+/g, "-");
     const pageSize = parsePageSize(args.pageSize);
-    const offset = args.cursor === undefined
-      ? 0
-      : decodeCursor(args.cursor, { operation: "search", resource, query }, options.cursorSecret).offset;
+    const offset =
+      args.cursor === undefined
+        ? 0
+        : decodeCursor(args.cursor, { operation: "search", resource, query }, options.cursorSecret).offset;
     let pending = searchIndexes.get(resource);
     if (!pending) {
       pending = buildSearchIndex(resource);
@@ -249,7 +280,10 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
       query,
       items,
       totalCount: matches.length,
-      nextCursor: nextOffset === null ? null : encodeCursor({ v: 1, operation: "search", resource, query, offset: nextOffset }, options.cursorSecret),
+      nextCursor:
+        nextOffset === null
+          ? null
+          : encodeCursor({ v: 1, operation: "search", resource, query, offset: nextOffset }, options.cursorSecret),
       requestId: context.requestId,
     };
   }
@@ -308,7 +342,8 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
   async function upstreamJson<T>(path: string): Promise<T> {
     const target = new URL(path, ensureTrailingSlash(options.upstreamBaseUrl));
     const base = new URL(options.upstreamBaseUrl);
-    if (target.origin !== base.origin || !target.pathname.startsWith("/api/v2/")) throw new Error("Local-only upstream routing invariant failed");
+    if (target.origin !== base.origin || !target.pathname.startsWith("/api/v2/"))
+      throw new Error("Local-only upstream routing invariant failed");
     let response: Response;
     try {
       response = await upstreamFetch(target);
@@ -323,7 +358,10 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
     if (!response.ok) {
       throw new ToolError(response.status === 404 ? 404 : 502, {
         code: response.status === 404 ? "NOT_FOUND" : "UPSTREAM_ERROR",
-        message: response.status === 404 ? "Local Pokédex resource was not found" : `Local PokéAPI returned ${response.status}`,
+        message:
+          response.status === 404
+            ? "Local Pokédex resource was not found"
+            : `Local PokéAPI returned ${response.status}`,
         retryable: response.status >= 500,
         retryAfterMs: response.status >= 500 ? 100 : null,
       });
@@ -337,7 +375,10 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
       if (pokemon.name !== "bulbasaur") throw new Error("Seeded Bulbasaur record is unavailable");
       return Response.json({ ok: true, upstream: "bulbasaur" });
     } catch (error) {
-      return Response.json({ ok: false, message: error instanceof Error ? error.message : "health check failed" }, { status: 503 });
+      return Response.json(
+        { ok: false, message: error instanceof Error ? error.message : "health check failed" },
+        { status: 503 },
+      );
     }
   }
 
@@ -363,12 +404,19 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
     if (request.method !== "PUT") return Response.json({ code: "METHOD_NOT_ALLOWED" }, { status: 405 });
     try {
       const body = (await request.json()) as { scenarioId?: unknown; faults?: unknown };
-      if (typeof body.scenarioId !== "string" || !/^[A-Za-z0-9._:-]{1,128}$/.test(body.scenarioId)) throw new Error("scenarioId is invalid");
+      if (typeof body.scenarioId !== "string" || !/^[A-Za-z0-9._:-]{1,128}$/.test(body.scenarioId))
+        throw new Error("scenarioId is invalid");
       const configuration = { scenarioId: body.scenarioId, faults: validateFaults(body.faults ?? []) };
       runs.set(runId, { configuration, issuedRefs: new Set(), matchCounts: new Map(), events: [] });
       return Response.json({ runId, scenarioId: configuration.scenarioId, faultCount: configuration.faults.length });
     } catch (error) {
-      return Response.json({ code: "INVALID_RUN_CONFIGURATION", message: error instanceof Error ? error.message : "invalid configuration" }, { status: 400 });
+      return Response.json(
+        {
+          code: "INVALID_RUN_CONFIGURATION",
+          message: error instanceof Error ? error.message : "invalid configuration",
+        },
+        { status: 400 },
+      );
     }
   }
 
@@ -418,7 +466,11 @@ function toolFromPath(pathname: string): ToolName | undefined {
   return routes[pathname];
 }
 
-function normalizeNamedResource(item: NamedResource, resource: Resource, upstreamOrigin: string): { name: string; ref: string } {
+function normalizeNamedResource(
+  item: NamedResource,
+  resource: Resource,
+  upstreamOrigin: string,
+): { name: string; ref: string } {
   const ref = normalizeUrl(item.url, upstreamOrigin);
   if (!ref || !ref.startsWith(`${resource}/`)) throw new Error(`Upstream returned a non-local ${resource} URL`);
   return { name: item.name, ref };
@@ -450,14 +502,17 @@ function compactValue(
     truncated.value = true;
     return value.slice(0, 2_000);
   }
-  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+    return value;
   if (depth > 7) {
     truncated.value = true;
     return undefined;
   }
   if (Array.isArray(value)) {
     if (value.length > 20) truncated.value = true;
-    return value.slice(0, 20).map((entry, index) => compactValue(entry, `${field}[${index}]`, depth + 1, related, upstreamOrigin, truncated));
+    return value
+      .slice(0, 20)
+      .map((entry, index) => compactValue(entry, `${field}[${index}]`, depth + 1, related, upstreamOrigin, truncated));
   }
   if (typeof value !== "object") return undefined;
   const object = value as Record<string, unknown>;
@@ -481,7 +536,9 @@ function compactValue(
   return result;
 }
 
-function deduplicateRelations(relations: Array<{ field: string; name?: string; ref: string }>): Array<{ field: string; name?: string; ref: string }> {
+function deduplicateRelations(
+  relations: Array<{ field: string; name?: string; ref: string }>,
+): Array<{ field: string; name?: string; ref: string }> {
   const seen = new Set<string>();
   return relations.filter((relation) => {
     const key = `${relation.field}\0${relation.ref}`;
@@ -495,9 +552,12 @@ function boundedValue(value: unknown, requestId: string): unknown {
   const json = JSON.stringify(value);
   if (Buffer.byteLength(json) <= MAX_RESPONSE_BYTES) return value;
   const object = value as { resource?: unknown; ref?: unknown; data?: unknown; related?: unknown[] };
-  const data = object.data && typeof object.data === "object" && !Array.isArray(object.data)
-    ? Object.fromEntries(Object.entries(object.data as Record<string, unknown>).filter(([key]) => key === "id" || key === "name"))
-    : undefined;
+  const data =
+    object.data && typeof object.data === "object" && !Array.isArray(object.data)
+      ? Object.fromEntries(
+          Object.entries(object.data as Record<string, unknown>).filter(([key]) => key === "id" || key === "name"),
+        )
+      : undefined;
   return {
     resource: object.resource,
     ref: object.ref,

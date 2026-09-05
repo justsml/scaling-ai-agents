@@ -43,10 +43,7 @@ export async function runSandbox(candidateSource: string, timeoutMs = 5000): Pro
       }
     }, timeoutMs);
 
-    const [stdout, stderr] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-    ]);
+    const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
     const exitCode = await proc.exited;
     clearTimeout(killer);
 

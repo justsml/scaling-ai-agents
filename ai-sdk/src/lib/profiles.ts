@@ -6,9 +6,9 @@
 import { openai } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
 
-export const WORKER_MODEL_ID = process.env.MODEL_WORKER ?? "openai/gpt-5.4-mini";
-export const JUDGE_MODEL_ID = process.env.MODEL_JUDGE ?? "openai/gpt-5.4-nano";
-export const FRONTIER_MODEL_ID = process.env.MODEL_FRONTIER ?? "openai/gpt-5.4";
+export const WORKER_MODEL_ID = process.env.MODEL_WORKER ?? "openai/gpt-5.6-luna";
+export const JUDGE_MODEL_ID = process.env.MODEL_JUDGE ?? "openai/gpt-5.6-luna";
+export const FRONTIER_MODEL_ID = process.env.MODEL_FRONTIER ?? "openai/gpt-5.6-luna";
 
 function bare(id: string): string {
   return id.includes("/") ? id.split("/").slice(1).join("/") : id;

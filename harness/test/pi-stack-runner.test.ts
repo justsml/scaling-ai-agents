@@ -16,7 +16,9 @@ const request: StackInvestigationRequest = {
 
 describe("Stack subprocess runner", () => {
   test("uses exact argv/cwd/stdin and accepts one evidence document", async () => {
-    const process = fixedProcess(`${JSON.stringify({ stack: "ai-sdk", answer: {}, toolCalls: [], usage: { inputTokens: 1, outputTokens: 2 }, latencyMs: 3, stopReason: "stop" })}\n`);
+    const process = fixedProcess(
+      `${JSON.stringify({ stack: "ai-sdk", answer: {}, toolCalls: [], usage: { inputTokens: 1, outputTokens: 2 }, latencyMs: 3, stopReason: "stop" })}\n`,
+    );
     const spawner = new RecordingSpawner(process);
     const runner = new StackRunner("/repo", { spawner, bunExecutable: "bun-test" });
     const result = await runner.run("ai-sdk", request);
@@ -67,7 +69,9 @@ class RecordingSpawner implements ProcessSpawner {
 function fixedProcess(stdout: string, stderr = "", exitCode = 0) {
   return {
     input: "",
-    async writeStdin(data: string) { this.input += data; },
+    async writeStdin(data: string) {
+      this.input += data;
+    },
     async closeStdin() {},
     stdout: chunks(stdout),
     stderr: chunks(stderr),

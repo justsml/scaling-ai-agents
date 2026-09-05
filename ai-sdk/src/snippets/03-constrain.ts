@@ -61,7 +61,13 @@ async function runOneConstrainedWorker(
 ): Promise<ConstrainedResult> {
   const reserved = ledger.reserve(profile.name, estimateReservation(profile.modelId));
   if (!reserved) {
-    return { profile: profile.name, reserved: false, ranSteps: 0, costUsd: 0, outcome: "not-dispatched(no-budget-room)" };
+    return {
+      profile: profile.name,
+      reserved: false,
+      ranSteps: 0,
+      costUsd: 0,
+      outcome: "not-dispatched(no-budget-room)",
+    };
   }
 
   // Cap output tokens to the dollar value just reserved, roughly, via price table.
@@ -134,7 +140,9 @@ async function runTournament(budgetUsd: number, deadlineMs: number) {
   const profiles = competitorProfiles();
   const settled = await Promise.allSettled(profiles.map((p) => runOneConstrainedWorker(p, ledger, combined)));
   const results: ConstrainedResult[] = settled.map((s, i) =>
-    s.status === "fulfilled" ? s.value : { profile: profiles[i]!.name, reserved: false, ranSteps: 0, costUsd: 0, outcome: "rejected" },
+    s.status === "fulfilled"
+      ? s.value
+      : { profile: profiles[i]!.name, reserved: false, ranSteps: 0, costUsd: 0, outcome: "rejected" },
   );
 
   return { results, ledger, deadlineHit: deadline.aborted, budgetHit: ledger.exceeded };
@@ -174,7 +182,14 @@ async function runOnce(label: string, budgetUsd: number, deadlineMs: number) {
 
   printTable(
     "workers",
-    results.map((r) => ({ profile: r.profile, reserved: r.reserved, steps: r.ranSteps, sandboxOk: r.sandboxOk, costUsd: r.costUsd, outcome: r.outcome })),
+    results.map((r) => ({
+      profile: r.profile,
+      reserved: r.reserved,
+      steps: r.ranSteps,
+      sandboxOk: r.sandboxOk,
+      costUsd: r.costUsd,
+      outcome: r.outcome,
+    })),
   );
 
   const summary = ledger.summary();
@@ -186,7 +201,11 @@ async function runOnce(label: string, budgetUsd: number, deadlineMs: number) {
     exceeded: summary.exceeded,
   });
 
-  const stopReason = budgetHit ? "budget cap reached mid-run" : deadlineHit ? "deadline cap reached" : "all workers finished under both caps";
+  const stopReason = budgetHit
+    ? "budget cap reached mid-run"
+    : deadlineHit
+      ? "deadline cap reached"
+      : "all workers finished under both caps";
   printKV("stop reason", { reason: stopReason });
 
   const gate = await runConsequentialGate(Math.max(0, budgetUsd - summary.spentUsd));

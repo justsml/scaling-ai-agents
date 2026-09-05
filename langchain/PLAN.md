@@ -6,7 +6,7 @@ Implements `../shared/TASK.md` on LangChain.js v1 (`createAgent`, middleware) an
 
 - `langchain`, `@langchain/core`, `@langchain/langgraph`, `@langchain/openai`, `zod`
 - Optional: `deepagents` (subagents, async subagents preview), `@langchain/langgraph-checkpoint-sqlite` for durable state, `@langchain/langgraph-cli` (`langgraphjs dev`) to expose the remote worker.
-- Model ids as `initChatModel` strings: `openai:gpt-5.4-mini` workers, `openai:gpt-5.4-nano` judge, `openai:gpt-5.4` frontier. Local slot through `ChatOpenAI` with `configuration.baseURL` when `LOCAL_OPENAI_BASE_URL` is set.
+- Model id as an `initChatModel` string: `openai:gpt-5.6-luna` for workers, judges, and the frontier role. Local slot through `ChatOpenAI` with `configuration.baseURL` when `LOCAL_OPENAI_BASE_URL` is set.
 - Tracing: LangSmith if `LANGSMITH_API_KEY` is set; otherwise a `BaseCallbackHandler` in `lib/trace.ts` that builds an in-memory span tree keyed by `runId`/`parentRunId` and prints it. Both paths attach `profile`, `costUsd`, `latencyMs`, `outcome`, `whyItExisted` as run metadata/tags.
 
 ## Layout

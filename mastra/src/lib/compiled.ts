@@ -10,59 +10,59 @@
  * similar error message hashes differently and misses the rule, which is the
  * negative case 05 prints on purpose.
  */
-import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { PKG_ROOT } from './setup.js'
-import type { ReferenceArtifact } from './readiness-challenge.js'
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { PKG_ROOT } from "./setup.js";
+import type { ReferenceArtifact } from "./readiness-challenge.js";
 
-const REGISTRY_PATH = join(PKG_ROOT, '.compiled', 'registry.json')
+const REGISTRY_PATH = join(PKG_ROOT, ".compiled", "registry.json");
 
 export interface CompiledRule {
-  sourceHash: string
-  patch: string
+  sourceHash: string;
+  patch: string;
   /** Which competitor produced it, and when. Provenance is part of the artifact. */
-  wonBy: string
-  compiledAt: string
-  testsPassed: number
-  testsFailed: number
+  wonBy: string;
+  compiledAt: string;
+  testsPassed: number;
+  testsFailed: number;
 }
 
 export function hashSource(source: string): string {
   // Normalise whitespace so trailing-newline noise does not create a new key.
-  return createHash('sha256').update(source.trim().replace(/\r\n/g, '\n')).digest('hex').slice(0, 16)
+  return createHash("sha256").update(source.trim().replace(/\r\n/g, "\n")).digest("hex").slice(0, 16);
 }
 
 function loadRegistry(): Record<string, CompiledRule> {
-  if (!existsSync(REGISTRY_PATH)) return {}
+  if (!existsSync(REGISTRY_PATH)) return {};
   try {
-    return JSON.parse(readFileSync(REGISTRY_PATH, 'utf8')) as Record<string, CompiledRule>
+    return JSON.parse(readFileSync(REGISTRY_PATH, "utf8")) as Record<string, CompiledRule>;
   } catch {
-    return {}
+    return {};
   }
 }
 
 function saveRegistry(reg: Record<string, CompiledRule>): void {
-  mkdirSync(dirname(REGISTRY_PATH), { recursive: true })
-  writeFileSync(REGISTRY_PATH, JSON.stringify(reg, null, 2), 'utf8')
+  mkdirSync(dirname(REGISTRY_PATH), { recursive: true });
+  writeFileSync(REGISTRY_PATH, JSON.stringify(reg, null, 2), "utf8");
 }
 
 export function registerCompiled(rule: CompiledRule): void {
-  const reg = loadRegistry()
-  reg[rule.sourceHash] = rule
-  saveRegistry(reg)
+  const reg = loadRegistry();
+  reg[rule.sourceHash] = rule;
+  saveRegistry(reg);
 }
 
 export function lookupCompiled(sourceHash: string): CompiledRule | null {
-  return loadRegistry()[sourceHash] ?? null
+  return loadRegistry()[sourceHash] ?? null;
 }
 
 export function listCompiled(): CompiledRule[] {
-  return Object.values(loadRegistry())
+  return Object.values(loadRegistry());
 }
 
 export function clearCompiled(): void {
-  saveRegistry({})
+  saveRegistry({});
 }
 
 /**
@@ -71,8 +71,8 @@ export function clearCompiled(): void {
  * artifact through the Readiness challenge; this registry owns no fixtures.
  */
 export function compiledPatchFor(sourceHash: string, fallback?: ReferenceArtifact): string {
-  const stored = lookupCompiled(sourceHash)
-  if (stored) return stored.patch
-  if (fallback && sourceHash === fallback.targetIdentity) return fallback.source
-  return ''
+  const stored = lookupCompiled(sourceHash);
+  if (stored) return stored.patch;
+  if (fallback && sourceHash === fallback.targetIdentity) return fallback.source;
+  return "";
 }

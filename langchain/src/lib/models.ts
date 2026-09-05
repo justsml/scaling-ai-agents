@@ -1,10 +1,8 @@
 /**
  * models.ts — the model ids this package uses, and how they are built.
  *
- * Verified against the OpenAI API on 2026-09-05 with a one-token call each:
- *   openai:gpt-5.4-mini  -> gpt-5.4-mini-2026-03-17
- *   openai:gpt-5.4-nano  -> gpt-5.4-nano-2026-03-17
- *   openai:gpt-5.4       -> gpt-5.4-2026-03-05
+ * Model used for every hosted role:
+ *   openai:gpt-5.6-luna -> gpt-5.6-luna
  *
  * `initChatModel` is exported from `langchain` (not `langchain/chat_models`) in
  * langchain@1.5.x. It takes a "provider:model" string and returns a chat model.
@@ -15,11 +13,11 @@ import { ChatOpenAI } from "@langchain/openai";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 
 /** Workers: three profiles of one model compete against each other. */
-export const WORKER_MODEL = "openai:gpt-5.4-mini";
-/** Judges are cheap on purpose. The rubric is the expensive part, not the model. */
-export const JUDGE_MODEL = "openai:gpt-5.4-nano";
-/** Exactly one frontier competitor per tournament. This is the budget line item. */
-export const FRONTIER_MODEL = "openai:gpt-5.4";
+export const WORKER_MODEL = "openai:gpt-5.6-luna";
+/** Judges use the same model as workers. */
+export const JUDGE_MODEL = "openai:gpt-5.6-luna";
+/** Exactly one frontier-role competitor runs per tournament. */
+export const FRONTIER_MODEL = "openai:gpt-5.6-luna";
 
 export function hasOpenAIKey(): boolean {
   return Boolean(process.env.OPENAI_API_KEY);
@@ -52,7 +50,7 @@ export async function model(id: string, opts: { temperature?: number } = {}): Pr
   const key = `${id}::${opts.temperature ?? "default"}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  // gpt-5.4* are reasoning models: they reject a non-default temperature, so it is only
+  // gpt-5.6-luna is a reasoning model: it rejects a non-default temperature, so it is only
   // passed when a caller explicitly asks for one.
   const built = (await initChatModel(id, {
     ...(opts.temperature === undefined ? {} : { temperature: opts.temperature }),

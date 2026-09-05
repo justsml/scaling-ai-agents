@@ -70,22 +70,28 @@ export const CompeteState = new StateSchema({
    *
    * Keying on `profile` satisfies both: new profiles append, known profiles replace.
    */
-  candidates: new ReducedValue(z.array(CandidateBox).default(() => []), {
-    reducer: (left: Candidate[], right: Candidate[]) => {
-      const out = [...left];
-      for (const candidate of right) {
-        const at = out.findIndex((c) => c.profile === candidate.profile);
-        if (at >= 0) out[at] = candidate;
-        else out.push(candidate);
-      }
-      return out;
+  candidates: new ReducedValue(
+    z.array(CandidateBox).default(() => []),
+    {
+      reducer: (left: Candidate[], right: Candidate[]) => {
+        const out = [...left];
+        for (const candidate of right) {
+          const at = out.findIndex((c) => c.profile === candidate.profile);
+          if (at >= 0) out[at] = candidate;
+          else out.push(candidate);
+        }
+        return out;
+      },
     },
-  }),
+  ),
 
   /** Competitors that never ran, and why. Same reducer story. */
-  skipped: new ReducedValue(z.array(SkipBox).default(() => []), {
-    reducer: (left, right) => [...left, ...right],
-  }),
+  skipped: new ReducedValue(
+    z.array(SkipBox).default(() => []),
+    {
+      reducer: (left, right) => [...left, ...right],
+    },
+  ),
 
   /** Set by `judgeDeterministic`; consumed by the conditional edge into `judgeRubric`. */
   survivorProfiles: z.array(z.string()).default(() => []),
@@ -204,8 +210,7 @@ export function buildCompeteGraph(deps: CompeteDeps) {
       const stop = deps.caps.stopReason();
       return {
         winner,
-        stopReason:
-          state.stopReason || (stop ? `${stop.kind}: ${stop.detail}` : ""),
+        stopReason: state.stopReason || (stop ? `${stop.kind}: ${stop.detail}` : ""),
       };
     })
 
@@ -219,8 +224,7 @@ export function buildCompeteGraph(deps: CompeteDeps) {
         if (state.stopReason) return [END];
         // One Send per profile => one `attempt` task per profile => one superstep.
         return deps.profileNames.map(
-          (profileName) =>
-            new Send("attempt", { profileName, buggySource: state.buggySource }),
+          (profileName) => new Send("attempt", { profileName, buggySource: state.buggySource }),
         );
       },
       ["attempt", END],

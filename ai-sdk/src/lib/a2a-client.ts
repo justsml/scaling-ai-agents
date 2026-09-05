@@ -50,7 +50,10 @@ function nextId(): string {
 }
 
 export class A2AClient {
-  constructor(private readonly baseUrl: string, private readonly rpcPath = "/a2a/competitor-remote") {}
+  constructor(
+    private readonly baseUrl: string,
+    private readonly rpcPath = "/a2a/competitor-remote",
+  ) {}
 
   private get rpcUrl(): string {
     return new URL(this.rpcPath, this.baseUrl).toString();

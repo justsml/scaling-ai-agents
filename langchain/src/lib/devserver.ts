@@ -55,10 +55,7 @@ async function isUp(baseUrl: string, timeoutMs = 1000): Promise<boolean> {
  * @param port         port to bind
  * @param readyTimeout how long to wait for `/ok` before giving up
  */
-export async function startDevServer(
-  port = devServerPort(),
-  readyTimeoutMs = 60_000,
-): Promise<DevServerResult> {
+export async function startDevServer(port = devServerPort(), readyTimeoutMs = 60_000): Promise<DevServerResult> {
   const baseUrl = `http://localhost:${port}`;
 
   if (await isUp(baseUrl)) {

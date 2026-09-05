@@ -25,7 +25,10 @@ let memoryExporter: InMemorySpanExporter | undefined;
 let tracerProvider: NodeTracerProvider | undefined;
 
 /** Initialize telemetry once per process. Safe to call from every snippet. */
-export function initTelemetry(): { tracer: ReturnType<NodeTracerProvider["getTracer"]>; exporter: InMemorySpanExporter } {
+export function initTelemetry(): {
+  tracer: ReturnType<NodeTracerProvider["getTracer"]>;
+  exporter: InMemorySpanExporter;
+} {
   if (!initialized) {
     memoryExporter = new InMemorySpanExporter();
     const spanProcessors = [new SimpleSpanProcessor(memoryExporter)];

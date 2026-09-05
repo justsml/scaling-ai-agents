@@ -74,17 +74,23 @@ async function executeTask(record: TaskRecord, message: A2AMessage): Promise<voi
   try {
     const text = message.parts.map((p) => p.text).join("\n");
     const result = await remoteAgent.generate({ prompt: text, abortSignal: record.controller.signal });
-    const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.4-mini", result.usage);
+    const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.6-luna", result.usage);
     record.artifacts.push({
       name: "patch",
       parts: [{ type: "text", text: JSON.stringify({ ...result.output, costUsd: spend }) }],
     });
-    record.status = { state: "completed", message: { role: "agent", parts: [{ type: "text", text: result.output.explanation }] } };
+    record.status = {
+      state: "completed",
+      message: { role: "agent", parts: [{ type: "text", text: result.output.explanation }] },
+    };
   } catch (err) {
     if (record.controller.signal.aborted) {
       record.status = { state: "canceled" };
     } else {
-      record.status = { state: "failed", message: { role: "agent", parts: [{ type: "text", text: (err as Error).message }] } };
+      record.status = {
+        state: "failed",
+        message: { role: "agent", parts: [{ type: "text", text: (err as Error).message }] },
+      };
     }
   }
 }
@@ -126,7 +132,12 @@ export function createA2AServer(port = 0) {
 
         if (method === "message/send") {
           const taskId = params.taskId ?? newTaskId();
-          const record: TaskRecord = tasks.get(taskId) ?? { id: taskId, status: { state: "submitted" }, artifacts: [], controller: new AbortController() };
+          const record: TaskRecord = tasks.get(taskId) ?? {
+            id: taskId,
+            status: { state: "submitted" },
+            artifacts: [],
+            controller: new AbortController(),
+          };
           tasks.set(taskId, record);
           await executeTask(record, params.message);
           return Response.json(jsonRpcResult(id, toA2ATask(record)));
@@ -134,7 +145,12 @@ export function createA2AServer(port = 0) {
 
         if (method === "message/stream") {
           const taskId = params.taskId ?? newTaskId();
-          const record: TaskRecord = tasks.get(taskId) ?? { id: taskId, status: { state: "submitted" }, artifacts: [], controller: new AbortController() };
+          const record: TaskRecord = tasks.get(taskId) ?? {
+            id: taskId,
+            status: { state: "submitted" },
+            artifacts: [],
+            controller: new AbortController(),
+          };
           tasks.set(taskId, record);
 
           const stream = new ReadableStream({
@@ -153,7 +169,9 @@ export function createA2AServer(port = 0) {
             },
           });
 
-          return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
+          return new Response(stream, {
+            headers: { "content-type": "text/event-stream", "cache-control": "no-cache" },
+          });
         }
 
         if (method === "tasks/get") {
@@ -191,12 +209,20 @@ async function main() {
   const card = await client.getAgentCard();
   printKV("agent card", { ...card });
 
-  const message: A2AMessage = { role: "user", parts: [{ type: "text", text: "Patch readiness.ts to fix the three bugs." }] };
+  const message: A2AMessage = {
+    role: "user",
+    parts: [{ type: "text", text: "Patch readiness.ts to fix the three bugs." }],
+  };
 
   const signal = AbortSignal.timeout(deadlineMs);
   const sendStart = Date.now();
   const sendTask = await client.sendMessage(message, undefined, signal);
-  printKV("message/send result", { taskId: sendTask.id, state: sendTask.status.state, latencyMs: Date.now() - sendStart, artifacts: sendTask.artifacts.length });
+  printKV("message/send result", {
+    taskId: sendTask.id,
+    state: sendTask.status.state,
+    latencyMs: Date.now() - sendStart,
+    artifacts: sendTask.artifacts.length,
+  });
 
   const events: string[] = [];
   const streamTask = await client.streamMessage(message, (evt) => events.push(evt.event), { signal });
@@ -205,7 +231,10 @@ async function main() {
   const fetched = await client.getTask(streamTask.id);
   printKV("tasks/get", { taskId: fetched.id, state: fetched.status.state });
 
-  const cancelMessage: A2AMessage = { role: "user", parts: [{ type: "text", text: "Patch readiness.ts (to be cancelled)." }] };
+  const cancelMessage: A2AMessage = {
+    role: "user",
+    parts: [{ type: "text", text: "Patch readiness.ts (to be cancelled)." }],
+  };
   const cancelClient = new A2AClient(baseUrl);
   const cancelPromise = cancelClient.sendMessage(cancelMessage, "task-to-cancel");
   await new Promise((r) => setTimeout(r, 10));

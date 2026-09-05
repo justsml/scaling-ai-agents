@@ -2,7 +2,10 @@
   "name": "agentic-parallelism-langchain",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20.0.0", "bun": ">=1.2.1" },
+  "engines": {
+    "node": ">=20.0.0",
+    "bun": ">=1.2.1"
+  },
   "scripts": {
     "setup": "bun run src/scripts/setup.ts",
     "check": "tsc --noEmit",

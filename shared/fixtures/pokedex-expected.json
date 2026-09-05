@@ -3,7 +3,11 @@
   "expected": {
     "ordinary-discovery": {
       "claims": [
-        { "path": "searchable", "operator": "set-equals", "value": ["ability", "generation", "move", "pokedex", "pokemon", "pokemon-species", "region", "type"] },
+        {
+          "path": "searchable",
+          "operator": "set-equals",
+          "value": ["ability", "generation", "move", "pokedex", "pokemon", "pokemon-species", "region", "type"]
+        },
         { "path": "listOnly", "operator": "contains", "value": "evolution-chain" }
       ],
       "evidence": { "requiredTools": ["pokedex_list_resources"] }
@@ -20,34 +24,52 @@
     "ordinary-ability": {
       "claims": [
         { "path": "abilities", "operator": "contains", "value": "overgrow" },
-        { "path": "hiddenAbility", "operator": "equals", "value": "chlorophyll", "support": { "operator": "contains-all", "values": ["chlorophyll", true] } }
+        {
+          "path": "hiddenAbility",
+          "operator": "equals",
+          "value": "chlorophyll",
+          "support": { "operator": "contains-all", "values": ["chlorophyll", true] }
+        }
       ],
       "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"] }
     },
     "ordinary-comparison": {
       "claims": [
-        { "path": "heavier", "operator": "equals", "value": "charmander", "support": { "operator": "contains-all", "values": [85, 69] } },
-        { "path": "difference", "operator": "equals", "value": 16, "support": { "operator": "contains-all", "values": [85, 69] } }
+        {
+          "path": "heavier",
+          "operator": "equals",
+          "value": "charmander",
+          "support": { "operator": "contains-all", "values": [85, 69] }
+        },
+        {
+          "path": "difference",
+          "operator": "equals",
+          "value": 16,
+          "support": { "operator": "contains-all", "values": [85, 69] }
+        }
       ],
       "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"], "minimumGets": 2 }
     },
     "pagination-resume": {
-      "claims": [
-        { "path": "names", "operator": "set-equals", "value": ["charmander", "charmeleon", "charizard"] }
-      ],
+      "claims": [{ "path": "names", "operator": "set-equals", "value": ["charmander", "charmeleon", "charizard"] }],
       "evidence": { "requiredTools": ["pokedex_list"], "minimumPages": 2, "requiresCursor": true }
     },
     "pagination-empty-page": {
       "claims": [
-        { "path": "names", "operator": "set-equals", "value": ["bulbasaur", "ivysaur", "venusaur", "squirtle", "wartortle", "blastoise"] }
+        {
+          "path": "names",
+          "operator": "set-equals",
+          "value": ["bulbasaur", "ivysaur", "venusaur", "squirtle", "wartortle", "blastoise"]
+        }
       ],
       "evidence": { "requiredTools": ["pokedex_list"], "minimumPages": 3, "requiresEmptyPageContinuation": true }
     },
     "cascade-evolution": {
-      "claims": [
-        { "path": "laterSpecies", "operator": "set-equals", "value": ["ivysaur", "venusaur"] }
-      ],
-      "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"], "requiredRefs": ["pokemon-species/1", "evolution-chain/1"] }
+      "claims": [{ "path": "laterSpecies", "operator": "set-equals", "value": ["ivysaur", "venusaur"] }],
+      "evidence": {
+        "requiredTools": ["pokedex_search", "pokedex_get"],
+        "requiredRefs": ["pokemon-species/1", "evolution-chain/1"]
+      }
     },
     "cascade-generation-region": {
       "claims": [
@@ -57,16 +79,20 @@
       "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"], "requiredRefs": ["region/1"] }
     },
     "failure-rate-limit": {
-      "claims": [
-        { "path": "baseExperience", "operator": "equals", "value": 112 }
-      ],
-      "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"], "requiredErrors": ["RATE_LIMITED"], "requiresRetry": true }
+      "claims": [{ "path": "baseExperience", "operator": "equals", "value": 112 }],
+      "evidence": {
+        "requiredTools": ["pokedex_search", "pokedex_get"],
+        "requiredErrors": ["RATE_LIMITED"],
+        "requiresRetry": true
+      }
     },
     "failure-cascade-500": {
-      "claims": [
-        { "path": "color", "operator": "equals", "value": "red" }
-      ],
-      "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"], "requiredErrors": ["UPSTREAM_UNAVAILABLE"], "requiresRetry": true }
+      "claims": [{ "path": "color", "operator": "equals", "value": "red" }],
+      "evidence": {
+        "requiredTools": ["pokedex_search", "pokedex_get"],
+        "requiredErrors": ["UPSTREAM_UNAVAILABLE"],
+        "requiresRetry": true
+      }
     }
   }
 }

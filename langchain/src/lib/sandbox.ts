@@ -59,10 +59,7 @@ export async function readRubric(): Promise<string> {
  * @param candidateSource full replacement source for `readiness.ts`
  * @param signal          the run's deadline; kills the child when it fires
  */
-export async function runCandidate(
-  candidateSource: string,
-  signal?: AbortSignal,
-): Promise<SandboxResult> {
+export async function runCandidate(candidateSource: string, signal?: AbortSignal): Promise<SandboxResult> {
   const started = Date.now();
   let dir: string | undefined;
   try {
@@ -84,10 +81,7 @@ export async function runCandidate(
 
     // Hard ceiling independent of the run deadline: 5 tests x 2s plus startup.
     const guard = setTimeout(() => proc.kill(), 20_000);
-    const [stdout, stderr] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-    ]);
+    const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
     await proc.exited;
     clearTimeout(guard);
     signal?.removeEventListener("abort", onAbort);
@@ -123,9 +117,7 @@ export function parseBunTestOutput(output: string): Omit<SandboxResult, "duratio
   const passMatch = plain.match(/^\s*(\d+)\s+pass\s*$/m);
   const failMatch = plain.match(/^\s*(\d+)\s+fail\s*$/m);
 
-  const failures = [...plain.matchAll(/^\(fail\)\s+(.+?)(?:\s+\[[\d.]+m?s\])?$/gm)].map((m) =>
-    m[1]!.trim(),
-  );
+  const failures = [...plain.matchAll(/^\(fail\)\s+(.+?)(?:\s+\[[\d.]+m?s\])?$/gm)].map((m) => m[1]!.trim());
 
   // A candidate that does not even compile produces no summary at all.
   if (!passMatch && !failMatch) {

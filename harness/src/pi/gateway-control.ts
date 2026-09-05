@@ -8,10 +8,16 @@ export interface GatewayControl {
 export class HttpGatewayControl implements GatewayControl {
   readonly #baseUrl: string;
 
-  constructor(baseUrl: string, readonly controlSecret: string, readonly fetcher: typeof fetch = fetch) {
+  constructor(
+    baseUrl: string,
+    readonly controlSecret: string,
+    readonly fetcher: typeof fetch = fetch,
+  ) {
     const parsed = new URL(baseUrl);
     if (
-      parsed.protocol !== "http:" || parsed.username || parsed.password ||
+      parsed.protocol !== "http:" ||
+      parsed.username ||
+      parsed.password ||
       !["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname)
     ) {
       throw new Error("Gateway control URL must be credential-free loopback HTTP");
@@ -28,12 +34,7 @@ export class HttpGatewayControl implements GatewayControl {
     }
   }
 
-  async configureRun(
-    runId: string,
-    scenarioId: string,
-    faults: unknown[],
-    signal?: AbortSignal,
-  ): Promise<void> {
+  async configureRun(runId: string, scenarioId: string, faults: unknown[], signal?: AbortSignal): Promise<void> {
     const response = await this.fetcher(`${this.#baseUrl}/control/runs/${encodeURIComponent(runId)}`, {
       method: "PUT",
       headers: {
@@ -52,7 +53,7 @@ export class HttpGatewayControl implements GatewayControl {
       signal,
     });
     if (!response.ok) throw new Error(`Gateway event read failed (${response.status})`);
-    const body = await response.json() as { events?: unknown };
+    const body = (await response.json()) as { events?: unknown };
     if (!Array.isArray(body.events)) throw new Error("Gateway returned malformed events");
     return body.events;
   }

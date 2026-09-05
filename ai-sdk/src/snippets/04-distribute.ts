@@ -53,7 +53,7 @@ async function probeLocalEndpoint(baseUrl: string): Promise<boolean> {
 // createProviderRegistry>` erases the specific provider map TypeScript
 // infers from the `{ openai, local }` object literal below and collapses
 // `registry.languageModel`'s id parameter to `never`. Letting inference flow
-// through keeps the literal `"openai:gpt-5.4-mini"` / `"local:..."` ids type-checked.
+// through keeps the literal `"openai:gpt-5.6-luna"` / `"local:..."` ids type-checked.
 async function buildProviderPool() {
   const localBaseUrl = process.env.LOCAL_OPENAI_BASE_URL ?? "http://localhost:1234/v1";
   const localAvailable = await probeLocalEndpoint(localBaseUrl);
@@ -62,11 +62,32 @@ async function buildProviderPool() {
   const registry = createProviderRegistry({ openai, local });
 
   const pool: ProviderSlot[] = [
-    { id: "openai-primary", kind: "openai", regions: ["*"], dataClasses: ["*"], available: true, registryId: "openai:gpt-5.4-mini" },
-    { id: "local-slot", kind: "local", regions: ["*"], dataClasses: ["public", "internal"], available: localAvailable, registryId: "local:local-model" },
+    {
+      id: "openai-primary",
+      kind: "openai",
+      regions: ["*"],
+      dataClasses: ["*"],
+      available: true,
+      registryId: "openai:gpt-5.6-luna",
+    },
+    {
+      id: "local-slot",
+      kind: "local",
+      regions: ["*"],
+      dataClasses: ["public", "internal"],
+      available: localAvailable,
+      registryId: "local:local-model",
+    },
     // remote-a2a isn't a registry model -- it's handled separately via A2AClient, but still
     // participates in the same region/dataClass filter so the pool logic covers it too.
-    { id: "remote-a2a", kind: "remote-a2a", regions: ["*"], dataClasses: ["public", "internal", "restricted"], available: true, registryId: "n/a" },
+    {
+      id: "remote-a2a",
+      kind: "remote-a2a",
+      regions: ["*"],
+      dataClasses: ["public", "internal", "restricted"],
+      available: true,
+      registryId: "n/a",
+    },
   ];
 
   return { registry, pool };
@@ -93,7 +114,10 @@ async function runViaRegistryModel(
   signal: AbortSignal,
 ): Promise<{ costUsd: number; latencyMs: number; outcome: string }> {
   return withWorkerSpan(
-    { profile: `distribute-${slot.id}`, whyItExisted: `serve ${requestId} from the ${slot.kind} slot after region/dataClass filtering` },
+    {
+      profile: `distribute-${slot.id}`,
+      whyItExisted: `serve ${requestId} from the ${slot.kind} slot after region/dataClass filtering`,
+    },
     async () => {
       const start = Date.now();
       const model = wrapLanguageModel({ model: registry.languageModel(slot.registryId), middleware: [] });
@@ -102,11 +126,12 @@ async function runViaRegistryModel(
         output: Output.object({ schema: patchSchema }),
         abortSignal: signal,
         telemetry: { functionId: `distribute-${slot.id}` },
-        instructions: "Patch readiness.ts: EACCES stops immediately, a deadline is enforced with capped exponential backoff, ETIMEDOUT/ECONNREFUSED keep retrying.",
+        instructions:
+          "Patch readiness.ts: EACCES stops immediately, a deadline is enforced with capped exponential backoff, ETIMEDOUT/ECONNREFUSED keep retrying.",
         prompt: "Patch readiness.ts to fix the three bugs.",
       });
       const latencyMs = Date.now() - start;
-      const spend = slot.kind === "local" ? 0 : costUsd("openai/gpt-5.4-mini", result.usage);
+      const spend = slot.kind === "local" ? 0 : costUsd("openai/gpt-5.6-luna", result.usage);
       const sandbox = await runSandbox(result.output.source, 6000);
       const outcome = sandbox.ok ? "served;passed-sandbox" : "served;failed-sandbox";
       return { result: { costUsd: spend, latencyMs, outcome }, costUsd: spend, latencyMs, outcome };
@@ -116,11 +141,17 @@ async function runViaRegistryModel(
 
 async function runViaRemoteA2A(baseUrl: string, requestId: string, signal: AbortSignal) {
   return withWorkerSpan(
-    { profile: "distribute-remote-a2a", whyItExisted: `serve ${requestId} from the remote A2A competitor across the network boundary` },
+    {
+      profile: "distribute-remote-a2a",
+      whyItExisted: `serve ${requestId} from the remote A2A competitor across the network boundary`,
+    },
     async () => {
       const start = Date.now();
       const client = new A2AClient(baseUrl);
-      const message: A2AMessage = { role: "user", parts: [{ type: "text", text: "Patch readiness.ts to fix the three bugs." }] };
+      const message: A2AMessage = {
+        role: "user",
+        parts: [{ type: "text", text: "Patch readiness.ts to fix the three bugs." }],
+      };
       const task = await client.sendMessage(message, undefined, signal);
       const latencyMs = Date.now() - start;
       const artifactText = task.artifacts[0]?.parts[0]?.text;
@@ -136,7 +167,12 @@ async function runViaRemoteA2A(baseUrl: string, requestId: string, signal: Abort
           outcome = "served;unparseable-artifact";
         }
       }
-      return { result: { costUsd: costUsdValue, latencyMs, outcome, taskId: task.id }, costUsd: costUsdValue, latencyMs, outcome };
+      return {
+        result: { costUsd: costUsdValue, latencyMs, outcome, taskId: task.id },
+        costUsd: costUsdValue,
+        latencyMs,
+        outcome,
+      };
     },
   );
 }
@@ -154,13 +190,21 @@ async function main() {
         "providerOptions.gateway.{order,only,models,sort}. See ai-sdk/README.md for the gateway-enabled shape.",
     );
   } else {
-    console.log("\nAI_GATEWAY_API_KEY set, but this snippet still demonstrates the code-level pool filter first (see README for the gateway variant).");
+    console.log(
+      "\nAI_GATEWAY_API_KEY set, but this snippet still demonstrates the code-level pool filter first (see README for the gateway variant).",
+    );
   }
 
   const { registry, pool } = await buildProviderPool();
   printTable(
     "provider pool",
-    pool.map((p) => ({ id: p.id, kind: p.kind, regions: p.regions.join(","), dataClasses: p.dataClasses.join(","), available: p.available })),
+    pool.map((p) => ({
+      id: p.id,
+      kind: p.kind,
+      regions: p.regions.join(","),
+      dataClasses: p.dataClasses.join(","),
+      available: p.available,
+    })),
   );
 
   // Start our own A2A server for the remote-a2a slot (falls back to the
@@ -172,16 +216,25 @@ async function main() {
   const a2aBaseUrl = `http://localhost:${a2aServer.port}`;
 
   const signal = deadlineSignal(deadlineMs);
-  const requests = (requestsFixture as Array<{ id: string; class: string; text: string; region: string; dataClass: string }>).filter(
-    (r) => r.class === "novel",
-  );
+  const requests = (
+    requestsFixture as Array<{ id: string; class: string; text: string; region: string; dataClass: string }>
+  ).filter((r) => r.class === "novel");
 
   const results: DistributedResult[] = [];
   let totalCostUsd = 0;
 
   for (const request of requests) {
     if (totalCostUsd >= budgetUsd) {
-      results.push({ requestId: request.id, region: request.region, dataClass: request.dataClass, eligibleProviders: [], servedBy: "-", costUsd: 0, latencyMs: 0, outcome: "skipped(budget)" });
+      results.push({
+        requestId: request.id,
+        region: request.region,
+        dataClass: request.dataClass,
+        eligibleProviders: [],
+        servedBy: "-",
+        costUsd: 0,
+        latencyMs: 0,
+        outcome: "skipped(budget)",
+      });
       continue;
     }
 

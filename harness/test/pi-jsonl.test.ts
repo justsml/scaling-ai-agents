@@ -30,4 +30,3 @@ describe("Pi RPC JSONL decoder", () => {
     expect(() => new JsonlDecoder({ maximumTotalBytes: 4 }).push(bytes("12345"))).toThrow("stream exceeded");
   });
 });
-

@@ -28,11 +28,7 @@ export interface A2AProbe {
   conclusion: string;
 }
 
-const CARD_PATHS = [
-  "/.well-known/agent-card.json",
-  "/.well-known/agent.json",
-  "/.well-known/ai-agent.json",
-];
+const CARD_PATHS = ["/.well-known/agent-card.json", "/.well-known/agent.json", "/.well-known/ai-agent.json"];
 
 /**
  * Ask the server, rather than assume. Tries the agent card first (cheap GET) and then a
@@ -165,11 +161,7 @@ export class A2AClient {
   }
 
   /** `message/stream` is Server-Sent Events. Yields each parsed `data:` frame. */
-  async *streamMessage(
-    text: string,
-    contextId?: string,
-    signal?: AbortSignal,
-  ): AsyncGenerator<unknown> {
+  async *streamMessage(text: string, contextId?: string, signal?: AbortSignal): AsyncGenerator<unknown> {
     const res = await fetch(this.endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "text/event-stream", ...this.headers },

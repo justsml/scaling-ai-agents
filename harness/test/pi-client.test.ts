@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { assertDriverState, buildDriverPrompt, readCompatiblePiVersion, runPiDriver, verifyDriverDispatch } from "../src/pi/client";
+import {
+  assertDriverState,
+  buildDriverPrompt,
+  readCompatiblePiVersion,
+  runPiDriver,
+  verifyDriverDispatch,
+} from "../src/pi/client";
 import type { ChildProcessHandle, ProcessSpawner, SpawnOptions } from "../src/pi/types";
 
 const encoder = new TextEncoder();
@@ -17,11 +23,22 @@ describe("Pi RPC client", () => {
     expect(spawner.calls[0]?.argv).toEqual(["pi", "--version"]);
     expect(spawner.calls[1]?.argv).toContain("--no-builtin-tools");
     expect(spawner.calls[1]?.options.env?.POKEDEX_SCENARIO_ID).toBe("case-1");
-    expect(result).toMatchObject({ piVersion: "0.85.1", thinkingLevel: "off", exitCode: 0, timedOut: false, protocolErrors: [] });
+    expect(result).toMatchObject({
+      piVersion: "0.85.1",
+      thinkingLevel: "off",
+      exitCode: 0,
+      timedOut: false,
+      protocolErrors: [],
+    });
     expect(result.toolCalls).toHaveLength(7);
     expect(result.dispatch).toMatchObject({ passed: true, observed: ["ai-sdk", "mastra", "langchain"] });
     expect(result.sessionStats).toMatchObject({ toolCalls: 1 });
-    expect(rpc.commands.map((command) => command.type)).toEqual(["get_state", "prompt", "get_state", "get_session_stats"]);
+    expect(rpc.commands.map((command) => command.type)).toEqual([
+      "get_state",
+      "prompt",
+      "get_state",
+      "get_session_stats",
+    ]);
   });
 
   test("sends abort and preserves partial evidence on deadline", async () => {
@@ -41,8 +58,12 @@ describe("Pi RPC client", () => {
   });
 
   test("rejects the wrong model or reasoning state", () => {
-    expect(() => assertDriverState({ model: { provider: "openai", id: "gpt-5.6-luna" }, thinkingLevel: "low" })).toThrow("thinking level");
-    expect(() => assertDriverState({ model: { provider: "other", id: "gpt-5.6-luna" }, thinkingLevel: "off" })).toThrow("unexpected model");
+    expect(() =>
+      assertDriverState({ model: { provider: "openai", id: "gpt-5.6-luna" }, thinkingLevel: "low" }),
+    ).toThrow("thinking level");
+    expect(() => assertDriverState({ model: { provider: "other", id: "gpt-5.6-luna" }, thinkingLevel: "off" })).toThrow(
+      "unexpected model",
+    );
   });
 
   test("requires Pi 0.85.x before starting RPC mode", async () => {
@@ -62,7 +83,12 @@ describe("Pi RPC client", () => {
       ...completedTool("list", "list_stacks", {}, {}),
       ...completedTool("run-1", "run_scenario", { stack: "ai-sdk", scenarioId: "case-1" }, { evidenceId: "ev-1" }),
       ...completedTool("run-2", "run_scenario", { stack: "ai-sdk", scenarioId: "case-1" }, { evidenceId: "ev-2" }),
-      { type: "tool_execution_start", toolCallId: "run-3", toolName: "run_scenario", args: { stack: "mastra", scenarioId: "other" } },
+      {
+        type: "tool_execution_start",
+        toolCallId: "run-3",
+        toolName: "run_scenario",
+        args: { stack: "mastra", scenarioId: "other" },
+      },
       ...completedTool("read-1", "read_evidence", { evidenceId: "ev-1" }, {}),
       ...completedTool("read-2", "read_evidence", { evidenceId: "ev-2" }, {}),
     ];
@@ -132,17 +158,34 @@ class FakeRpcProcess implements ChildProcessHandle {
   readonly exited: Promise<number>;
   #resolveExit!: (code: number) => void;
 
-  constructor(readonly settle: boolean, readonly closeStreams = true) {
-    this.exited = new Promise((resolve) => { this.#resolveExit = resolve; });
+  constructor(
+    readonly settle: boolean,
+    readonly closeStreams = true,
+  ) {
+    this.exited = new Promise((resolve) => {
+      this.#resolveExit = resolve;
+    });
   }
 
   async writeStdin(data: string): Promise<void> {
     const command = JSON.parse(data.trim()) as Record<string, unknown>;
     this.commands.push(command);
     if (command.type === "get_state") {
-      this.emit({ id: command.id, type: "response", command: "get_state", success: true, data: { model: { provider: "openai", id: "gpt-5.6-luna" }, thinkingLevel: "off" } });
+      this.emit({
+        id: command.id,
+        type: "response",
+        command: "get_state",
+        success: true,
+        data: { model: { provider: "openai", id: "gpt-5.6-luna" }, thinkingLevel: "off" },
+      });
     } else if (command.type === "get_session_stats") {
-      this.emit({ id: command.id, type: "response", command: "get_session_stats", success: true, data: { toolCalls: 1, tokens: { input: 10, output: 2 } } });
+      this.emit({
+        id: command.id,
+        type: "response",
+        command: "get_session_stats",
+        success: true,
+        data: { toolCalls: 1, tokens: { input: 10, output: 2 } },
+      });
     } else if (command.type === "prompt") {
       this.emit({ id: command.id, type: "response", command: "prompt", success: true });
       if (this.settle) {
@@ -150,7 +193,9 @@ class FakeRpcProcess implements ChildProcessHandle {
         this.emitMany(completedTool("call-1", "list_stacks", {}, {}));
         for (const [index, stack] of ["ai-sdk", "mastra", "langchain"].entries()) {
           const evidenceId = `ev-${index + 1}`;
-          this.emitMany(completedTool(`call-${index + 2}`, "run_scenario", { stack, scenarioId: "case-1" }, { evidenceId }));
+          this.emitMany(
+            completedTool(`call-${index + 2}`, "run_scenario", { stack, scenarioId: "case-1" }, { evidenceId }),
+          );
           this.emitMany(completedTool(`read-${index + 1}`, "read_evidence", { evidenceId }, {}));
         }
         this.emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "done" }] } });

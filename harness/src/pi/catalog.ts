@@ -29,10 +29,14 @@ function parseScenario(value: unknown): CanonicalScenario {
   }
   const item = value as Record<string, unknown>;
   if (
-    typeof item.id !== "string" || !item.id ||
-    typeof item.prompt !== "string" || !item.prompt ||
-    !Number.isSafeInteger(item.deadlineMs) || (item.deadlineMs as number) <= 0 ||
-    !Number.isSafeInteger(item.maxToolCalls) || (item.maxToolCalls as number) <= 0 ||
+    typeof item.id !== "string" ||
+    !item.id ||
+    typeof item.prompt !== "string" ||
+    !item.prompt ||
+    !Number.isSafeInteger(item.deadlineMs) ||
+    (item.deadlineMs as number) <= 0 ||
+    !Number.isSafeInteger(item.maxToolCalls) ||
+    (item.maxToolCalls as number) <= 0 ||
     !Array.isArray(item.faults)
   ) {
     throw new Error("Scenario has an invalid id, prompt, deadline, budget, or fault schedule");
@@ -45,4 +49,3 @@ function parseScenario(value: unknown): CanonicalScenario {
     faults: item.faults,
   };
 }
-

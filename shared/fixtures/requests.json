@@ -1,8 +1,44 @@
 [
-  { "id": "r1", "class": "lookup", "text": "What is the current status of the ws-app service?", "region": "us", "dataClass": "public" },
-  { "id": "r2", "class": "routine", "text": "Summarize the last three reconnect events for user u-9.", "region": "us", "dataClass": "internal" },
-  { "id": "r3", "class": "novel", "text": "Why do WebSocket sessions for u-9 keep closing with 1006? Investigate network, app and state evidence.", "region": "eu", "dataClass": "internal" },
-  { "id": "r4", "class": "novel", "text": "Fix runWhenReady so all readiness tests pass.", "region": "us", "dataClass": "internal" },
-  { "id": "r5", "class": "consequential", "text": "Apply the winning readiness patch to main and push.", "region": "us", "dataClass": "internal" },
-  { "id": "r6", "class": "novel", "text": "Fix runWhenReady so all readiness tests pass.", "region": "eu", "dataClass": "restricted" }
+  {
+    "id": "r1",
+    "class": "lookup",
+    "text": "What is the current status of the ws-app service?",
+    "region": "us",
+    "dataClass": "public"
+  },
+  {
+    "id": "r2",
+    "class": "routine",
+    "text": "Summarize the last three reconnect events for user u-9.",
+    "region": "us",
+    "dataClass": "internal"
+  },
+  {
+    "id": "r3",
+    "class": "novel",
+    "text": "Why do WebSocket sessions for u-9 keep closing with 1006? Investigate network, app and state evidence.",
+    "region": "eu",
+    "dataClass": "internal"
+  },
+  {
+    "id": "r4",
+    "class": "novel",
+    "text": "Fix runWhenReady so all readiness tests pass.",
+    "region": "us",
+    "dataClass": "internal"
+  },
+  {
+    "id": "r5",
+    "class": "consequential",
+    "text": "Apply the winning readiness patch to main and push.",
+    "region": "us",
+    "dataClass": "internal"
+  },
+  {
+    "id": "r6",
+    "class": "novel",
+    "text": "Fix runWhenReady so all readiness tests pass.",
+    "region": "eu",
+    "dataClass": "restricted"
+  }
 ]

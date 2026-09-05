@@ -7,7 +7,7 @@ Implements `../shared/TASK.md` on the AI SDK (`ai` v6 line with `ToolLoopAgent`)
 - `ai`, `@ai-sdk/openai`, `@ai-sdk/openai-compatible` (local slot), `@ai-sdk/otel` + `@opentelemetry/sdk-node` + `@opentelemetry/sdk-trace-base` (in-memory + console span exporter, no collector), `zod`
 - Optional: `@ai-sdk/gateway` for `models` fallback and `order`/`only`/`sort` routing, used only when `AI_GATEWAY_API_KEY` is set; `@ai-sdk/policy-opa` only if `opa` binary is present, otherwise the plain `toolApproval` callback.
 - Not used: `@ai-sdk/workflow` `WorkflowAgent` (needs the Workflow DevKit runtime; reference it in README as the durable option).
-- Default models: `gpt-5.4-mini` workers, `gpt-5.4-nano` judge, `gpt-5.4` frontier competitor. Env overrides `MODEL_*`.
+- Default model: `gpt-5.6-luna` for workers, judges, and the frontier-role competitor. Env overrides `MODEL_*`.
 
 ## Layout
 

@@ -69,7 +69,7 @@ async function runFixedWorker(source: EvidenceSource, signal: AbortSignal): Prom
         prompt: `Evidence (${source}):\n\n${content}\n\nWhat is the single most important fact this reveals about why sessions disconnect?`,
       });
       const latencyMs = Date.now() - start;
-      const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.4-mini", result.usage);
+      const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.6-luna", result.usage);
       return {
         result: {
           source,
@@ -93,22 +93,30 @@ const reviewerSchema = z.object({
 });
 
 async function runReviewer(artifacts: WorkerArtifact[], signal: AbortSignal) {
-  return withWorkerSpan({ profile: "reviewer", whyItExisted: "look for evidence against the favored hypothesis" }, async () => {
-    const start = Date.now();
-    const result = await generateText({
-      model: workerModel(),
-      output: Output.object({ schema: reviewerSchema }),
-      abortSignal: signal,
-      telemetry: { functionId: "decompose-reviewer" },
-      instructions:
-        "You are a reviewer. Read all three worker findings. State the favored hypothesis, but explicitly check " +
-        "whether a second, independent cause is also supported by the evidence -- do not stop at the first plausible explanation.",
-      prompt: artifacts.map((a) => `[${a.source}] ${a.finding}`).join("\n\n"),
-    });
-    const latencyMs = Date.now() - start;
-    const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.4-mini", result.usage);
-    return { result: { ...result.output, costUsd: spend, latencyMs }, costUsd: spend, latencyMs, outcome: "reviewed" };
-  });
+  return withWorkerSpan(
+    { profile: "reviewer", whyItExisted: "look for evidence against the favored hypothesis" },
+    async () => {
+      const start = Date.now();
+      const result = await generateText({
+        model: workerModel(),
+        output: Output.object({ schema: reviewerSchema }),
+        abortSignal: signal,
+        telemetry: { functionId: "decompose-reviewer" },
+        instructions:
+          "You are a reviewer. Read all three worker findings. State the favored hypothesis, but explicitly check " +
+          "whether a second, independent cause is also supported by the evidence -- do not stop at the first plausible explanation.",
+        prompt: artifacts.map((a) => `[${a.source}] ${a.finding}`).join("\n\n"),
+      });
+      const latencyMs = Date.now() - start;
+      const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.6-luna", result.usage);
+      return {
+        result: { ...result.output, costUsd: spend, latencyMs },
+        costUsd: spend,
+        latencyMs,
+        outcome: "reviewed",
+      };
+    },
+  );
 }
 
 /** Subagent variant: the model decides which evidence sources to consult. */
@@ -133,21 +141,32 @@ async function runSubagentVariant(signal: AbortSignal) {
     telemetry: { functionId: "decompose-subagent" },
   });
 
-  return withWorkerSpan({ profile: "subagent-investigator", whyItExisted: "model-chosen decomposition, for cost contrast with the fixed plan" }, async () => {
-    const start = Date.now();
-    const result = await investigator.generate({
-      prompt: "Investigate why WebSocket sessions for u-9 keep closing with code 1006.",
-      abortSignal: signal,
-    });
-    const latencyMs = Date.now() - start;
-    const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.4-mini", result.usage);
-    return {
-      result: { text: result.text, toolCalls: result.steps.flatMap((s) => s.toolCalls).length, costUsd: spend, latencyMs },
-      costUsd: spend,
-      latencyMs,
-      outcome: "answered",
-    };
-  });
+  return withWorkerSpan(
+    {
+      profile: "subagent-investigator",
+      whyItExisted: "model-chosen decomposition, for cost contrast with the fixed plan",
+    },
+    async () => {
+      const start = Date.now();
+      const result = await investigator.generate({
+        prompt: "Investigate why WebSocket sessions for u-9 keep closing with code 1006.",
+        abortSignal: signal,
+      });
+      const latencyMs = Date.now() - start;
+      const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.6-luna", result.usage);
+      return {
+        result: {
+          text: result.text,
+          toolCalls: result.steps.flatMap((s) => s.toolCalls).length,
+          costUsd: spend,
+          latencyMs,
+        },
+        costUsd: spend,
+        latencyMs,
+        outcome: "answered",
+      };
+    },
+  );
 }
 
 async function main() {
@@ -162,11 +181,21 @@ async function main() {
   const artifacts = await Promise.all(sources.map((s) => runFixedWorker(s, signal)));
   printTable(
     "worker artifacts (fixed plan, one file each)",
-    artifacts.map((a) => ({ source: a.source, finding: a.finding.slice(0, 70), supportsNetworkTimeout: a.supportsNetworkTimeoutHypothesis, costUsd: a.costUsd, latencyMs: a.latencyMs })),
+    artifacts.map((a) => ({
+      source: a.source,
+      finding: a.finding.slice(0, 70),
+      supportsNetworkTimeout: a.supportsNetworkTimeoutHypothesis,
+      costUsd: a.costUsd,
+      latencyMs: a.latencyMs,
+    })),
   );
 
   const review = await runReviewer(artifacts, signal);
-  printKV("reviewer verdict", { favoredHypothesis: review.favoredHypothesis, mentionsSecondCause: review.mentionsIndependentSecondCause, verdict: review.verdict.slice(0, 200) });
+  printKV("reviewer verdict", {
+    favoredHypothesis: review.favoredHypothesis,
+    mentionsSecondCause: review.mentionsIndependentSecondCause,
+    verdict: review.verdict.slice(0, 200),
+  });
 
   // Deterministic check against ground truth: did the reviewer find BOTH causes?
   const groundTruth = await readFile(new URL("../fixtures/incident/ground-truth.md", import.meta.url), "utf8");
@@ -196,7 +225,7 @@ async function main() {
     filesWritten: "network.log -> worker(network), app.log -> worker(app), state.json -> worker(state); no overlap",
     fixedPlanCostUsd: formatUsd(fixedTotalCostUsd),
     subagentCostUsd: subagentResult ? formatUsd(subagentResult.costUsd) : "skipped(budget)",
-    costDeltaVsFixed: subagentResult ? formatUsd(subagentResult.costUsd - (artifacts[0]!.costUsd)) : "-",
+    costDeltaVsFixed: subagentResult ? formatUsd(subagentResult.costUsd - artifacts[0]!.costUsd) : "-",
     totalCostUsd: formatUsd(totalCostUsd),
     stopReason: totalCostUsd >= budgetUsd ? "budget reached" : "all workers and reviewer completed",
   });

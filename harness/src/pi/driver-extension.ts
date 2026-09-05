@@ -42,11 +42,15 @@ export default async function pokedexDriverExtension(pi: ExtensionAPI): Promise<
   pi.registerTool({
     name: "run_scenario",
     label: "Run scenario",
-    description: "Run one canonical Pokédex scenario against one requested Stack agent. Each stack may be run exactly once.",
-    parameters: Type.Object({
-      stack: StringEnum(STACKS),
-      scenarioId: Type.String({ minLength: 1 }),
-    }, { additionalProperties: false }),
+    description:
+      "Run one canonical Pokédex scenario against one requested Stack agent. Each stack may be run exactly once.",
+    parameters: Type.Object(
+      {
+        stack: StringEnum(STACKS),
+        scenarioId: Type.String({ minLength: 1 }),
+      },
+      { additionalProperties: false },
+    ),
     executionMode: "parallel",
     async execute(
       _toolCallId: string,
@@ -61,7 +65,10 @@ export default async function pokedexDriverExtension(pi: ExtensionAPI): Promise<
     name: "read_evidence",
     label: "Read evidence",
     description: "Read bounded normalized evidence by an evidence ID returned from run_scenario.",
-    parameters: Type.Object({ evidenceId: Type.String({ minLength: 36, maxLength: 36 }) }, { additionalProperties: false }),
+    parameters: Type.Object(
+      { evidenceId: Type.String({ minLength: 36, maxLength: 36 }) },
+      { additionalProperties: false },
+    ),
     async execute(_toolCallId: string, params: { evidenceId: string }) {
       return toolResult(await tools.readEvidence(params.evidenceId));
     },

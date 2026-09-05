@@ -27,8 +27,12 @@ describe("canonical Pokédex fixtures", () => {
     expect(new Set(ids).size).toBe(10);
     expect(Object.keys(expected.expected).sort()).toEqual([...ids].sort());
     expect(scenarios.scenarios.filter((scenario: { group: string }) => scenario.group === "ordinary")).toHaveLength(4);
-    expect(scenarios.scenarios.filter((scenario: { group: string }) => scenario.group === "pagination")).toHaveLength(2);
+    expect(scenarios.scenarios.filter((scenario: { group: string }) => scenario.group === "pagination")).toHaveLength(
+      2,
+    );
     expect(scenarios.scenarios.filter((scenario: { group: string }) => scenario.group === "cascade")).toHaveLength(2);
-    expect(scenarios.scenarios.filter((scenario: { group: string }) => scenario.group === "injected-failure")).toHaveLength(2);
+    expect(
+      scenarios.scenarios.filter((scenario: { group: string }) => scenario.group === "injected-failure"),
+    ).toHaveLength(2);
   });
 });

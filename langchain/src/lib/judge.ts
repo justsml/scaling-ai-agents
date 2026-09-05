@@ -33,11 +33,7 @@ export type RubricScore = z.infer<typeof RubricScoreSchema>;
 export function rubricTotal(score: RubricScore): number {
   if (score.disqualified) return 0;
   return (
-    score.correctnessBeyondTests +
-    score.minimalSurface +
-    score.honestStop +
-    score.backoffQuality +
-    score.readability
+    score.correctnessBeyondTests + score.minimalSurface + score.honestStop + score.backoffQuality + score.readability
   );
 }
 

@@ -25,8 +25,8 @@ export interface PriceEntry {
 const TABLE = priceTable as unknown as Record<string, PriceEntry | string>;
 
 /**
- * Model ids in this package are LangChain `initChatModel` strings ("openai:gpt-5.4-mini").
- * The price table is keyed with a slash ("openai/gpt-5.4-mini"). Normalise, and fall back
+ * Model ids in this package are LangChain `initChatModel` strings ("openai:gpt-5.6-luna").
+ * The price table is keyed with a slash ("openai/gpt-5.6-luna"). Normalise, and fall back
  * to the wildcard row for the local slot.
  */
 export function priceFor(modelId: string): PriceEntry {
@@ -55,10 +55,7 @@ export function isPriced(modelId: string): boolean {
 /** USD for one call. Prices in the table are per 1M tokens. */
 export function estimateCostUsd(modelId: string, usage: Usage): number {
   const price = priceFor(modelId);
-  return (
-    (usage.inputTokens / 1_000_000) * price.input +
-    (usage.outputTokens / 1_000_000) * price.output
-  );
+  return (usage.inputTokens / 1_000_000) * price.input + (usage.outputTokens / 1_000_000) * price.output;
 }
 
 /** Pull `usage_metadata` off anything LangChain hands back, tolerating older shapes. */

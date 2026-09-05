@@ -20,8 +20,8 @@
  *   `src/fixtures/rubric.md`, which the judge did not write.
  *
  * WHAT IT COSTS
- *   Three gpt-5.4-mini attempts, one gpt-5.4 attempt, and up to four gpt-5.4-nano judge
- *   calls. Roughly $0.04-$0.09 depending on how verbose the frontier model is.
+ *   Four gpt-5.6-luna attempts and up to four gpt-5.6-luna judge calls. Roughly $0.04-$0.09
+ *   depending on response length.
  *
  * SKIPS
  *   `skipped: OPENAI_API_KEY is not set` when there is no key. Never silently fakes a run.
@@ -36,12 +36,7 @@ import { PROFILES, modelForProfile, profileByName, stripFences } from "../lib/pr
 import { candidateRows, rubricTotal, type Candidate } from "../lib/judge.ts";
 import { readBuggyModule } from "../lib/sandbox.ts";
 import { runMetadata, stampRun, startTracing } from "../lib/trace.ts";
-import {
-  buildCompeteGraph,
-  latestByProfile,
-  type AttemptResult,
-  type CompeteDeps,
-} from "../graphs/compete.ts";
+import { buildCompeteGraph, latestByProfile, type AttemptResult, type CompeteDeps } from "../graphs/compete.ts";
 import { header, kv, ledgerTable, note, section, skip, stopLine, table } from "../lib/print.ts";
 
 // ---------------------------------------------------------------------------
@@ -141,10 +136,7 @@ export async function attemptOnce(
       ctx.caps.charge(costUsd);
       if (ctx.chargeLedger !== false) ctx.ledger.charge(costUsd);
 
-      const text =
-        typeof response.content === "string"
-          ? response.content
-          : JSON.stringify(response.content);
+      const text = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
       return {
         value: {
           patch: stripFences(text),
@@ -288,10 +280,7 @@ async function main() {
   // The table a speaker reads aloud.
   // -------------------------------------------------------------------------
   section("tournament");
-  table(
-    ["profile", "tests", "rubric", "cost", "ms", "note"],
-    candidateRows(result.candidates, result.winner),
-  );
+  table(["profile", "tests", "rubric", "cost", "ms", "note"], candidateRows(result.candidates, result.winner));
 
   if (result.skipped.length > 0) {
     section("did not run");

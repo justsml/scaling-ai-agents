@@ -5,21 +5,21 @@
  * are all mechanical; the snippets should be about what the events mean, not
  * about process management. So the plumbing lives here.
  */
-import type { Subprocess } from 'bun'
-import { MastraClient } from '@mastra/client-js'
-import { PKG_ROOT } from './setup.js'
+import type { Subprocess } from "bun";
+import { MastraClient } from "@mastra/client-js";
+import { PKG_ROOT } from "./setup.js";
 
-export const REMOTE_PORT = Number(process.env.REMOTE_PORT ?? 4112)
-export const REMOTE_BASE_URL = `http://127.0.0.1:${REMOTE_PORT}`
-export const REMOTE_AGENT_ID = 'competitor-remote'
+export const REMOTE_PORT = Number(process.env.REMOTE_PORT ?? 4112);
+export const REMOTE_BASE_URL = `http://127.0.0.1:${REMOTE_PORT}`;
+export const REMOTE_AGENT_ID = "competitor-remote";
 /** Note the /api prefix: Mastra's default apiPrefix is part of the well-known path. */
-export const REMOTE_CARD_URL = `${REMOTE_BASE_URL}/api/.well-known/${REMOTE_AGENT_ID}/agent-card.json`
+export const REMOTE_CARD_URL = `${REMOTE_BASE_URL}/api/.well-known/${REMOTE_AGENT_ID}/agent-card.json`;
 
 export interface RemoteHandle {
-  proc: Subprocess
-  baseUrl: string
-  client: MastraClient
-  stop: () => Promise<void>
+  proc: Subprocess;
+  baseUrl: string;
+  client: MastraClient;
+  stop: () => Promise<void>;
 }
 
 /**
@@ -28,24 +28,24 @@ export interface RemoteHandle {
  * instead of hanging.
  */
 export async function startRemoteServer(opts: { timeoutMs?: number } = {}): Promise<RemoteHandle | null> {
-  const timeoutMs = opts.timeoutMs ?? 20_000
-  const proc = Bun.spawn(['bun', 'run', 'src/remote/server.ts'], {
+  const timeoutMs = opts.timeoutMs ?? 20_000;
+  const proc = Bun.spawn(["bun", "run", "src/remote/server.ts"], {
     cwd: PKG_ROOT,
     env: { ...process.env, REMOTE_PORT: String(REMOTE_PORT) },
-    stdout: 'pipe',
-    stderr: 'pipe',
-  })
+    stdout: "pipe",
+    stderr: "pipe",
+  });
 
   const stop = async () => {
     try {
-      proc.kill('SIGTERM')
-      await Promise.race([proc.exited, new Promise(r => setTimeout(r, 3000))])
+      proc.kill("SIGTERM");
+      await Promise.race([proc.exited, new Promise((r) => setTimeout(r, 3000))]);
     } catch {
       /* nothing to do */
     }
-  }
+  };
 
-  const deadline = Date.now() + timeoutMs
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await cardReachable()) {
       return {
@@ -53,33 +53,33 @@ export async function startRemoteServer(opts: { timeoutMs?: number } = {}): Prom
         baseUrl: REMOTE_BASE_URL,
         client: new MastraClient({ baseUrl: REMOTE_BASE_URL }),
         stop,
-      }
+      };
     }
-    if (proc.exitCode !== null) break
-    await new Promise(r => setTimeout(r, 300))
+    if (proc.exitCode !== null) break;
+    await new Promise((r) => setTimeout(r, 300));
   }
 
-  await stop()
-  return null
+  await stop();
+  return null;
 }
 
 export async function cardReachable(): Promise<boolean> {
   try {
-    const res = await fetch(REMOTE_CARD_URL, { signal: AbortSignal.timeout(1500) })
-    return res.ok
+    const res = await fetch(REMOTE_CARD_URL, { signal: AbortSignal.timeout(1500) });
+    return res.ok;
   } catch {
-    return false
+    return false;
   }
 }
 
 export interface A2AEvent {
-  kind: string
-  state?: string
-  text?: string
-  taskId?: string
+  kind: string;
+  state?: string;
+  text?: string;
+  taskId?: string;
   /** artifact-update only: true when this chunk extends the artifact rather than replacing it. */
-  append?: boolean
-  raw: unknown
+  append?: boolean;
+  raw: unknown;
 }
 
 /**
@@ -88,14 +88,14 @@ export interface A2AEvent {
  * ever want "what state is it in" and "what did it say".
  */
 export function normalizeEvent(event: any): A2AEvent {
-  const kind = String(event?.kind ?? event?.type ?? 'unknown')
-  const parts = event?.status?.message?.parts ?? event?.artifact?.parts ?? event?.parts ?? []
+  const kind = String(event?.kind ?? event?.type ?? "unknown");
+  const parts = event?.status?.message?.parts ?? event?.artifact?.parts ?? event?.parts ?? [];
   const text = Array.isArray(parts)
     ? parts
-        .filter((p: any) => p?.kind === 'text' || typeof p?.text === 'string')
+        .filter((p: any) => p?.kind === "text" || typeof p?.text === "string")
         .map((p: any) => p.text)
-        .join('')
-    : undefined
+        .join("")
+    : undefined;
   return {
     kind,
     state: event?.status?.state ?? event?.state,
@@ -103,7 +103,7 @@ export function normalizeEvent(event: any): A2AEvent {
     taskId: event?.taskId ?? event?.id ?? event?.status?.taskId,
     append: event?.append === true,
     raw: event,
-  }
+  };
 }
 
 /**
@@ -115,23 +115,23 @@ export function normalizeEvent(event: any): A2AEvent {
  * good remote patch arrives as a file that does not parse.
  */
 export class ArtifactAssembler {
-  private text = ''
+  private text = "";
 
   push(event: A2AEvent): void {
-    if (event.kind !== 'artifact-update' || event.text === undefined) return
-    this.text = event.append ? this.text + event.text : event.text
+    if (event.kind !== "artifact-update" || event.text === undefined) return;
+    this.text = event.append ? this.text + event.text : event.text;
   }
 
   get value(): string {
-    return this.text
+    return this.text;
   }
 }
 
 export function userMessage(text: string) {
   return {
-    kind: 'message' as const,
-    role: 'user' as const,
+    kind: "message" as const,
+    role: "user" as const,
     messageId: crypto.randomUUID(),
-    parts: [{ kind: 'text' as const, text }],
-  }
+    parts: [{ kind: "text" as const, text }],
+  };
 }

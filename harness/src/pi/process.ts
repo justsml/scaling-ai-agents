@@ -25,7 +25,7 @@ export class NodeProcessSpawner implements ProcessSpawner {
     return {
       writeStdin(data) {
         return new Promise<void>((resolve, reject) => {
-          child.stdin.write(data, (error) => error ? reject(error) : resolve());
+          child.stdin.write(data, (error) => (error ? reject(error) : resolve()));
         });
       },
       closeStdin() {
@@ -48,10 +48,7 @@ export class NodeProcessSpawner implements ProcessSpawner {
   }
 }
 
-export async function collectUtf8(
-  stream: AsyncIterable<Uint8Array>,
-  maximumBytes: number,
-): Promise<string> {
+export async function collectUtf8(stream: AsyncIterable<Uint8Array>, maximumBytes: number): Promise<string> {
   const decoder = new TextDecoder("utf-8", { fatal: true });
   let bytes = 0;
   let text = "";

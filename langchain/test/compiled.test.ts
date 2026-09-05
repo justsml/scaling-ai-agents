@@ -28,16 +28,12 @@ function clock() {
 }
 
 describe("compiled patch: the contract that chose it still holds", () => {
-  test(
-    "COMPILED_PATCH passes all five fixture tests",
-    async () => {
-      const result = await runCandidate(COMPILED_PATCH);
-      expect(result.failed).toBe(0);
-      expect(result.passed).toBe(TOTAL_FIXTURE_TESTS);
-      expect(result.green).toBe(true);
-    },
-    60_000,
-  );
+  test("COMPILED_PATCH passes all five fixture tests", async () => {
+    const result = await runCandidate(COMPILED_PATCH);
+    expect(result.failed).toBe(0);
+    expect(result.passed).toBe(TOTAL_FIXTURE_TESTS);
+    expect(result.green).toBe(true);
+  }, 60_000);
 
   test("COMPILED_PATCH trips none of the rubric's disqualifiers", () => {
     expect(disqualify(COMPILED_PATCH)).toBeNull();
@@ -48,8 +44,7 @@ describe("compiled implementation: the four dependency states", () => {
   test("starting: waits with exponential backoff, then runs once", async () => {
     const c = clock();
     let calls = 0;
-    const probe: Probe = async () =>
-      calls++ < 3 ? { ok: false, code: "ECONNREFUSED" } : { ok: true };
+    const probe: Probe = async () => (calls++ < 3 ? { ok: false, code: "ECONNREFUSED" } : { ok: true });
     let ran = 0;
     const out = await runWhenReady(probe, async () => void ran++, {
       deadlineMs: 5000,
@@ -65,10 +60,14 @@ describe("compiled implementation: the four dependency states", () => {
   test("ready: one probe, one run", async () => {
     const c = clock();
     let ran = 0;
-    const out = await runWhenReady(async () => ({ ok: true }), async () => void ran++, {
-      deadlineMs: 1000,
-      ...c,
-    });
+    const out = await runWhenReady(
+      async () => ({ ok: true }),
+      async () => void ran++,
+      {
+        deadlineMs: 1000,
+        ...c,
+      },
+    );
     expect(out).toEqual({ status: "ran", attempts: 1 });
     expect(ran).toBe(1);
   });

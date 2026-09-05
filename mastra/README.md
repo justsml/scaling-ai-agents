@@ -44,7 +44,7 @@ Prints: the contract table for all six requests, the validator's accept/reject l
 
 ### `01-compete` — many solutions, one problem
 
-Four competitors on the same bug: three instruction profiles on `gpt-5.4-mini` plus one on `gpt-5.4`, fanned out with `Promise.allSettled`. Plus a free hand-written control that is allowed to win.
+Four competitors on the same bug use `gpt-5.6-luna` with four instruction profiles, fanned out with `Promise.allSettled`. A free hand-written control is also allowed to win.
 
 Judging is two passes and the order is the point. Every candidate is written to a temp directory with an untouched `readiness.test.ts` and run as a child process with `bun test --timeout 2000`; only fully green candidates reach the LLM rubric judge, whose rubric is read verbatim from `src/fixtures/rubric.md`. The tie-break order is fixed and printed: tests → rubric → cost → latency.
 
@@ -131,7 +131,7 @@ The plan was written against `@mastra/core@1.34.0`. This was built against **`@m
 | — | not in the plan | Mastra reports **zero usage on an aborted stream**, so the ledger's `billedAnyway` column is implemented and tested but never fires against OpenAI on this path. The column is kept because the accounting question is real even when this provider's answer is zero |
 | — | not in the plan | A2A `artifact-update` events either **replace or append** (`append: true`). Concatenating every chunk corrupts the artifact; `ArtifactAssembler` in `lib/a2a.ts` handles it |
 | — | not in the plan | the agent card publishes the agent's **instructions verbatim as `description`** and every tool id as a `skill`. Write remote agent instructions as public text. What it genuinely hides: model, memory, storage, tool schemas, tool implementations |
-| — | not in the plan | the rubric judge on `gpt-5.4-nano` disqualified correct whole-file patches for "changing exported types", because it could not tell an unchanged declaration from a changed one. `lib/judge.ts` gives it the original module for comparison. The rubric text itself is still passed verbatim |
+| — | not in the plan | the rubric judge on `gpt-5.6-luna` disqualified correct whole-file patches for "changing exported types", because it could not tell an unchanged declaration from a changed one. `lib/judge.ts` gives it the original module for comparison. The rubric text itself is still passed verbatim |
 
 ## Layout
 

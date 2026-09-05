@@ -69,10 +69,7 @@ async function main() {
   const ledger = new Ledger(caps.budgetUsd);
   const tracing = startTracing();
 
-  header(
-    "06 REMOTE — a worker in another process",
-    `caps: ${caps.describe()}   tracing: ${tracing.destination}`,
-  );
+  header("06 REMOTE — a worker in another process", `caps: ${caps.describe()}   tracing: ${tracing.destination}`);
 
   // -------------------------------------------------------------------------
   // REMOTE / start the server.
@@ -136,11 +133,7 @@ async function main() {
 
       section("A2A: message/stream (status events)");
       let events = 0;
-      for await (const event of client.streamMessage(
-        "What evidence do you own?",
-        undefined,
-        caps.signal,
-      )) {
+      for await (const event of client.streamMessage("What evidence do you own?", undefined, caps.signal)) {
         events++;
         const e = event as { result?: { status?: { state?: string } }; kind?: string };
         console.log(`  event ${events}: ${e.kind ?? ""} ${e.result?.status?.state ?? ""}`);
@@ -263,7 +256,7 @@ async function main() {
         )) as { patch?: string };
         // The remote process owns its own provider account; its usage_metadata is not visible
         // from here, so this is an estimate and is labelled as one everywhere it is printed.
-        const costUsd = estimateCostUsd("openai:gpt-5.4-mini", {
+        const costUsd = estimateCostUsd("openai:gpt-5.6-luna", {
           inputTokens: 700,
           outputTokens: 600,
         });
@@ -302,10 +295,7 @@ async function main() {
     );
 
     ledgerTable(ledger, caps);
-    stopLine(
-      caps,
-      "completed: server started, A2A probed and found absent, Agent Protocol exercised",
-    );
+    stopLine(caps, "completed: server started, A2A probed and found absent, Agent Protocol exercised");
   } finally {
     if (caps.flags["keep-alive"]) {
       console.log(`  server left running at ${server.baseUrl} (--keep-alive)`);

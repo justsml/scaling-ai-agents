@@ -8,16 +8,16 @@
  * whatever is current on the day.
  */
 
-export const WORKER_MODEL = process.env.MODEL_WORKER ?? 'openai/gpt-5.4-mini'
-export const JUDGE_MODEL = process.env.MODEL_JUDGE ?? 'openai/gpt-5.4-nano'
-export const FRONTIER_MODEL = process.env.MODEL_FRONTIER ?? 'openai/gpt-5.4'
+export const WORKER_MODEL = process.env.MODEL_WORKER ?? "openai/gpt-5.6-luna";
+export const JUDGE_MODEL = process.env.MODEL_JUDGE ?? "openai/gpt-5.6-luna";
+export const FRONTIER_MODEL = process.env.MODEL_FRONTIER ?? "openai/gpt-5.6-luna";
 
 /** The optional local OpenAI-compatible slot (LM Studio, Ollama, vLLM). */
-export const LOCAL_BASE_URL = process.env.LOCAL_OPENAI_BASE_URL
-export const LOCAL_MODEL_ID = process.env.LOCAL_OPENAI_MODEL ?? 'local/unknown'
+export const LOCAL_BASE_URL = process.env.LOCAL_OPENAI_BASE_URL;
+export const LOCAL_MODEL_ID = process.env.LOCAL_OPENAI_MODEL ?? "local/unknown";
 
 export function localSlotAvailable(): boolean {
-  return typeof LOCAL_BASE_URL === 'string' && LOCAL_BASE_URL.length > 0
+  return typeof LOCAL_BASE_URL === "string" && LOCAL_BASE_URL.length > 0;
 }
 
 /**
@@ -26,19 +26,19 @@ export function localSlotAvailable(): boolean {
  * rather than pretending the id resolves through the registry.
  */
 export function localModelConfig(): {
-  id: string
-  url: string
-  apiKey: string
+  id: string;
+  url: string;
+  apiKey: string;
 } | null {
-  if (!localSlotAvailable()) return null
+  if (!localSlotAvailable()) return null;
   return {
-    id: LOCAL_MODEL_ID.replace(/^local\//, ''),
-    url: `${LOCAL_BASE_URL!.replace(/\/$/, '')}/chat/completions`,
-    apiKey: process.env.LOCAL_OPENAI_API_KEY ?? 'not-needed',
-  }
+    id: LOCAL_MODEL_ID.replace(/^local\//, ""),
+    url: `${LOCAL_BASE_URL!.replace(/\/$/, "")}/chat/completions`,
+    apiKey: process.env.LOCAL_OPENAI_API_KEY ?? "not-needed",
+  };
 }
 
 /** Price-table key for a model. The local slot is priced at zero on purpose. */
 export function priceKey(model: string): string {
-  return model.startsWith('local/') ? 'local/*' : model
+  return model.startsWith("local/") ? "local/*" : model;
 }

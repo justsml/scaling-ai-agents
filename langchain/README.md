@@ -207,9 +207,9 @@ Verified against the OpenAI API on 2026-09-05 with a one-token call each:
 
 | Role | id | resolves to |
 | --- | --- | --- |
-| workers | `openai:gpt-5.4-mini` | `gpt-5.4-mini-2026-03-17` |
-| judge | `openai:gpt-5.4-nano` | `gpt-5.4-nano-2026-03-17` |
-| frontier competitor (one per tournament) | `openai:gpt-5.4` | `gpt-5.4-2026-03-05` |
+| workers | `openai:gpt-5.6-luna` | `gpt-5.6-luna` |
+| judge | `openai:gpt-5.6-luna` | `gpt-5.6-luna` |
+| frontier competitor (one per tournament) | `openai:gpt-5.6-luna` | `gpt-5.6-luna` |
 
 No fallback ids were needed. `LANGSMITH_API_KEY` and Anthropic keys are not available in this
 environment; nothing here requires them.

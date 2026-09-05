@@ -11,15 +11,7 @@
  */
 
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import {
-  FRONTIER_MODEL,
-  JUDGE_MODEL,
-  WORKER_MODEL,
-  localModel,
-  localSlot,
-  localSlotAlive,
-  model,
-} from "./models.ts";
+import { FRONTIER_MODEL, JUDGE_MODEL, WORKER_MODEL, localModel, localSlot, localSlotAlive, model } from "./models.ts";
 
 export type Region = "us" | "eu" | "any";
 export type DataClass = "public" | "internal" | "restricted";
