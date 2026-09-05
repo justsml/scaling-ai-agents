@@ -13,3 +13,5 @@ Routing rules:
 - general: classification, formatting, extraction, status, simple Q&A
 
 The reason must cite the task signals in the request. Do not answer the user request. Only choose the route.
+
+Application code validates this object, adds `action: "route"` and `source: "model"`, then applies the confidence policy. Approval and clarification outcomes are produced only by trusted application policy, never by this model.

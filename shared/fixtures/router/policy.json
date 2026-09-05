@@ -1,5 +1,5 @@
 {
-  "version": "policy-2026-09-05",
+  "version": "policy-2026-09-05.2",
   "routes": {
     "code": { "minConfidence": 0.7, "costClass": "mini", "escalateTo": "frontier", "escalationNeeds": ["hard"] },
     "long-context": { "minConfidence": 0.7, "costClass": "mini" },
@@ -8,6 +8,9 @@
   "allowDowngrade": true,
   "clarifyBelow": 0.4,
   "routerModelClass": "nano",
-  "fallbackRouterModelClass": "nano",
+  "routerFallbacks": [
+    { "providerSlot": "primary", "modelClass": "nano", "maxRetries": 1, "on": ["timeout", "rate-limit", "server-error"] },
+    { "providerSlot": "secondary", "modelClass": "nano", "maxRetries": 1, "on": ["timeout", "rate-limit", "server-error"] }
+  ],
   "liveScorerSamplingRate": 1
 }

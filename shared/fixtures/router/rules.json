@@ -1,11 +1,11 @@
 {
-  "version": "rules-2026-09-05",
+  "version": "rules-2026-09-05.2",
   "rules": [
-    { "id": "consequential-push", "pattern": "\\b(push|deploy|apply .* to main|merge to main)\\b", "flags": "i", "action": "consequential" },
-    { "id": "code-fix-tests", "pattern": "\\b(fix|make)\\b.*\\btests? (pass|green)\\b", "flags": "i", "route": "code", "tags": ["hard"] },
-    { "id": "code-verbs", "pattern": "\\b(refactor|debug|implement|stack trace|unit test|typescript|function)\\b", "flags": "i", "route": "code" },
-    { "id": "long-context-logs", "pattern": "\\b(logs?|transcripts?|investigate|evidence|root cause|1006|disconnect)\\b", "flags": "i", "route": "long-context" },
-    { "id": "general-status", "pattern": "^(what is|what's) the (current )?status\\b", "flags": "i", "route": "general" },
-    { "id": "general-classify", "pattern": "\\b(classify|categori[sz]e|format (this|the)|extract the)\\b", "flags": "i", "route": "general" }
+    { "id": "consequential-production-change", "priority": 100, "pattern": "^(apply|deploy|merge|push)\\b.*\\b(to main|production|prod)\\b", "flags": "i", "action": "approval" },
+    { "id": "general-status-summary", "priority": 90, "pattern": "(^((what is|what's) the (current )?status\\b)|\\b(one-line summary|summary for the status page)\\b)", "flags": "i", "route": "general" },
+    { "id": "code-fix-tests", "priority": 80, "pattern": "\\b(fix|make)\\b.*\\btests? (pass|green)\\b", "flags": "i", "route": "code", "tags": ["hard"] },
+    { "id": "code-verbs", "priority": 70, "pattern": "\\b(refactor|debug|implement|unit test|typescript|function)\\b", "flags": "i", "route": "code" },
+    { "id": "long-context-evidence", "priority": 60, "pattern": "\\b(logs?|transcripts?|investigate|evidence|root cause|1006|disconnect|stack trace)\\b", "flags": "i", "route": "long-context" },
+    { "id": "general-classify", "priority": 50, "pattern": "\\b(classify|categori[sz]e|format (this|the)|extract the)\\b", "flags": "i", "route": "general" }
   ]
 }
