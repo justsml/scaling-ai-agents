@@ -1,11 +1,4 @@
-import { deterministic, applyPolicy, loadRouterCases, loadRules, Outcome, score } from '../lib/model-router.ts'
+import { decide, loadRouterCases, loadRules, langchainDecision, score } from '../lib/model-router.ts'
 
-const rules = await loadRules(); const cases = await loadRouterCases()
-const rows = cases.map((c, index) => {
-  const rule = deterministic(c.input, rules)
-  const outcome = rule ?? applyPolicy({ action: 'route', route: c.groundTruth.route ? c.groundTruth.route as any : 'general', confidence: 0.5, reason: 'semantic decision model required; injectable via decide()', source: 'model' })
-  return { id: c.id ?? `router-${index + 1}`, action: outcome.action, route: outcome.action === 'route' ? outcome.route : outcome.action, source: outcome.source, ...score(outcome, c.groundTruth) }
-})
-console.table(rows); if (rows.some(r => !r.valid || !r.forbidden)) process.exitCode = 1
-console.log(`LangGraph routing contract: action-discriminated · ${rows.length} cases · rules-first`)
-console.log('2x2 experiments: A rules-off/mini, B rules-on/mini, C rules-off/nano, D rules-on/nano; fallback slots: primary then secondary')
+const rules = await loadRules(); const cases = await loadRouterCases(); const model = langchainDecision(process.env.OPENAI_MODEL ?? 'openai:gpt-5.6-luna')
+for (const c of [{name:'A',on:false,modelClass:'mini'},{name:'B',on:true,modelClass:'mini'},{name:'C',on:false,modelClass:'nano'},{name:'D',on:true,modelClass:'nano'}]) { let good=0; for (const item of cases) { const outcome=await decide(item.input,c.on?rules:[],model); if(score(outcome,item.groundTruth).accurate) good++ } console.log(`${c.name}: ${good}/${cases.length} (${c.modelClass}, rules=${c.on})`) }

@@ -14,7 +14,7 @@ export type ModelDecision = { route: 'code' | 'long-context' | 'general'; confid
 export type DecisionModel = (input: string) => Promise<ModelDecision>
 const DecisionSchema = z.object({ route: Route, confidence: z.number().min(0).max(1), reason: z.string().min(1) })
 export function langchainDecision(modelId = 'openai:gpt-5.4-nano'): DecisionModel { return async input => (await (await model(modelId)).withStructuredOutput(DecisionSchema).invoke(input)) as ModelDecision }
-const fixture = (name: string) => fileURLToPath(new URL(`../../../shared/fixtures/router/${name}`, import.meta.url))
+const fixture = (name: string) => fileURLToPath(new URL(`../fixtures/router/${name}`, import.meta.url))
 export async function loadRouterCases(): Promise<RouterCase[]> { return JSON.parse(await readFile(fixture('cases.json'), 'utf8')) }
 export async function loadRules(): Promise<any[]> { return (JSON.parse(await readFile(fixture('rules.json'), 'utf8')) as any).rules }
 export function deterministic(input: string, rules: any[]): RouterOutcome | undefined { for (const rule of [...rules].sort((a, b) => b.priority - a.priority)) if (new RegExp(rule.pattern, rule.flags ?? 'i').test(input.trim())) return rule.action === 'approval' ? { action: 'approval', reason: `rule ${rule.id}`, source: 'rule' } : { action: 'route', route: rule.route, confidence: 1, reason: `rule ${rule.id}`, source: 'rule' } }

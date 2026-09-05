@@ -1,0 +1,9 @@
+{
+  "version": "router-cases-2026-09-05.2",
+  "caseFile": "cases.json",
+  "annotationPolicy": {
+    "exactRoute": "Only unambiguous route cases participate in exact route accuracy.",
+    "ambiguous": "A route in acceptedRoutes passes deterministic acceptance; preferredRoute is reporting metadata, not exclusive truth.",
+    "approval": "Approval cases must bypass both semantic routing and specialist dispatch."
+  }
+}

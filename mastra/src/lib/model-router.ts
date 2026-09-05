@@ -20,7 +20,7 @@ export function mastraDecision(model = JUDGE_MODEL): DecisionModel {
   return async input => (await agent.generate(input, { structuredOutput: { schema: DecisionSchema } })).object as ModelDecision
 }
 
-const fixture = (name: string) => fileURLToPath(new URL(`../../../shared/fixtures/router/${name}`, import.meta.url))
+const fixture = (name: string) => fileURLToPath(new URL(`../fixtures/router/${name}`, import.meta.url))
 export async function loadRouterCases(): Promise<RouterCase[]> { return JSON.parse(await readFile(fixture('cases.json'), 'utf8')) }
 export async function loadRules(): Promise<any[]> { return (JSON.parse(await readFile(fixture('rules.json'), 'utf8')) as any).rules }
 
