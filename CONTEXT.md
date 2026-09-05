@@ -15,3 +15,7 @@ _Avoid_: Reference patch, golden patch
 **Certified artifact**:
 A challenge artifact that passes every deterministic fixture test. Rubric scoring ranks certified artifacts but does not determine certification.
 _Avoid_: Winning patch, approved patch
+
+**Conformance harness**:
+The common agent-driven test system that runs comparable scenarios across the independent stacks and collects normalized evidence. It does not replace a stack's deterministic certification.
+_Avoid_: Shared implementation, test agent
