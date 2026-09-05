@@ -126,7 +126,7 @@ export async function routeRequest(input: string, decisionAgent: ModelDecisionAg
 }
 
 export function createAiSdkDecisionAgent(options: { instructions: string; modelId?: string; providerSlot?: string; apiKey?: string; baseURL?: string; onLiveFinishScore?: (event: LiveScoreEvent) => void }): ModelDecisionAgent {
-  const modelId = options.modelId ?? process.env.MODEL_ROUTER ?? 'openai/gpt-5.4-nano'
+  const modelId = options.modelId ?? process.env.MODEL_ROUTER ?? 'openai/gpt-5.6-luna'
   const providerSlot = options.providerSlot ?? 'primary'
   const bareModelId = modelId.includes('/') ? modelId.split('/').slice(1).join('/') : modelId
   const provider = options.apiKey || options.baseURL ? createOpenAI({ apiKey: options.apiKey, baseURL: options.baseURL }) : openai
@@ -158,7 +158,7 @@ export async function scoreAmbiguousRoute(item: { input: string; groundTruth: { 
   return judge(item.input, outcome, accepted)
 }
 export function createAiSdkReasonablenessJudge(options: { rubric: string; modelId?: string }): ReasonablenessJudge {
-  const modelId = options.modelId ?? process.env.MODEL_JUDGE ?? 'openai/gpt-5.4-nano'
+  const modelId = options.modelId ?? process.env.MODEL_JUDGE ?? 'openai/gpt-5.6-luna'
   const bareModelId = modelId.includes('/') ? modelId.split('/').slice(1).join('/') : modelId
   const outputSchema = z.object({ score: z.number().min(0).max(1), rationale: z.string().trim().min(1) })
   return async (input, outcome, acceptedRoutes) => {

@@ -60,11 +60,11 @@ function fallbackConfig() {
     note: 'secondary provider via LOCAL_OPENAI_BASE_URL',
   }
   if (process.env.OPENAI_FALLBACK_API_KEY) return {
-    agent: createAiSdkDecisionAgent({ instructions, modelId: 'openai/gpt-5.4-nano', providerSlot: 'secondary', apiKey: process.env.OPENAI_FALLBACK_API_KEY }),
+    agent: createAiSdkDecisionAgent({ instructions, modelId: 'openai/gpt-5.6-luna', providerSlot: 'secondary', apiKey: process.env.OPENAI_FALLBACK_API_KEY }),
     note: 'secondary credential slot (same provider)',
   }
   return {
-    agent: createAiSdkDecisionAgent({ instructions, modelId: 'openai/gpt-5.4-nano', providerSlot: 'primary' }),
+    agent: createAiSdkDecisionAgent({ instructions, modelId: 'openai/gpt-5.6-luna', providerSlot: 'primary' }),
     note: 'same-provider nano fallback; tier fallback, not provider resilience',
   }
 }
@@ -156,10 +156,10 @@ async function main() {
   const recordLiveScore = (event: { score: 0 | 1 }) => { liveScores.fired++; liveScores.passed += event.score }
   printKV('caps and fallback', { budgetUsd, deadlineMs, fallback: fallback.note })
   const matrix = [
-    { name: 'A rules-off / mini', rulesEnabled: false, model: 'openai/gpt-5.4-mini' },
-    { name: 'B rules-on / mini', rulesEnabled: true, model: 'openai/gpt-5.4-mini' },
-    { name: 'C rules-off / nano', rulesEnabled: false, model: 'openai/gpt-5.4-nano' },
-    { name: 'D rules-on / nano', rulesEnabled: true, model: 'openai/gpt-5.4-nano' },
+    { name: 'A rules-off / mini-policy', rulesEnabled: false, model: 'openai/gpt-5.6-luna' },
+    { name: 'B rules-on / mini-policy', rulesEnabled: true, model: 'openai/gpt-5.6-luna' },
+    { name: 'C rules-off / nano-policy', rulesEnabled: false, model: 'openai/gpt-5.6-luna' },
+    { name: 'D rules-on / nano-policy', rulesEnabled: true, model: 'openai/gpt-5.6-luna' },
   ]
   const runs: ExperimentRun[] = []
   for (const item of matrix) runs.push(await runExperiment({ ...item, routerModel: item.model, decisionAgent: createAiSdkDecisionAgent({ instructions, modelId: item.model, onLiveFinishScore: recordLiveScore }), fallbackDecisionAgent: fallback.agent, deadlineAt, budgetUsd: budgetUsd / matrix.length }))
