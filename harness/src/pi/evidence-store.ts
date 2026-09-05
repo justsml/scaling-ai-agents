@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const EVIDENCE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -27,10 +27,16 @@ export class EvidenceStore<T> {
     if (!EVIDENCE_ID.test(id)) return undefined;
     const cached = this.#memory.get(id);
     if (cached !== undefined) return cached;
-    const file = Bun.file(this.#path(id));
-    if (!(await file.exists())) return undefined;
-    if (file.size > this.maximumReadBytes) throw new Error(`Evidence ${id} exceeds the read bound`);
-    const value = JSON.parse(await readFile(this.#path(id), "utf8")) as T;
+    const path = this.#path(id);
+    let metadata;
+    try {
+      metadata = await stat(path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw error;
+    }
+    if (metadata.size > this.maximumReadBytes) throw new Error(`Evidence ${id} exceeds the read bound`);
+    const value = JSON.parse(await readFile(path, "utf8")) as T;
     this.#memory.set(id, value);
     return value;
   }
@@ -40,4 +46,3 @@ export class EvidenceStore<T> {
     return resolve(this.directory, `${id}.json`);
   }
 }
-

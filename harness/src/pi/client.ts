@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { JsonlDecoder } from "./jsonl";
-import { BunProcessSpawner, collectUtf8, delay } from "./process";
+import { NodeProcessSpawner, collectUtf8, delay } from "./process";
 import type { ProcessSpawner, StackName } from "./types";
 
 const DRIVER_MODEL = "openai/gpt-5.6-luna";
@@ -83,7 +83,7 @@ export async function runPiDriver(
   if (!/^[A-Za-z0-9._-]{1,64}$/.test(request.driverRunId)) {
     throw new Error("driverRunId must be 1-64 URL-safe identifier characters");
   }
-  const spawner = options.spawner ?? new BunProcessSpawner();
+  const spawner = options.spawner ?? new NodeProcessSpawner();
   const piExecutable = options.piExecutable ?? process.env.PI_BIN ?? "pi";
   const piVersion = await readCompatiblePiVersion(piExecutable, request.repoRoot, spawner);
   const extensionPath = resolve(options.extensionPath ?? resolve(import.meta.dir, "driver-extension.ts"));
@@ -395,7 +395,7 @@ export function correlateToolExecutions(frames: readonly unknown[]): CorrelatedT
 export async function readCompatiblePiVersion(
   piExecutable: string,
   cwd: string,
-  spawner: ProcessSpawner = new BunProcessSpawner(),
+  spawner: ProcessSpawner = new NodeProcessSpawner(),
 ): Promise<string> {
   const child = spawner.spawn([piExecutable, "--version"], { cwd, env: process.env });
   await child.closeStdin();

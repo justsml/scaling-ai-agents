@@ -1,26 +1,39 @@
+import { spawn } from "node:child_process";
 import type { ChildProcessHandle, ProcessSpawner, SpawnOptions } from "./types";
 
-export class BunProcessSpawner implements ProcessSpawner {
+/** Process adapter that works in both Bun controllers and Node-hosted Pi extensions. */
+export class NodeProcessSpawner implements ProcessSpawner {
   spawn(argv: string[], options: SpawnOptions): ChildProcessHandle {
-    const child = Bun.spawn(argv, {
+    const [command, ...args] = argv;
+    if (!command) throw new Error("process command is required");
+    const child = spawn(command, args, {
       cwd: options.cwd,
-      env: options.env,
-      stdin: "pipe",
-      stdout: "pipe",
-      stderr: "pipe",
+      env: options.env as NodeJS.ProcessEnv,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const exited = new Promise<number>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", (code, signal) => {
+        if (code !== null) resolve(code);
+        else resolve(signal === "SIGKILL" ? 137 : 143);
+      });
     });
 
     return {
-      async writeStdin(data) {
-        child.stdin.write(data);
-        await child.stdin.flush();
+      writeStdin(data) {
+        return new Promise<void>((resolve, reject) => {
+          child.stdin.write(data, (error) => error ? reject(error) : resolve());
+        });
       },
-      async closeStdin() {
-        child.stdin.end();
+      closeStdin() {
+        return new Promise<void>((resolve, reject) => {
+          child.stdin.once("error", reject);
+          child.stdin.end(resolve);
+        });
       },
-      stdout: child.stdout,
-      stderr: child.stderr,
-      exited: child.exited,
+      stdout: child.stdout as AsyncIterable<Uint8Array>,
+      stderr: child.stderr as AsyncIterable<Uint8Array>,
+      exited,
       kill(signal) {
         child.kill(signal);
       },
@@ -46,4 +59,3 @@ export async function collectUtf8(
 export function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
-

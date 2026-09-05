@@ -1,6 +1,8 @@
-import { resolve } from "node:path";
+import { access } from "node:fs/promises";
+import { constants } from "node:fs";
+import { delimiter, isAbsolute, resolve } from "node:path";
 import { JsonlDecoder } from "./jsonl";
-import { BunProcessSpawner, collectUtf8, delay } from "./process";
+import { NodeProcessSpawner, collectUtf8, delay } from "./process";
 import type {
   ProcessSpawner,
   StackInvestigationEvidence,
@@ -39,7 +41,7 @@ export class StackRunner {
   readonly #maximumOutputBytes: number;
 
   constructor(readonly repoRoot: string, options: StackRunnerOptions = {}) {
-    this.#spawner = options.spawner ?? new BunProcessSpawner();
+    this.#spawner = options.spawner ?? new NodeProcessSpawner();
     this.#bunExecutable = options.bunExecutable ?? "bun";
     this.#terminationGraceMs = options.terminationGraceMs ?? 500;
     this.#maximumOutputBytes = options.maximumOutputBytes ?? 4 * 1024 * 1024;
@@ -50,8 +52,8 @@ export class StackRunner {
     return {
       stack,
       entrypoint,
-      entrypointExists: await Bun.file(resolve(cwd, entrypoint)).exists(),
-      bunAvailable: Bun.which(this.#bunExecutable) !== null,
+      entrypointExists: await pathExists(resolve(cwd, entrypoint)),
+      bunAvailable: await executableExists(this.#bunExecutable),
     };
   }
 
@@ -160,6 +162,30 @@ export class StackRunner {
       ...((decodeError ?? documentError) ? { protocolError: decodeError ?? documentError } : {}),
     };
   }
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path, constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function executableExists(command: string): Promise<boolean> {
+  const candidates = isAbsolute(command) || command.includes("/")
+    ? [command]
+    : (process.env.PATH ?? "").split(delimiter).filter(Boolean).map((directory) => resolve(directory, command));
+  for (const candidate of candidates) {
+    try {
+      await access(candidate, constants.X_OK);
+      return true;
+    } catch {
+      // Keep searching PATH.
+    }
+  }
+  return false;
 }
 
 function validateEvidence(value: unknown, stack: StackName): asserts value is StackInvestigationEvidence {
