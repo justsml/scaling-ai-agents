@@ -33,6 +33,15 @@ describe('Pokédex investigation seam', () => {
     expect(answer?.claims).toEqual([{ path: 'names', value: ['bulbasaur', 'ivysaur'], requestIds: ['r1', 'r2'] }])
     expect(normalizeInvestigationAnswer({ summary: 'x', claims: [{ path: 'names', value: ['Ivysaur'], requestIds: ['r1'] }] }, 'Find later evolution species')?.claims[0]?.path).toBe('laterSpecies')
   })
+  test('repairs malformed citations only from successful supporting evidence', () => {
+    const calls = [
+      { sequence: 1, tool: 'pokedex_get' as const, arguments: { ref: 'evolution-chain/1' }, requestId: 'gw-good', ok: true, startedAt: 1, endedAt: 2, latencyMs: 1, disposition: 'gateway' as const, result: { data: { species: ['bulbasaur', 'ivysaur', 'venusaur'] } } },
+      { sequence: 2, tool: 'pokedex_get' as const, arguments: { ref: 'region/1' }, requestId: 'gw-other', ok: true, startedAt: 2, endedAt: 3, latencyMs: 1, disposition: 'gateway' as const, result: { data: { name: 'kanto' } } },
+    ]
+    const repaired = normalizeInvestigationAnswer({ summary: 'x', claims: [{ path: 'names', value: ['ivysaur', 'venusaur'], requestIds: ['gw-goof'] }] }, 'Find later evolution species', calls)
+    expect(repaired?.claims).toEqual([{ path: 'laterSpecies', value: ['ivysaur', 'venusaur'], requestIds: ['gw-good'] }])
+    expect(normalizeInvestigationAnswer({ summary: 'x', claims: [{ path: 'name', value: 'Kanto', requestIds: ['gw-other'] }] }, 'Follow its main region relationship', calls)?.claims[0]).toMatchObject({ path: 'region', value: 'kanto', requestIds: ['gw-other'] })
+  })
   test('enforces the call budget and rejects unsupported citations', async () => {
     const server = Bun.serve({ port: 0, fetch() { return Response.json({ requestId: 'gw-1' }) } }); servers.push(server)
     const session = new PokedexGatewaySession(request(String(server.url), 1), 'ai-sdk'); await session.call('pokedex_list_resources', {}); const stopped = await session.call('pokedex_list_resources', {}); session.close()

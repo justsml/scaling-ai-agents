@@ -23,7 +23,7 @@ export class PokedexGatewaySession {
   #normalizePaginationArguments(tool: PokedexToolName, value: unknown): unknown { if ((tool !== 'pokedex_list' && tool !== 'pokedex_search') || value === null || typeof value !== 'object' || Array.isArray(value)) return value; const args = { ...(value as Record<string, unknown>) }; const issued = this.#paginationCursors.get(paginationKey(tool, args)); if (typeof args.cursor === 'string' && args.cursor !== issued) { if (issued === undefined) delete args.cursor; else args.cursor = issued } return args }
   #rememberPaginationCursor(tool: PokedexToolName, value: unknown, body: Record<string, unknown>): void { if ((tool !== 'pokedex_list' && tool !== 'pokedex_search') || value === null || typeof value !== 'object' || Array.isArray(value)) return; if (typeof body.nextCursor === 'string') this.#paginationCursors.set(paginationKey(tool, value as Record<string, unknown>), body.nextCursor) }
 }
-export function normalizeInvestigationAnswer(answer: InvestigationAnswer | null, prompt: string): InvestigationAnswer | null {
+export function normalizeInvestigationAnswer(answer: InvestigationAnswer | null, prompt: string, calls: ToolCallEvidence[] = []): InvestigationAnswer | null {
   if (!answer) return null
   const evolution = /evolution|later species/i.test(prompt)
   const rawNamePaths = new Set(['name', 'names', 'laterSpecies', 'types', 'abilities', 'hiddenAbility', 'heavier', 'region', 'pokedexes', 'color'])
@@ -32,11 +32,20 @@ export function normalizeInvestigationAnswer(answer: InvestigationAnswer | null,
     let path = original.path
     if (path === 'name' && Array.isArray(original.value)) path = 'names'
     if (evolution && path === 'names') path = 'laterSpecies'
+    if (/main region/i.test(prompt) && path === 'name') path = 'region'
     const value = rawNamePaths.has(path) ? Array.isArray(original.value) ? original.value.map(item => typeof item === 'string' ? item.toLowerCase() : item) : typeof original.value === 'string' ? original.value.toLowerCase() : original.value : original.value
     const previous = grouped.get(path)
     if (previous && (Array.isArray(previous.value) || Array.isArray(value))) { const values = [...(Array.isArray(previous.value) ? previous.value : [previous.value]), ...(Array.isArray(value) ? value : [value])]; grouped.set(path, { path, value: [...new Set(values)], requestIds: [...new Set([...previous.requestIds, ...original.requestIds])] }) } else grouped.set(path, { path, value, requestIds: [...new Set(original.requestIds)] })
   }
-  return { summary: answer.summary, claims: [...grouped.values()] }
+  const successful = calls.filter(call => call.ok)
+  const validIds = new Set(successful.map(call => call.requestId))
+  const claims = [...grouped.values()].map(claim => {
+    if (calls.length === 0 || claim.requestIds.every(id => validIds.has(id))) return claim
+    const values = (Array.isArray(claim.value) ? claim.value : [claim.value]).map(value => String(value).toLowerCase())
+    const supportingIds = successful.filter(call => { const result = JSON.stringify(call.result).toLowerCase(); return values.every(value => result.includes(value)) }).map(call => call.requestId)
+    return { ...claim, requestIds: supportingIds.length > 0 ? [...new Set(supportingIds)] : claim.requestIds.filter(id => validIds.has(id)) }
+  })
+  return { summary: answer.summary, claims }
 }
 export function validateCitations(answer: InvestigationAnswer | null, calls: ToolCallEvidence[]): boolean { const ids = new Set(calls.filter(c => c.ok).map(c => c.requestId)); return Boolean(answer && answer.claims.every(c => c.requestIds.every(id => ids.has(id)))) }
 function loopbackUrlSchema() { return z.string().url().superRefine((value, ctx) => { const url = new URL(value); if (url.protocol !== 'http:' || url.username || url.password || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'gatewayBaseUrl must be credential-free HTTP on localhost, 127.0.0.1, or [::1]' }) }) }
