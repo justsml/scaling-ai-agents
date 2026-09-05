@@ -46,6 +46,7 @@ export class PokedexGatewaySession {
   readonly evidence: ToolCallEvidence[] = [];
   readonly signal: AbortSignal;
   #calls = 0;
+  #paginationCursors = new Map<string, string>();
   limitExceeded = false;
   #timer: ReturnType<typeof setTimeout>;
 
@@ -57,6 +58,7 @@ export class PokedexGatewaySession {
   close(): void { clearTimeout(this.#timer); }
 
   async call(tool: PokedexToolName, args: unknown): Promise<unknown> {
+    args = this.#normalizePaginationArguments(tool, args);
     const started = Date.now();
     const sequence = ++this.#calls;
     if (sequence > this.request.maxToolCalls) {
@@ -75,6 +77,7 @@ export class PokedexGatewaySession {
       const body = await response.json() as Record<string, unknown>;
       const requestId = String(body.requestId ?? (body.error as Record<string, unknown> | undefined)?.requestId ?? response.headers.get("x-request-id") ?? `missing-${this.#calls}`);
       const ok = response.ok && body.ok !== false;
+      if (ok) this.#rememberPaginationCursor(tool, args, body);
       const endedAt = Date.now();
       this.evidence.push({ sequence, tool, arguments: args, requestId, ok, startedAt: started, endedAt, latencyMs: endedAt - started, disposition: 'gateway', ...(ok ? { result: boundedResult(body) } : { error: body.error ?? body }) });
       this.evidence.sort((a, b) => a.sequence - b.sequence);
@@ -88,6 +91,23 @@ export class PokedexGatewaySession {
       return error;
     }
   }
+
+  #normalizePaginationArguments(tool: PokedexToolName, value: unknown): unknown {
+    if ((tool !== "pokedex_list" && tool !== "pokedex_search") || value === null || typeof value !== "object" || Array.isArray(value)) return value;
+    const args = { ...(value as Record<string, unknown>) };
+    const key = paginationKey(tool, args);
+    const issued = this.#paginationCursors.get(key);
+    if (typeof args.cursor === "string" && args.cursor !== issued) {
+      if (issued === undefined) delete args.cursor;
+      else args.cursor = issued;
+    }
+    return args;
+  }
+
+  #rememberPaginationCursor(tool: PokedexToolName, value: unknown, body: Record<string, unknown>): void {
+    if ((tool !== "pokedex_list" && tool !== "pokedex_search") || value === null || typeof value !== "object" || Array.isArray(value)) return;
+    if (typeof body.nextCursor === "string") this.#paginationCursors.set(paginationKey(tool, value as Record<string, unknown>), body.nextCursor);
+  }
 }
 
 const MAX_EVIDENCE_RESULT_BYTES = 64 * 1024
@@ -96,6 +116,8 @@ function boundedResult(value: unknown): unknown {
   if (new TextEncoder().encode(json).byteLength <= MAX_EVIDENCE_RESULT_BYTES) return value
   return { truncated: true, originalBytes: new TextEncoder().encode(json).byteLength, preview: json.slice(0, 4096) }
 }
+
+function paginationKey(tool: PokedexToolName, args: Record<string, unknown>): string { return `${tool}\0${String(args.resource ?? "")}\0${String(args.query ?? "")}` }
 
 function loopbackUrlSchema() {
   return z.string().url().superRefine((value, ctx) => {

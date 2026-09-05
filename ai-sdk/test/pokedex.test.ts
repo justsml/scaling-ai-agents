@@ -19,6 +19,12 @@ describe('Pokédex investigation seam', () => {
     const session = new PokedexGatewaySession(request(String(server.url)), 'ai-sdk'); await Promise.all([session.call('pokedex_list_resources', {}), session.call('pokedex_list_resources', {})]); session.close()
     expect(headers?.get('x-pokedex-run-id')).toBe('run-1'); expect(headers?.get('x-pokedex-stack')).toBe('ai-sdk'); expect(session.evidence.map(e => e.sequence)).toEqual([1, 2]); expect(session.evidence[0]).toMatchObject({ ok: true }); for (const evidence of session.evidence) { expect(evidence.endedAt).toBeGreaterThanOrEqual(evidence.startedAt); expect(evidence.latencyMs).toBe(evidence.endedAt - evidence.startedAt) }
   })
+  test('owns opaque pagination state at the tool boundary', async () => {
+    const bodies: unknown[] = []; let call = 0
+    const server = Bun.serve({ port: 0, async fetch(req) { bodies.push(await req.json()); return Response.json({ requestId: `gw-${++call}`, nextCursor: call === 1 ? 'issued-cursor' : null, items: [] }) } }); servers.push(server)
+    const session = new PokedexGatewaySession(request(String(server.url)), 'ai-sdk'); await session.call('pokedex_list', { resource: 'pokemon', cursor: 'start' }); await session.call('pokedex_list', { resource: 'pokemon', cursor: 'edited' }); session.close()
+    expect(bodies).toEqual([{ resource: 'pokemon' }, { resource: 'pokemon', cursor: 'issued-cursor' }])
+  })
   test('enforces the call budget and rejects unsupported citations', async () => {
     const server = Bun.serve({ port: 0, fetch() { return Response.json({ requestId: 'gw-1' }) } }); servers.push(server)
     const session = new PokedexGatewaySession(request(String(server.url), 1), 'ai-sdk'); await session.call('pokedex_list_resources', {}); const stopped = await session.call('pokedex_list_resources', {}); session.close()
