@@ -8,3 +8,4 @@ const rows = cases.map((c, index) => {
 })
 console.table(rows); if (rows.some(r => !r.valid || !r.forbidden)) process.exitCode = 1
 console.log(`LangGraph routing contract: action-discriminated · ${rows.length} cases · rules-first`)
+console.log('2x2 experiments: A rules-off/mini, B rules-on/mini, C rules-off/nano, D rules-on/nano; fallback slots: primary then secondary')

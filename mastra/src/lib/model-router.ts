@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
+import { Agent } from '@mastra/core/agent'
+import { JUDGE_MODEL } from './models.js'
 
 export const Route = z.enum(['code', 'long-context', 'general'])
 export const Outcome = z.discriminatedUnion('action', [
@@ -12,6 +14,11 @@ export type RouterOutcome = z.infer<typeof Outcome>
 export type RouterCase = { id: string; input: string; groundTruth: { route?: string | null; action?: string; acceptedRoutes?: string[]; forbidden?: string[]; ambiguous?: boolean; source: string; hard?: boolean } }
 export type ModelDecision = { route: 'code' | 'long-context' | 'general'; confidence: number; reason: string }
 export type DecisionModel = (input: string) => Promise<ModelDecision>
+const DecisionSchema = z.object({ route: Route, confidence: z.number().min(0).max(1), reason: z.string().min(1) })
+export function mastraDecision(model = JUDGE_MODEL): DecisionModel {
+  const agent = new Agent({ id: 'semantic-router', name: 'Semantic Router', instructions: 'Select the best route. Return only the requested structured fields.', model })
+  return async input => (await agent.generate(input, { structuredOutput: { schema: DecisionSchema } })).object as ModelDecision
+}
 
 const fixture = (name: string) => fileURLToPath(new URL(`../../../shared/fixtures/router/${name}`, import.meta.url))
 export async function loadRouterCases(): Promise<RouterCase[]> { return JSON.parse(await readFile(fixture('cases.json'), 'utf8')) }

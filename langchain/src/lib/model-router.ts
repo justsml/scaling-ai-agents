@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
+import { model } from './models.ts'
 export const Route = z.enum(['code', 'long-context', 'general'])
 export const Outcome = z.discriminatedUnion('action', [
   z.object({ action: z.literal('route'), route: Route, confidence: z.number().min(0).max(1), reason: z.string().min(1), source: z.enum(['rule', 'model']) }),
@@ -11,6 +12,8 @@ export type RouterOutcome = z.infer<typeof Outcome>
 export type RouterCase = { id: string; input: string; groundTruth: { route?: string | null; action?: string; acceptedRoutes?: string[]; forbidden?: string[]; ambiguous?: boolean; source: string; hard?: boolean } }
 export type ModelDecision = { route: 'code' | 'long-context' | 'general'; confidence: number; reason: string }
 export type DecisionModel = (input: string) => Promise<ModelDecision>
+const DecisionSchema = z.object({ route: Route, confidence: z.number().min(0).max(1), reason: z.string().min(1) })
+export function langchainDecision(modelId = 'openai:gpt-5.4-nano'): DecisionModel { return async input => (await (await model(modelId)).withStructuredOutput(DecisionSchema).invoke(input)) as ModelDecision }
 const fixture = (name: string) => fileURLToPath(new URL(`../../../shared/fixtures/router/${name}`, import.meta.url))
 export async function loadRouterCases(): Promise<RouterCase[]> { return JSON.parse(await readFile(fixture('cases.json'), 'utf8')) }
 export async function loadRules(): Promise<any[]> { return (JSON.parse(await readFile(fixture('rules.json'), 'utf8')) as any).rules }
