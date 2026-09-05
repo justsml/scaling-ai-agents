@@ -16,6 +16,10 @@ _Avoid_: Reference patch, golden patch
 A challenge artifact that passes every deterministic fixture test. Rubric scoring ranks certified artifacts but does not determine certification.
 _Avoid_: Winning patch, approved patch
 
+**Pokédex investigation**:
+A conformance scenario in which an agent answers a realistic research request by paging through Pokémon records, searching the result set, and following related records.
+_Avoid_: PokéAPI benchmark, Pokémon lookup
+
 **Conformance harness**:
 The common agent-driven test system that runs comparable scenarios across the independent stacks and collects normalized evidence. It does not replace a stack's deterministic certification.
 _Avoid_: Shared implementation, test agent
