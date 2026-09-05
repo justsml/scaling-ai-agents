@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { POKEDEX_TOOLS, PokedexGatewaySession, investigationRequestSchema, loadPokedexToolContract, validateCitations, type InvestigationRequest } from '../src/lib/pokedex'
+import { POKEDEX_TOOLS, PokedexGatewaySession, investigationRequestSchema, loadPokedexToolContract, normalizeInvestigationAnswer, validateCitations, type InvestigationRequest } from '../src/lib/pokedex'
 import { createPokedexTools } from '../src/snippets/08-pokedex'
 import { readFile } from 'node:fs/promises'
 
@@ -24,6 +24,14 @@ describe('Pokédex investigation seam', () => {
     const server = Bun.serve({ port: 0, async fetch(req) { bodies.push(await req.json()); return Response.json({ requestId: `gw-${++call}`, nextCursor: call === 1 ? 'issued-cursor' : null, items: [] }) } }); servers.push(server)
     const session = new PokedexGatewaySession(request(String(server.url)), 'ai-sdk'); await session.call('pokedex_list', { resource: 'pokemon', cursor: 'start' }); await session.call('pokedex_list', { resource: 'pokemon', cursor: 'edited' }); session.close()
     expect(bodies).toEqual([{ resource: 'pokemon' }, { resource: 'pokemon', cursor: 'issued-cursor' }])
+  })
+  test('normalizes raw names and merges paged name claims', () => {
+    const answer = normalizeInvestigationAnswer({ summary: 'x', claims: [
+      { path: 'name', value: ['Bulbasaur'], requestIds: ['r1'] },
+      { path: 'name', value: ['Ivysaur'], requestIds: ['r2'] },
+    ] }, 'List names')
+    expect(answer?.claims).toEqual([{ path: 'names', value: ['bulbasaur', 'ivysaur'], requestIds: ['r1', 'r2'] }])
+    expect(normalizeInvestigationAnswer({ summary: 'x', claims: [{ path: 'names', value: ['Ivysaur'], requestIds: ['r1'] }] }, 'Find later evolution species')?.claims[0]?.path).toBe('laterSpecies')
   })
   test('enforces the call budget and rejects unsupported citations', async () => {
     const server = Bun.serve({ port: 0, fetch() { return Response.json({ requestId: 'gw-1' }) } }); servers.push(server)

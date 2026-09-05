@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { openai } from '@ai-sdk/openai'
 import { generateText, isStepCount, jsonSchema, Output, tool } from 'ai'
-import { POKEDEX_TOOLS, PokedexGatewaySession, answerSchema, investigationRequestSchema, loadPokedexToolContract, validateCitations, type InvestigationEvidence, type InvestigationRequest } from '../lib/pokedex'
+import { POKEDEX_TOOLS, PokedexGatewaySession, answerSchema, investigationRequestSchema, loadPokedexToolContract, normalizeInvestigationAnswer, validateCitations, type InvestigationEvidence, type InvestigationRequest } from '../lib/pokedex'
 
 export function createPokedexTools(contract: Awaited<ReturnType<typeof loadPokedexToolContract>>, session: PokedexGatewaySession) {
   return Object.fromEntries(POKEDEX_TOOLS.map(name => [name, tool({ description: contract[name].description, inputSchema: jsonSchema(contract[name].inputSchema), execute: args => session.call(name, args) })]))
@@ -17,10 +17,10 @@ export async function investigatePokedex(input: InvestigationRequest): Promise<I
     const result = await generateText({
       model: openai('gpt-5.6-luna'), tools, output: Output.object({ schema: answerSchema }), stopWhen: isStepCount(request.maxToolCalls + 1), abortSignal: session.signal,
       providerOptions: { openai: { reasoningEffort: 'none', store: false } },
-      system: "Investigate only with the supplied Pokédex tools. Follow normalized refs; never construct URLs. Omit cursor entirely on the first pokedex_list or pokedex_search call—there is no starting cursor. For later pages, copy the exact nextCursor byte-for-byte; never invent, decode, edit, or shorten a cursor. Retry only errors marked retryable. Every factual claim must cite requestIds from successful tool results. Preserve exact raw API names, casing, numbers, and PokéAPI units; never capitalize names or convert units. Use only the requested canonical lowerCamelCase claim paths without namespace prefixes: searchable, listOnly, name, height, weight, types, abilities, hiddenAbility, heavier, difference, names, laterSpecies, region, pokedexes, baseExperience, or color. Use searchable/listOnly for resource discovery and laterSpecies for evolution descendants.",
+      system: "Investigate only with the supplied Pokédex tools. Follow normalized refs; never construct URLs. Call pokedex_list_resources only when the request explicitly asks for resource discovery. For a named entity, search once and then get the exact returned ref; do not fall back to listing. Omit cursor entirely on the first pokedex_list or pokedex_search call—there is no starting cursor. For later pages, copy the exact nextCursor byte-for-byte; never invent, decode, edit, or shorten a cursor. Retry only errors marked retryable. Every factual claim must cite requestIds from successful tool results. Preserve exact raw API names, casing, numbers, and PokéAPI units; never capitalize names or convert units. Use only the requested canonical lowerCamelCase claim paths without namespace prefixes: searchable, listOnly, name, height, weight, types, abilities, hiddenAbility, heavier, difference, names, laterSpecies, region, pokedexes, baseExperience, or color. Use searchable/listOnly for resource discovery and laterSpecies for evolution descendants.",
       prompt: request.prompt,
     })
-    const answer = result.output ?? null
+    const answer = normalizeInvestigationAnswer(result.output ?? null, request.prompt)
     const usage = result.totalUsage as unknown as { inputTokens?: number; outputTokens?: number; reasoningTokens?: number }
     const finishReason = String(result.finishReason)
     return { stack: 'ai-sdk', answer, toolCalls: session.evidence, usage: normalizeUsage(usage), latencyMs: Date.now() - started, stopReason: session.signal.aborted ? 'deadline' : session.limitExceeded ? 'max-tool-calls' : validateCitations(answer, session.evidence) ? finishReason : 'invalid-evidence', stopMetadata: { finishReason, toolCallAttempts: session.evidence.length, maxToolCalls: request.maxToolCalls, deadlineMs: request.deadlineMs } }

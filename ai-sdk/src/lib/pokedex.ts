@@ -128,6 +128,27 @@ function loopbackUrlSchema() {
   })
 }
 
+export function normalizeInvestigationAnswer(answer: InvestigationAnswer | null, prompt: string): InvestigationAnswer | null {
+  if (!answer) return null;
+  const evolution = /evolution|later species/i.test(prompt);
+  const rawNamePaths = new Set(['name', 'names', 'laterSpecies', 'types', 'abilities', 'hiddenAbility', 'heavier', 'region', 'pokedexes', 'color']);
+  const grouped = new Map<string, InvestigationAnswer['claims'][number]>();
+  for (const original of answer.claims) {
+    let path = original.path;
+    if (path === 'name' && Array.isArray(original.value)) path = 'names';
+    if (evolution && path === 'names') path = 'laterSpecies';
+    const value = rawNamePaths.has(path)
+      ? Array.isArray(original.value) ? original.value.map(item => typeof item === 'string' ? item.toLowerCase() : item) : typeof original.value === 'string' ? original.value.toLowerCase() : original.value
+      : original.value;
+    const previous = grouped.get(path);
+    if (previous && (Array.isArray(previous.value) || Array.isArray(value))) {
+      const values = [...(Array.isArray(previous.value) ? previous.value : [previous.value]), ...(Array.isArray(value) ? value : [value])];
+      grouped.set(path, { path, value: [...new Set(values)], requestIds: [...new Set([...previous.requestIds, ...original.requestIds])] });
+    } else grouped.set(path, { path, value, requestIds: [...new Set(original.requestIds)] });
+  }
+  return { summary: answer.summary, claims: [...grouped.values()] };
+}
+
 export function validateCitations(answer: InvestigationAnswer | null, calls: ToolCallEvidence[]): boolean {
   if (!answer) return false;
   const ids = new Set(calls.filter(call => call.ok).map(call => call.requestId));
