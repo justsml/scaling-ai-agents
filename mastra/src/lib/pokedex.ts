@@ -5,7 +5,9 @@ export const POKEDEX_TOOLS = ['pokedex_list_resources', 'pokedex_list', 'pokedex
 export type PokedexToolName = (typeof POKEDEX_TOOLS)[number]
 export const investigationRequestSchema = z.object({ runId: z.string().min(1), scenarioId: z.string().min(1), prompt: z.string().min(1), gatewayBaseUrl: loopbackUrlSchema(), deadlineMs: z.number().int().positive(), maxToolCalls: z.number().int().positive(), model: z.literal('openai/gpt-5.6-luna'), reasoningEffort: z.literal('none') })
 export type InvestigationRequest = z.infer<typeof investigationRequestSchema>
-export const answerSchema = z.object({ summary: z.string(), claims: z.array(z.object({ path: z.string().min(1), value: z.unknown(), requestIds: z.array(z.string()).min(1) })) })
+const claimScalarSchema = z.union([z.string(), z.number(), z.boolean()])
+const claimValueSchema = z.union([claimScalarSchema, z.array(claimScalarSchema)])
+export const answerSchema = z.object({ summary: z.string(), claims: z.array(z.object({ path: z.string().min(1), value: claimValueSchema, requestIds: z.array(z.string()).min(1) })) })
 export type InvestigationAnswer = z.infer<typeof answerSchema>
 export interface ToolCallEvidence { sequence: number; tool: PokedexToolName; arguments: unknown; requestId: string; ok: boolean; startedAt: number; endedAt: number; latencyMs: number; disposition: 'gateway' | 'blocked'; result?: unknown; error?: unknown }
 export interface InvestigationEvidence { stack: 'mastra'; answer: InvestigationAnswer | null; toolCalls: ToolCallEvidence[]; usage: { inputTokens: number; outputTokens: number; reasoningTokens?: number }; latencyMs: number; stopReason: string; stopMetadata: { finishReason?: string; error?: string; toolCallAttempts: number; maxToolCalls: number; deadlineMs: number } }

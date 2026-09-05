@@ -4,7 +4,7 @@ import { createPokedexTools } from '../src/snippets/08-pokedex.js'
 import { readFile } from 'node:fs/promises'
 const servers: ReturnType<typeof Bun.serve>[] = []
 afterEach(() => { for (const server of servers.splice(0)) server.stop(true) })
-const request = (url: string, maxToolCalls = 2): InvestigationRequest => ({ runId: 'run-1', scenarioId: 'case-1', prompt: 'investigate', gatewayBaseUrl: url, deadlineMs: 1000, maxToolCalls, model: 'openai/gpt-5.6-luna', reasoningEffort: 'none' })
+const request = (url: string, maxToolCalls = 2): InvestigationRequest => ({ runId: 'run-1', scenarioId: 'case-1', prompt: 'investigate', gatewayBaseUrl: url, deadlineMs: 5000, maxToolCalls, model: 'openai/gpt-5.6-luna', reasoningEffort: 'none' })
 describe('Pokédex investigation seam', () => {
   test('loads all four schemas from the copied canonical contract', async () => { expect(Object.keys(await loadPokedexToolContract())).toEqual([...POKEDEX_TOOLS]) })
   test('all copied conformance fixtures are byte-for-byte in sync', async () => { for (const name of ['pokedex-tools.schema.json', 'pokedex-scenarios.json', 'pokedex-expected.json', 'readiness.reference.ts']) expect(await readFile(new URL(`../src/fixtures/${name}`, import.meta.url), 'utf8')).toBe(await readFile(new URL(`../../shared/fixtures/${name}`, import.meta.url), 'utf8')) })

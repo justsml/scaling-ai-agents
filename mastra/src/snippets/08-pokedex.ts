@@ -12,7 +12,7 @@ export async function investigatePokedex(input: InvestigationRequest): Promise<I
   try {
     const contract = await loadPokedexToolContract()
     const tools = createPokedexTools(contract, session)
-    const agent = new Agent({ id: `pokedex-${request.runId}`, name: 'Pokédex Investigator', model: 'openai/gpt-5.6-luna', tools, instructions: 'Investigate only with the supplied Pokédex tools. Follow normalized refs; never construct URLs. Retry only errors marked retryable. Every factual claim must cite requestIds from successful tool results.' })
+    const agent = new Agent({ id: `pokedex-${request.runId}`, name: 'Pokédex Investigator', model: 'openai/gpt-5.6-luna', tools, instructions: 'Investigate only with the supplied Pokédex tools. Follow normalized refs; never construct URLs. Retry only errors marked retryable. Every factual claim must cite requestIds from successful tool results. Use concise lowerCamelCase claim paths named exactly for the requested facts, without namespace prefixes: name, height, weight, types, abilities, hiddenAbility, heavier, difference, names, laterSpecies, region, pokedexes, baseExperience, or color.' })
     const result = await agent.generate(request.prompt, { maxSteps: request.maxToolCalls + 1, abortSignal: session.signal, structuredOutput: { schema: answerSchema }, providerOptions: { openai: { reasoningEffort: 'none', store: false } } })
     const answer = result.object ?? null
     const usage = result.usage as unknown as { inputTokens?: number; outputTokens?: number; reasoningTokens?: number }
