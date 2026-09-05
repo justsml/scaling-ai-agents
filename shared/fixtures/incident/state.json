@@ -1,0 +1,6 @@
+{
+  "user": "u-9",
+  "sessions": ["s-41", "s-42", "s-43"],
+  "subscriptions": { "expected": ["orders", "alerts"], "restored_after_reconnect": [] },
+  "note": "reconnect handler re-opens socket but does not replay subscribe frames"
+}
