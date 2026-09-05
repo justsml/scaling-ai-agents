@@ -1,0 +1,5 @@
+{
+  "default": { "requestId": "studio-default", "profile": "minimal-diff", "region": "us", "dataClass": "internal" },
+  "eu-restricted": { "requestId": "studio-eu", "profile": "best-practices", "region": "eu", "dataClass": "restricted" },
+  "frontier": { "requestId": "studio-frontier", "profile": "frontier", "region": "us", "dataClass": "public" }
+}

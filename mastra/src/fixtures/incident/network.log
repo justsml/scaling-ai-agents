@@ -1,0 +1,11 @@
+2026-09-04T10:00:01Z proxy   conn=8812 upstream=ws-app:8080 state=open
+2026-09-04T10:00:31Z proxy   conn=8812 idle=30s
+2026-09-04T10:01:01Z proxy   conn=8812 idle=60s action=close reason=idle_timeout(60s)
+2026-09-04T10:01:01Z proxy   conn=8812 state=closed bytes_in=1204 bytes_out=88
+2026-09-04T10:01:03Z proxy   conn=8813 upstream=ws-app:8080 state=open
+2026-09-04T10:02:03Z proxy   conn=8813 idle=60s action=close reason=idle_timeout(60s)
+2026-09-04T10:02:05Z proxy   conn=8814 upstream=ws-app:8080 state=open
+2026-09-04T10:02:47Z proxy   conn=8814 idle=42s
+2026-09-04T10:02:47Z proxy   conn=8814 frame=ping dir=client->upstream
+2026-09-04T10:02:47Z proxy   conn=8814 frame=pong dir=upstream->client
+2026-09-04T10:03:47Z proxy   conn=8814 idle=60s action=close reason=idle_timeout(60s)
