@@ -33,7 +33,7 @@ Each snippet prints a one-screen result a speaker can read aloud: the candidates
 
 ## Rules shared by all three
 
-- One snippet per axis plus one router, one remote-worker and one batching snippet. Snippets are single scripts of up to 600 to 1000 lines; the largest reusable chunks move into `src/lib/` biggest-first so each snippet reads top to bottom. Shorter is fine when the mechanism is fully shown. As built, snippets run 180 to 590 lines.
+- One snippet per axis plus one router, one remote-worker, one batching snippet, and one model-router snippet (`08`) implementing the pattern from Dan's routing articles, specified in [`shared/MODEL-ROUTER.md`](shared/MODEL-ROUTER.md). Snippets are single scripts of up to 600 to 1000 lines; the largest reusable chunks move into `src/lib/` biggest-first so each snippet reads top to bottom. Shorter is fine when the mechanism is fully shown. As built, snippets run 180 to 590 lines.
 - Every worker gets one span with `profile`, `costUsd`, `latencyMs`, `outcome`, and `whyItExisted`.
 - Caps are inputs. Every snippet accepts `--budget-usd` and `--deadline-ms` and must stop honestly with partial artifacts and a reason when either is hit.
 - The judge never writes its own rubric. Deterministic checks first, an LLM rubric judge only for survivors, and the rubric text lives in a fixture file.

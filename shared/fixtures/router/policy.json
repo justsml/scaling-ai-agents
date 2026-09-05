@@ -1,0 +1,13 @@
+{
+  "version": "policy-2026-09-05",
+  "routes": {
+    "code": { "minConfidence": 0.7, "costClass": "mini", "escalateTo": "frontier", "escalationNeeds": ["hard"] },
+    "long-context": { "minConfidence": 0.7, "costClass": "mini" },
+    "general": { "minConfidence": 0.0, "costClass": "nano" }
+  },
+  "allowDowngrade": true,
+  "clarifyBelow": 0.4,
+  "routerModelClass": "nano",
+  "fallbackRouterModelClass": "nano",
+  "liveScorerSamplingRate": 1
+}

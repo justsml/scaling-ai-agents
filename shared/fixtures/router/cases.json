@@ -1,0 +1,18 @@
+[
+  { "input": "Fix runWhenReady so all readiness tests pass.", "groundTruth": { "route": "code", "hard": true, "source": "task:r4" } },
+  { "input": "Refactor the retry loop in readiness.ts to use exponential backoff.", "groundTruth": { "route": "code", "source": "synthetic" } },
+  { "input": "Debug a failing Playwright test that only breaks in CI.", "groundTruth": { "route": "code", "source": "article" } },
+  { "input": "Write a unit test for the EACCES branch.", "groundTruth": { "route": "code", "source": "synthetic" } },
+  { "input": "Why do WebSocket sessions for u-9 keep closing with 1006? Investigate network, app and state evidence.", "groundTruth": { "route": "long-context", "source": "task:r3" } },
+  { "input": "Summarize these 14 interview transcripts and find recurring objections.", "groundTruth": { "route": "long-context", "source": "article" } },
+  { "input": "Read network.log and app.log and tell me whether the proxy or the app closed the connection.", "groundTruth": { "route": "long-context", "source": "synthetic" } },
+  { "input": "What is the current status of the ws-app service?", "groundTruth": { "route": "general", "forbidden": ["code"], "source": "task:r1" } },
+  { "input": "Classify this ticket as billing, technical, account, or other.", "groundTruth": { "route": "general", "forbidden": ["code"], "source": "article" } },
+  { "input": "Extract the renewal date and contract value from this short paragraph.", "groundTruth": { "route": "general", "forbidden": ["code", "long-context"], "source": "article" } },
+  { "input": "Read these logs and tell me why the deploy failed.", "groundTruth": { "route": "long-context", "ambiguous": true, "source": "article" } },
+  { "input": "Summarize the last three reconnect events for user u-9.", "groundTruth": { "route": "general", "ambiguous": true, "source": "task:r2" } },
+  { "input": "Is the heartbeat interval a config problem or a code problem?", "groundTruth": { "route": "long-context", "ambiguous": true, "source": "synthetic" } },
+  { "input": "Turn this stack trace into a one-line summary for the status page.", "groundTruth": { "route": "general", "ambiguous": true, "source": "synthetic" } },
+  { "input": "Apply the winning readiness patch to main and push.", "groundTruth": { "route": null, "consequential": true, "source": "task:r5" } },
+  { "input": "Deploy the heartbeat fix to production now.", "groundTruth": { "route": null, "consequential": true, "source": "synthetic" } }
+]
