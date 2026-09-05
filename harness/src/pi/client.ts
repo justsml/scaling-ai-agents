@@ -220,7 +220,10 @@ export async function runPiDriver(
       stdoutPromise.then(() => true),
       delay(options.outputDrainGraceMs ?? 1_000).then(() => false),
     ]);
-    if (!stdoutDrained) protocolErrors.push("Pi RPC stdout remained open after process exit");
+    if (!stdoutDrained) {
+      protocolErrors.push("Pi RPC stdout remained open after process exit");
+      child.closeOutput?.();
+    }
   }
 
   const stderr = await Promise.race([

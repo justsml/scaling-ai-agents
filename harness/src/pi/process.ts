@@ -13,7 +13,10 @@ export class NodeProcessSpawner implements ProcessSpawner {
     });
     const exited = new Promise<number>((resolve, reject) => {
       child.once("error", reject);
-      child.once("close", (code, signal) => {
+      // `close` can wait forever when a grandchild inherits Pi's output pipes.
+      // Process lifecycle is represented by `exit`; stream draining is bounded
+      // independently by the RPC client.
+      child.once("exit", (code, signal) => {
         if (code !== null) resolve(code);
         else resolve(signal === "SIGKILL" ? 137 : 143);
       });
@@ -36,6 +39,10 @@ export class NodeProcessSpawner implements ProcessSpawner {
       exited,
       kill(signal) {
         child.kill(signal);
+      },
+      closeOutput() {
+        child.stdout.destroy();
+        child.stderr.destroy();
       },
     };
   }

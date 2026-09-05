@@ -37,6 +37,7 @@ export interface ChildProcessHandle {
   stderr: AsyncIterable<Uint8Array>;
   exited: Promise<number>;
   kill(signal: "SIGTERM" | "SIGKILL"): void;
+  closeOutput?(): void;
 }
 
 export interface SpawnOptions {
@@ -51,4 +52,3 @@ export interface ProcessSpawner {
 export function isStackName(value: unknown): value is StackName {
   return typeof value === "string" && (STACKS as readonly string[]).includes(value);
 }
-

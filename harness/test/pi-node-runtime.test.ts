@@ -2,8 +2,21 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import { NodeProcessSpawner, delay } from "../src/pi/process";
 
 describe("Node-hosted Pi extension runtime", () => {
+  test("observes process exit when a grandchild inherits output pipes", async () => {
+    const child = new NodeProcessSpawner().spawn([
+      process.execPath,
+      "-e",
+      "require('node:child_process').spawn(process.execPath,['-e','setTimeout(()=>{},1000)'],{stdio:['ignore',1,2]}).unref()",
+    ], { cwd: process.cwd(), env: process.env });
+    await child.closeStdin();
+    const exitCode = await Promise.race([child.exited, delay(300).then(() => "timeout" as const)]);
+    child.closeOutput?.();
+    expect(exitCode).toBe(0);
+  });
+
   test("health, evidence, and child-process adapters do not require Bun globals", async () => {
     const directory = await mkdtemp(resolve(tmpdir(), "pi-node-runtime-"));
     const repoRoot = resolve(import.meta.dir, "../..");
