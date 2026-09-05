@@ -62,6 +62,7 @@ export interface PiClientOptions {
   spawner?: ProcessSpawner;
   abortGraceMs?: number;
   exitGraceMs?: number;
+  outputDrainGraceMs?: number;
   maximumStdoutBytes?: number;
   maximumStderrBytes?: number;
   now?: () => number;
@@ -215,10 +216,20 @@ export async function runPiDriver(
       child.kill("SIGKILL");
       exitCode = await Promise.race([child.exited, delay(options.abortGraceMs ?? 500).then(() => null)]);
     }
-    await stdoutPromise;
+    const stdoutDrained = await Promise.race([
+      stdoutPromise.then(() => true),
+      delay(options.outputDrainGraceMs ?? 1_000).then(() => false),
+    ]);
+    if (!stdoutDrained) protocolErrors.push("Pi RPC stdout remained open after process exit");
   }
 
-  const stderr = await stderrPromise;
+  const stderr = await Promise.race([
+    stderrPromise,
+    delay(options.outputDrainGraceMs ?? 1_000).then(() => {
+      protocolErrors.push("Pi RPC stderr remained open after process exit");
+      return "";
+    }),
+  ]);
   if (exitCode !== 0) protocolErrors.push(`Pi RPC process exited ${exitCode ?? "without a status"}`);
   return {
     piVersion,

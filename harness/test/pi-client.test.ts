@@ -25,15 +25,18 @@ describe("Pi RPC client", () => {
   });
 
   test("sends abort and preserves partial evidence on deadline", async () => {
-    const rpc = new FakeRpcProcess(false);
+    const rpc = new FakeRpcProcess(false, false);
     const result = await runPiDriver(baseRequest(15), {
       spawner: new QueueSpawner([versionProcess("pi 0.85.1\n"), rpc]),
       extensionPath: "/repo/driver-extension.ts",
       abortGraceMs: 2,
       exitGraceMs: 2,
+      outputDrainGraceMs: 2,
     });
     expect(result.timedOut).toBeTrue();
     expect(result.protocolErrors.join(" ")).toContain("deadline exceeded");
+    expect(result.protocolErrors.join(" ")).toContain("stdout remained open");
+    expect(result.protocolErrors.join(" ")).toContain("stderr remained open");
     expect(rpc.commands.some((command) => command.type === "abort")).toBeTrue();
   });
 
@@ -129,7 +132,7 @@ class FakeRpcProcess implements ChildProcessHandle {
   readonly exited: Promise<number>;
   #resolveExit!: (code: number) => void;
 
-  constructor(readonly settle: boolean) {
+  constructor(readonly settle: boolean, readonly closeStreams = true) {
     this.exited = new Promise((resolve) => { this.#resolveExit = resolve; });
   }
 
@@ -159,8 +162,10 @@ class FakeRpcProcess implements ChildProcessHandle {
   }
 
   async closeStdin(): Promise<void> {
-    this.stdout.close();
-    this.stderr.close();
+    if (this.closeStreams) {
+      this.stdout.close();
+      this.stderr.close();
+    }
     this.#resolveExit(0);
   }
 
