@@ -20,14 +20,14 @@
     "ordinary-ability": {
       "claims": [
         { "path": "abilities", "operator": "contains", "value": "overgrow" },
-        { "path": "hiddenAbility", "operator": "equals", "value": "chlorophyll" }
+        { "path": "hiddenAbility", "operator": "equals", "value": "chlorophyll", "support": { "operator": "contains-all", "values": ["chlorophyll", true] } }
       ],
       "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"] }
     },
     "ordinary-comparison": {
       "claims": [
-        { "path": "heavier", "operator": "equals", "value": "charmander" },
-        { "path": "difference", "operator": "equals", "value": 16 }
+        { "path": "heavier", "operator": "equals", "value": "charmander", "support": { "operator": "contains-all", "values": [85, 69] } },
+        { "path": "difference", "operator": "equals", "value": 16, "support": { "operator": "contains-all", "values": [85, 69] } }
       ],
       "evidence": { "requiredTools": ["pokedex_search", "pokedex_get"], "minimumGets": 2 }
     },
