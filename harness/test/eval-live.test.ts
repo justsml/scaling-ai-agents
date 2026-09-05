@@ -134,7 +134,7 @@ describe("live Pi evaluation", () => {
     expect(result.report.passed).toBeFalse();
   });
 
-  test("corroborates every gateway identity field, result class, and call order", () => {
+  test("corroborates every gateway identity field while allowing concurrent arrival order", () => {
     const base = stackEvidence("ai-sdk");
     base.toolCalls[0]!.sequence = 1;
     const record = evidenceRecord("driver", "case", "ai-sdk", base);
@@ -159,7 +159,7 @@ describe("live Pi evaluation", () => {
     const ordered = { ...base, toolCalls: [base.toolCalls[0]!, secondCall] };
     const reordered = evidenceRecord("driver", "case", "ai-sdk", ordered);
     reordered.gatewayEvents.reverse();
-    expect(corroborateGatewayTrace(reordered, ordered).join(" ")).toContain("requestId mismatch");
+    expect(corroborateGatewayTrace(reordered, ordered)).toEqual([]);
 
     const badSequence = structuredClone(ordered);
     badSequence.toolCalls[1]!.sequence = 1;

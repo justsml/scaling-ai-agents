@@ -242,19 +242,17 @@ export function corroborateGatewayTrace(record: DriverEvidenceRecord, evidence: 
   addDuplicateRequestIdDetails(details, "stack trace", calls.map((call) => call.requestId));
   addDuplicateRequestIdDetails(details, "gateway trace", events.map((event) => asRecord(event).requestId));
   addSequenceDetails(details, calls);
-  const length = Math.max(calls.length, events.length);
-  for (let index = 0; index < length; index++) {
-    const call = calls[index];
-    const event = asRecord(events[index]);
-    if (!call) {
-      details.push(`gateway event ${index + 1} has no corresponding stack call`);
+  const eventsByRequestId = new Map(events.map((event) => {
+    const parsed = asRecord(event);
+    return [parsed.requestId, parsed] as const;
+  }));
+  for (let index = 0; index < calls.length; index++) {
+    const call = calls[index]!;
+    const event = eventsByRequestId.get(call.requestId);
+    if (!event) {
+      details.push(`gateway call ${index + 1} requestId mismatch: no event for expected ${call.requestId}`);
       continue;
     }
-    if (Object.keys(event).length === 0) {
-      details.push(`stack call ${index + 1} has no valid gateway event`);
-      continue;
-    }
-    compare(details, index, "requestId", event.requestId, call.requestId);
     compare(details, index, "tool", event.tool, call.tool);
     compare(details, index, "stack", event.stack, record.stack);
     compare(details, index, "run", event.run, record.stackRunId);
@@ -271,6 +269,11 @@ export function corroborateGatewayTrace(record: DriverEvidenceRecord, evidence: 
     if (call.status !== undefined && event.status !== call.status) {
       details.push(`gateway call ${index + 1} status mismatch: expected ${call.status}, received ${String(event.status)}`);
     }
+  }
+  const callIds = new Set(calls.map((call) => call.requestId));
+  for (const [index, value] of events.entries()) {
+    const event = asRecord(value);
+    if (!callIds.has(String(event.requestId))) details.push(`gateway event ${index + 1} has no corresponding stack call`);
   }
   return details;
 }
