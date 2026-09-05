@@ -87,7 +87,7 @@ export async function runPiDriver(
   const spawner = options.spawner ?? new NodeProcessSpawner();
   const piExecutable = options.piExecutable ?? process.env.PI_BIN ?? "pi";
   const piVersion = await readCompatiblePiVersion(piExecutable, request.repoRoot, spawner);
-  const extensionPath = resolve(options.extensionPath ?? resolve(import.meta.dir, "driver-extension.ts"));
+  const extensionPath = resolve(options.extensionPath ?? resolve(request.repoRoot, "harness/src/pi/driver-extension.ts"));
   const argv = [
     piExecutable,
     "--mode", "rpc",

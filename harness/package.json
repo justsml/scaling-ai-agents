@@ -14,7 +14,7 @@
     "down": "bun run src/compose/lifecycle.ts down",
     "clean": "bun run src/compose/lifecycle.ts clean",
     "reset": "bun run src/compose/lifecycle.ts reset",
-    "eval": "bun run src/eval/cli.ts"
+    "eval": "node src/eval/node-cli.mjs"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "0.85.1",
