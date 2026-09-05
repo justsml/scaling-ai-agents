@@ -15,8 +15,8 @@ describe('Pokédex investigation seam', () => {
   test('attaches hidden context and records request IDs', async () => {
     let headers: Headers | undefined
     const server = Bun.serve({ port: 0, fetch(req) { headers = req.headers; return Response.json({ requestId: 'gw-1', resources: [] }) } }); servers.push(server)
-    const session = new PokedexGatewaySession(request(String(server.url)), 'ai-sdk'); await session.call('pokedex_list_resources', {}); session.close()
-    expect(headers?.get('x-pokedex-run-id')).toBe('run-1'); expect(headers?.get('x-pokedex-stack')).toBe('ai-sdk'); expect(session.evidence[0]).toMatchObject({ requestId: 'gw-1', ok: true })
+    const session = new PokedexGatewaySession(request(String(server.url)), 'ai-sdk'); await session.call('pokedex_list_resources', {}); await session.call('pokedex_list_resources', {}); session.close()
+    expect(headers?.get('x-pokedex-run-id')).toBe('run-1'); expect(headers?.get('x-pokedex-stack')).toBe('ai-sdk'); expect(session.evidence.map(e => e.sequence)).toEqual([1, 2]); expect(session.evidence[0]).toMatchObject({ requestId: 'gw-1', ok: true, result: { requestId: 'gw-1', resources: [] } }); for (const evidence of session.evidence) { expect(evidence.endedAt).toBeGreaterThanOrEqual(evidence.startedAt); expect(evidence.latencyMs).toBe(evidence.endedAt - evidence.startedAt) }
   })
   test('enforces the call budget and rejects unsupported citations', async () => {
     const server = Bun.serve({ port: 0, fetch() { return Response.json({ requestId: 'gw-1' }) } }); servers.push(server)

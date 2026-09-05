@@ -17,7 +17,7 @@ export const answerSchema = z.object({
 });
 export type InvestigationAnswer = z.infer<typeof answerSchema>;
 
-export interface ToolCallEvidence { tool: PokedexToolName; arguments: unknown; requestId: string; ok: boolean; latencyMs: number; disposition: 'gateway' | 'blocked'; error?: unknown }
+export interface ToolCallEvidence { sequence: number; tool: PokedexToolName; arguments: unknown; requestId: string; ok: boolean; startedAt: number; endedAt: number; latencyMs: number; disposition: 'gateway' | 'blocked'; result?: unknown; error?: unknown }
 export interface InvestigationEvidence {
   stack: 'ai-sdk'; answer: InvestigationAnswer | null; toolCalls: ToolCallEvidence[];
   usage: { inputTokens: number; outputTokens: number; reasoningTokens?: number }; latencyMs: number; stopReason: string;
@@ -56,10 +56,12 @@ export class PokedexGatewaySession {
 
   async call(tool: PokedexToolName, args: unknown): Promise<unknown> {
     const started = Date.now();
-    if (++this.#calls > this.request.maxToolCalls) {
+    const sequence = ++this.#calls;
+    if (sequence > this.request.maxToolCalls) {
       this.limitExceeded = true;
-      const error = { code: "MAX_TOOL_CALLS", message: "tool-call budget exhausted", retryable: false, retryAfterMs: null, requestId: `local-${this.request.runId}-${this.#calls}` };
-      this.evidence.push({ tool, arguments: args, requestId: error.requestId, ok: false, latencyMs: 0, disposition: 'blocked', error });
+      const error = { code: "MAX_TOOL_CALLS", message: "tool-call budget exhausted", retryable: false, retryAfterMs: null, requestId: `local-${this.request.runId}-${sequence}` };
+      const endedAt = Date.now();
+      this.evidence.push({ sequence, tool, arguments: args, requestId: error.requestId, ok: false, startedAt: started, endedAt, latencyMs: endedAt - started, disposition: 'blocked', error });
       return error;
     }
     try {
@@ -70,15 +72,24 @@ export class PokedexGatewaySession {
       const body = await response.json() as Record<string, unknown>;
       const requestId = String(body.requestId ?? (body.error as Record<string, unknown> | undefined)?.requestId ?? response.headers.get("x-request-id") ?? `missing-${this.#calls}`);
       const ok = response.ok && body.ok !== false;
-      this.evidence.push({ tool, arguments: args, requestId, ok, latencyMs: Date.now() - started, disposition: 'gateway', ...(ok ? {} : { error: body.error ?? body }) });
+      const endedAt = Date.now();
+      this.evidence.push({ sequence, tool, arguments: args, requestId, ok, startedAt: started, endedAt, latencyMs: endedAt - started, disposition: 'gateway', ...(ok ? { result: boundedResult(body) } : { error: body.error ?? body }) });
       return body;
     } catch (cause) {
-      const requestId = `local-${this.request.runId}-${this.#calls}`;
+      const requestId = `local-${this.request.runId}-${sequence}`;
       const error = { code: this.signal.aborted ? "DEADLINE" : "GATEWAY_UNAVAILABLE", message: cause instanceof Error ? cause.message : String(cause), retryable: !this.signal.aborted, retryAfterMs: null, requestId };
-      this.evidence.push({ tool, arguments: args, requestId, ok: false, latencyMs: Date.now() - started, disposition: 'gateway', error });
+      const endedAt = Date.now();
+      this.evidence.push({ sequence, tool, arguments: args, requestId, ok: false, startedAt: started, endedAt, latencyMs: endedAt - started, disposition: 'gateway', error });
       return error;
     }
   }
+}
+
+const MAX_EVIDENCE_RESULT_BYTES = 64 * 1024
+function boundedResult(value: unknown): unknown {
+  const json = JSON.stringify(value)
+  if (new TextEncoder().encode(json).byteLength <= MAX_EVIDENCE_RESULT_BYTES) return value
+  return { truncated: true, originalBytes: new TextEncoder().encode(json).byteLength, preview: json.slice(0, 4096) }
 }
 
 function loopbackUrlSchema() {
