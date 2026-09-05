@@ -8,6 +8,10 @@ const pokemon = [
   { name: "venusaur", url: "http://pokeapi:80/api/v2/pokemon/3/" },
   { name: "charmander", url: "http://pokeapi:80/api/v2/pokemon/4/" },
 ];
+const generations = [
+  { name: "generation-i", url: "http://pokeapi:80/api/v2/generation/1/" },
+  { name: "generation-ii", url: "http://pokeapi:80/api/v2/generation/2/" },
+];
 
 function upstream(input: string | URL | Request): Promise<Response> {
   const url = new URL(input instanceof Request ? input.url : input.toString());
@@ -16,6 +20,9 @@ function upstream(input: string | URL | Request): Promise<Response> {
     const limit = Number(url.searchParams.get("limit") ?? 20);
     const results = pokemon.slice(offset, offset + limit);
     return Promise.resolve(Response.json({ count: pokemon.length, next: offset + limit < pokemon.length ? "next" : null, results }));
+  }
+  if (url.pathname === "/api/v2/generation/") {
+    return Promise.resolve(Response.json({ count: generations.length, next: null, results: generations }));
   }
   if (url.pathname === "/api/v2/pokemon/1/") {
     return Promise.resolve(Response.json({
@@ -133,6 +140,14 @@ describe("Pokédex gateway", () => {
     expect(JSON.stringify(body)).not.toContain("example.invalid");
     const counterfeit = await gateway.fetch(request("/tools/pokedex_get", { ref: "pokemon/4" }));
     expect(await counterfeit.json()).toMatchObject({ code: "UNISSUED_REFERENCE" });
+  });
+
+  test("searches names independently of spaces, underscores, or hyphens", async () => {
+    await configure();
+    const search = await gateway.fetch(request("/tools/pokedex_search", { resource: "generation", query: "Generation I", pageSize: 5 }));
+    const body = await search.json();
+    expect(body.query).toBe("generation-i");
+    expect(body.items[0]).toEqual({ name: "generation-i", ref: "generation/1" });
   });
 
   test("injects delay deterministically", async () => {

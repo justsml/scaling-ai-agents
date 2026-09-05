@@ -31,7 +31,7 @@
     },
     {
       "name": "pokedex_search",
-      "description": "Case-insensitively search names in one allowlisted local Pokédex resource. Continue only with the opaque nextCursor returned by this tool.",
+      "description": "Case- and separator-insensitively search names in one allowlisted local Pokédex resource. Continue only with the opaque nextCursor returned by this tool.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -49,7 +49,7 @@
     },
     {
       "name": "pokedex_get",
-      "description": "Read a normalized local reference returned by an earlier Pokédex tool call. URLs and invented references are rejected.",
+      "description": "Read a normalized local reference returned by an earlier Pokédex tool call. URLs and invented references are rejected. If the requested answer needs a fact about a related object, read its returned ref; the relationship name alone is not evidence for that object's fields.",
       "inputSchema": {
         "type": "object",
         "properties": {

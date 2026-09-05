@@ -230,7 +230,7 @@ export function createGateway(options: GatewayOptions): { fetch(request: Request
       });
     }
     const resource = args.resource;
-    const query = args.query.trim().toLocaleLowerCase("en-US");
+    const query = args.query.trim().toLocaleLowerCase("en-US").replace(/[\s_]+/g, "-");
     const pageSize = parsePageSize(args.pageSize);
     const offset = args.cursor === undefined
       ? 0
