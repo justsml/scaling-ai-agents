@@ -44,8 +44,8 @@ import {
   patchSchema,
 } from '../lib/profiles.js'
 import { TIEBREAK_ORDER, type Candidate, pickWinner, rubricJudgeScorer, survivors } from '../lib/judge.js'
-import { disqualify, readBuggyModule, runCandidate } from '../lib/sandbox.js'
-import { REFERENCE_PATCH, hashSource, registerCompiled } from '../lib/compiled.js'
+import { readinessChallenge, type ReadinessTestResult } from '../lib/readiness-challenge.js'
+import { hashSource, registerCompiled } from '../lib/compiled.js'
 import { JUDGE_MODEL } from '../lib/models.js'
 import { contextOf, endWorkerSpan, failWorkerSpan, shutdownTracing, startSnippetSpan, startWorkerSpan } from '../lib/spans.js'
 import { mastra } from '../mastra/index.js'
@@ -81,7 +81,7 @@ export async function runTournament(opts: {
   const includeReference = opts.includeReference ?? true
   const wantJudge = opts.judge ?? true
 
-  const buggySource = await readBuggyModule()
+  const buggySource = (await readinessChallenge.load('buggy')).source
   const prompt = buildTaskPrompt(buggySource)
 
   const local = localCompetitor()
@@ -175,28 +175,30 @@ export async function runTournament(opts: {
   if (includeReference) {
     const span = startWorkerSpan(parentSpan, 'competitor:reference', { profile: 'reference' })
     const started = Date.now()
-    const sandbox = await runCandidate(REFERENCE_PATCH, { abortSignal: signal })
+    const reference = await readinessChallenge.load('reference')
+    const certification = await readinessChallenge.certify(reference, { abortSignal: signal })
+    const sandbox = ('result' in certification ? certification.result : null) ?? null
     const latencyMs = Date.now() - started
     ledger.skip('reference', 'none', 'hand-written control; no model call')
     candidates.push({
       id: 'reference',
       label: 'hand-written control',
       model: 'none',
-      patch: REFERENCE_PATCH,
+      patch: reference.source,
       sandbox,
       costUsd: 0,
       latencyMs,
       rubricScore: null,
       rubricReason: '',
       whyItExisted: 'the free baseline; if no model beats it, the tournament produced nothing worth paying for',
-      outcome: 'ok',
-      note: '',
+      outcome: certification.outcome === 'certified' ? 'ok' : 'failed',
+      note: certification.outcome === 'certified' ? '' : certification.outcome,
     })
     endWorkerSpan(span, {
       profile: 'reference',
       costUsd: 0,
       latencyMs,
-      outcome: sandbox.green ? 'green' : `${sandbox.pass}/${sandbox.pass + sandbox.fail}`,
+      outcome: sandbox?.green ? 'green' : `${sandbox?.pass ?? 0}/${(sandbox?.pass ?? 0) + (sandbox?.fail ?? 0)}`,
       whyItExisted: 'free control on the same contract',
     })
   }
@@ -378,14 +380,20 @@ async function runCompetitor(
 
     // Structural disqualifiers first: they are detectable without running
     // anything, and catching them here saves a sandbox spawn.
-    const dq = disqualify(patch)
-    if (dq) {
+    const certification = await readinessChallenge.certify(patch, { abortSignal: signal })
+    if (certification.outcome === 'ineligible') {
       base.outcome = 'ok'
-      base.note = dq
-      base.sandbox = { pass: 0, fail: 5, green: false, output: '', exitCode: 1, durationMs: 0, failed: [dq] }
+      base.note = certification.reason
+      base.sandbox = failedEligibility(certification.reason)
     } else {
-      base.sandbox = await runCandidate(patch, { abortSignal: signal })
-      base.note = base.sandbox.green ? '' : base.sandbox.failed.slice(0, 2).join('; ')
+      base.sandbox = ('result' in certification ? certification.result : null) ?? null
+      base.outcome =
+        certification.outcome === 'cancelled' || certification.outcome === 'timed-out'
+          ? 'aborted'
+          : certification.outcome === 'execution-error'
+            ? 'failed'
+            : 'ok'
+      base.note = base.sandbox?.green ? '' : (base.sandbox?.failed.slice(0, 2).join('; ') || certification.outcome)
     }
 
     endWorkerSpan(
@@ -502,6 +510,10 @@ async function main(): Promise<void> {
 function isAbort(err: unknown): boolean {
   const m = err instanceof Error ? `${err.name} ${err.message}` : String(err)
   return /abort|timeout|MastraTimeoutError/i.test(m)
+}
+
+function failedEligibility(reason: string): ReadinessTestResult {
+  return { pass: 0, fail: 5, skip: 0, green: false, output: '', exitCode: 1, durationMs: 0, failed: [reason] }
 }
 
 if (import.meta.main) {

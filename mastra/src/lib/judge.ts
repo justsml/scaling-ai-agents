@@ -1,7 +1,7 @@
 /**
  * The judge, in two halves that must stay in that order.
  *
- * 1. Deterministic first. `sandbox.runCandidate` decides who is even eligible.
+ * 1. Deterministic first. The Readiness challenge decides who is even eligible.
  *    A candidate that fails the fixture tests never reaches the model.
  * 2. The rubric judge second, and only for survivors. The rubric text is read
  *    verbatim from src/fixtures/rubric.md; the judge does not get to write its
@@ -16,7 +16,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { FIXTURES_DIR } from './setup.js'
 import { JUDGE_MODEL } from './models.js'
-import type { SandboxResult } from './sandbox.js'
+import type { ReadinessTestResult } from './readiness-challenge.js'
 
 let cachedRubric: string | null = null
 
@@ -131,7 +131,7 @@ export interface Candidate {
   label: string
   model: string
   patch: string
-  sandbox: SandboxResult | null
+  sandbox: ReadinessTestResult | null
   costUsd: number
   latencyMs: number
   rubricScore: number | null

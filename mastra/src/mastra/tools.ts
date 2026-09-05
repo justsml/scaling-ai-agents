@@ -9,10 +9,8 @@
  */
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { FIXTURES_DIR } from '../lib/setup.js'
 import { compiledPatchFor, hashSource } from '../lib/compiled.js'
+import { readinessChallenge } from '../lib/readiness-challenge.js'
 
 /** Lookup class: a deterministic answer, no model in the path at all. */
 export const statusTool = createTool({
@@ -128,9 +126,13 @@ export const compiledReadinessTool = createTool({
     modelCalls: z.number(),
   }),
   execute: async ({ source }) => {
-    const text = source ?? (await readFile(join(FIXTURES_DIR, 'readiness.ts'), 'utf8'))
+    const [buggy, reference] = await Promise.all([
+      readinessChallenge.load('buggy'),
+      readinessChallenge.load('reference'),
+    ])
+    const text = source ?? buggy.source
     const sourceHash = hashSource(text)
-    const patch = compiledPatchFor(sourceHash)
+    const patch = compiledPatchFor(sourceHash, reference)
     return patch
       ? { matched: true, sourceHash, patch, reason: 'hash matched the compiled rule', modelCalls: 0 }
       : {

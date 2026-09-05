@@ -41,8 +41,7 @@ import type { StopReason } from '../lib/caps.js'
 import { Ledger, usdFromUsage } from '../lib/ledger.js'
 import { bullet, header, json, ledgerTable, reportSpend, section, stopBanner, table, usd } from '../lib/print.js'
 import { boundedPool } from '../lib/pool.js'
-import { REFERENCE_PATCH } from '../lib/compiled.js'
-import { readBuggyModule, runCandidate } from '../lib/sandbox.js'
+import { readinessChallenge } from '../lib/readiness-challenge.js'
 import { WORKER_MODEL } from '../lib/models.js'
 import { endWorkerSpan, contextOf, shutdownTracing, startSnippetSpan, startWorkerSpan } from '../lib/spans.js'
 import { backgroundAgent, probeAgent } from '../mastra/agents.js'
@@ -155,13 +154,18 @@ async function main(): Promise<void> {
   // (b) Fan-out over a list. No model, so the numbers are clean.
   // =========================================================================
   section(`(b) .foreach(step, { concurrency: ${FOREACH_CONCURRENCY} }) over the candidate list`)
-  const buggy = await readBuggyModule()
+  const [buggyArtifact, referenceArtifact] = await Promise.all([
+    readinessChallenge.load('buggy'),
+    readinessChallenge.load('reference'),
+  ])
+  const buggy = buggyArtifact.source
+  const reference = referenceArtifact.source
   const candidates = [
-    { name: 'reference', source: REFERENCE_PATCH },
+    { name: 'reference', source: reference },
     { name: 'buggy-original', source: buggy },
-    { name: 'reference-copy-1', source: REFERENCE_PATCH + '\n// variant 1\n' },
+    { name: 'reference-copy-1', source: reference + '\n// variant 1\n' },
     { name: 'buggy-copy-1', source: buggy + '\n// variant 1\n' },
-    { name: 'reference-copy-2', source: REFERENCE_PATCH + '\n// variant 2\n' },
+    { name: 'reference-copy-2', source: reference + '\n// variant 2\n' },
     { name: 'buggy-copy-2', source: buggy + '\n// variant 2\n' },
   ]
 
@@ -172,8 +176,9 @@ async function main(): Promise<void> {
     outputSchema: z.object({ name: z.string(), pass: z.number(), fail: z.number(), ms: z.number() }),
     execute: async ({ inputData }) => {
       const t = Date.now()
-      const r = await runCandidate(inputData.source, { abortSignal: signal })
-      return { name: inputData.name, pass: r.pass, fail: r.fail, ms: Date.now() - t }
+      const certification = await readinessChallenge.certify(inputData.source, { abortSignal: signal })
+      const result = 'result' in certification ? certification.result : null
+      return { name: inputData.name, pass: result?.pass ?? 0, fail: result?.fail ?? 0, ms: Date.now() - t }
     },
   })
 
@@ -213,7 +218,9 @@ async function main(): Promise<void> {
   // buys you a traced step per item and a resumable snapshot; a pool buys you
   // eight lines of code. Both are correct answers to different questions.
   const poolStart = Date.now()
-  const poolResults = await boundedPool(candidates, FOREACH_CONCURRENCY, async item => runCandidate(item.source, { abortSignal: signal }))
+  const poolResults = await boundedPool(candidates, FOREACH_CONCURRENCY, async item =>
+    readinessChallenge.certify(item.source, { abortSignal: signal }),
+  )
   const poolMs = Date.now() - poolStart
   table([
     { approach: 'workflow .foreach()', wall: `${fanMs}ms`, gives_you: 'one traced step per item, resumable snapshot, progress events' },

@@ -39,7 +39,7 @@ import { bullet, header, json, ledgerTable, reportSpend, section, stopBanner, ta
 import { COMPETITORS } from '../lib/profiles.js'
 import { runTournament } from './01-compete.js'
 import { fixtureScorer } from '../lib/judge.js'
-import { runCandidate, readBuggyModule } from '../lib/sandbox.js'
+import { readinessChallenge, type ReadinessTestResult } from '../lib/readiness-challenge.js'
 import {
   type CompiledRule,
   clearCompiled,
@@ -100,7 +100,12 @@ async function main(): Promise<void> {
     `${describeCaps(caps)} · the fixture tests are the contract, before and after`,
   )
 
-  const buggy = await readBuggyModule()
+  const buggyArtifact = await readinessChallenge.load('buggy')
+  const referenceArtifact = await readinessChallenge.load('reference')
+  const buggy = buggyArtifact.source
+  if (referenceArtifact.targetIdentity !== buggyArtifact.identity) {
+    throw new Error('the copied Reference artifact does not target the copied buggy fixture')
+  }
   const buggyHash = hashSource(buggy)
   const lookalikeHash = hashSource(LOOKALIKE_SOURCE)
   const requests = await loadRequests()
@@ -249,7 +254,7 @@ async function main(): Promise<void> {
       reason: string
       modelCalls: number
     }
-    const sandbox = await runCandidate(viaTool.patch)
+    const sandbox = await certifiedResult(viaTool.patch)
     const latencyMs = Date.now() - hitStarted
 
     json('what the compiled path returned', {
@@ -352,7 +357,7 @@ async function main(): Promise<void> {
                 patch: string
               }
               if (!out.matched) return { green: false, pass: 0, fail: 5, matched: false }
-              const s = await runCandidate(out.patch)
+              const s = await certifiedResult(out.patch)
               return { green: s.green, pass: s.pass, fail: s.fail, matched: true }
             },
           }),
@@ -427,6 +432,12 @@ async function main(): Promise<void> {
   })
   reportSpend(SNIPPET, ledger.spentUsd)
   await shutdownTracing()
+}
+
+async function certifiedResult(source: string): Promise<ReadinessTestResult> {
+  const certification = await readinessChallenge.certify(source)
+  if ('result' in certification && certification.result) return certification.result
+  throw new Error(`readiness certification did not execute: ${certification.outcome}`)
 }
 
 async function runViaDynamicWorkflow(source: string): Promise<{ status: string; matched: boolean } | null> {

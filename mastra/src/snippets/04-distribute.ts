@@ -41,7 +41,7 @@ import { Ledger, estimateWorkerCost, usdFromUsage } from '../lib/ledger.js'
 import { bullet, header, json, ledgerTable, reportSpend, section, stopBanner, table, usd } from '../lib/print.js'
 import { POOL, type ProviderEntry, resolveProvider, withFallback } from '../lib/pool.js'
 import { buildTaskPrompt, cleanPatch, patchSchema } from '../lib/profiles.js'
-import { disqualify, readBuggyModule, runCandidate } from '../lib/sandbox.js'
+import { readinessChallenge } from '../lib/readiness-challenge.js'
 import { loadRequests } from '../lib/router.js'
 import { localSlotAvailable } from '../lib/models.js'
 import { ArtifactAssembler, REMOTE_AGENT_ID, REMOTE_CARD_URL, normalizeEvent, startRemoteServer, userMessage } from '../lib/a2a.js'
@@ -136,7 +136,7 @@ async function main(): Promise<void> {
     return
   }
 
-  const buggy = await readBuggyModule()
+  const buggy = (await readinessChallenge.load('buggy')).source
   const prompt = buildTaskPrompt(buggy)
   const signal = deadlineSignal(caps)
   const served: ServedWorker[] = []
@@ -269,8 +269,9 @@ async function main(): Promise<void> {
     })
 
     const patch = cleanPatch(result.object?.patch ?? result.text ?? '')
-    const dq = patch ? disqualify(patch) : 'empty response'
-    const sandbox = !dq && !aborted ? await runCandidate(patch, { abortSignal: signal }) : null
+    const certification = patch && !aborted ? await readinessChallenge.certify(patch, { abortSignal: signal }) : null
+    const dq = !patch ? 'empty response' : certification?.outcome === 'ineligible' ? certification.reason : null
+    const sandbox = certification && 'result' in certification ? certification.result : null
 
     served.push({
       worker: w.id,
@@ -355,8 +356,9 @@ async function main(): Promise<void> {
       const latencyMs = Date.now() - remoteStarted
       const text = assembler.value
       const patch = cleanPatch(text)
-      const dq = patch ? disqualify(patch) : 'no text returned'
-      const sandbox = !dq ? await runCandidate(patch, { abortSignal: signal }) : null
+      const certification = patch ? await readinessChallenge.certify(patch, { abortSignal: signal }) : null
+      const dq = !patch ? 'no text returned' : certification?.outcome === 'ineligible' ? certification.reason : null
+      const sandbox = certification && 'result' in certification ? certification.result : null
 
       ledger.reconcile('remote-a2a', {
         usage: { inputTokens: Math.ceil(prompt.length / 4), outputTokens: Math.ceil(text.length / 4) },

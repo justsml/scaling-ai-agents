@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import { type Candidate, TIEBREAK_ORDER, compareCandidates, pickWinner, survivors } from '../src/lib/judge.js'
-import type { SandboxResult } from '../src/lib/sandbox.js'
+import type { ReadinessTestResult } from '../src/lib/readiness-challenge.js'
 
-function sandbox(pass: number, fail: number): SandboxResult {
+function sandbox(pass: number, fail: number): ReadinessTestResult {
   return {
     pass,
     fail,
+    skip: 0,
     green: fail === 0 && pass > 0,
     output: '',
     exitCode: fail === 0 ? 0 : 1,
