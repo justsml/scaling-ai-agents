@@ -187,7 +187,10 @@ export async function runPiDriver(
     protocolErrors.push(errorMessage(error));
     if (stdinOpen) {
       try {
-        await child.writeStdin(`${JSON.stringify({ id: "abort", type: "abort" })}\n`);
+        await Promise.race([
+          child.writeStdin(`${JSON.stringify({ id: "abort", type: "abort" })}\n`),
+          delay(options.abortGraceMs ?? 500),
+        ]);
         await Promise.race([settled.promise, delay(options.abortGraceMs ?? 500)]);
       } catch (abortError) {
         protocolErrors.push(`abort failed: ${errorMessage(abortError)}`);
@@ -199,7 +202,10 @@ export async function runPiDriver(
     if (stdinOpen) {
       stdinOpen = false;
       try {
-        await child.closeStdin();
+        await Promise.race([
+          child.closeStdin(),
+          delay(options.abortGraceMs ?? 500),
+        ]);
       } catch (error) {
         protocolErrors.push(`stdin close failed: ${errorMessage(error)}`);
       }
@@ -255,7 +261,11 @@ export async function runPiDriver(
     const pending = new Deferred<RpcResponse>();
     responses.set(id, pending);
     try {
-      await child.writeStdin(`${JSON.stringify({ id, ...command })}\n`);
+      await waitFor(
+        child.writeStdin(`${JSON.stringify({ id, ...command })}\n`),
+        lifecycleAbort.signal,
+        streamFailed.promise,
+      );
       return await waitFor(pending.promise, lifecycleAbort.signal, streamFailed.promise);
     } finally {
       responses.delete(id);
