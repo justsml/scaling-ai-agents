@@ -1,0 +1,102 @@
+name: ${COMPOSE_PROJECT_NAME:-agentic-pokedex}
+
+services:
+  db:
+    image: postgres:17.2-alpine3.21@sha256:7e5df973a74872482e320dcbdeb055e178d6f42de0558b083892c50cda833c96
+    environment:
+      POSTGRES_DB: pokeapi
+      POSTGRES_USER: ash
+      POSTGRES_PASSWORD: pokemon
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ash -d pokeapi"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  cache:
+    image: redis:7.4.2-alpine3.21@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile.pokeapi-seed
+    user: root
+    environment: &pokeapi-environment
+      POSTGRES_DB: pokeapi
+      POSTGRES_USER: ash
+      POSTGRES_PASSWORD: pokemon
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      REDIS_CONNECTION_STRING: redis://cache:6379/1
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    volumes:
+      - pg_data:/seed-state-db
+    command:
+      - sh
+      - -ec
+      - |
+        python manage.py migrate --settings=config.docker-compose
+        if [ ! -f /seed-state-db/.pokeapi-2.9.0.complete ]; then
+          echo 'from data.v2.build import build_all; build_all()' | python manage.py shell --settings=config.docker-compose
+          touch /seed-state-db/.pokeapi-2.9.0.complete
+        fi
+    restart: "no"
+
+  pokeapi:
+    image: pokeapi/pokeapi:2.9.0@sha256:4b88349acee7e1ecc80b441da236e39b58e9389aed4e8de7fe9bd2feb7e355cf
+    user: pokeapi
+    environment: *pokeapi-environment
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1/api/v2/pokemon/1/', timeout=3))['name'] == 'bulbasaur'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PORT: "8080"
+      POKEAPI_BASE_URL: http://pokeapi:80/
+      POKEDEX_CURSOR_SECRET: ${POKEDEX_CURSOR_SECRET:-local-conformance-cursor-v1}
+      POKEDEX_CONTROL_SECRET: ${POKEDEX_CONTROL_SECRET:-local-conformance-control-v1}
+    depends_on:
+      pokeapi:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${POKEDEX_GATEWAY_PORT:-3210}:8080"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "const r=await fetch('http://127.0.0.1:8080/healthz');process.exit(r.ok?0:1)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+    name: ${COMPOSE_PROJECT_NAME:-agentic-pokedex}-pg-v2-9-0
+  redis_data:
+    name: ${COMPOSE_PROJECT_NAME:-agentic-pokedex}-redis-v2-9-0

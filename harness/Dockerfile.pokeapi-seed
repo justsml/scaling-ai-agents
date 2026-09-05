@@ -1,0 +1,11 @@
+FROM pokeapi/pokeapi:2.9.0@sha256:4b88349acee7e1ecc80b441da236e39b58e9389aed4e8de7fe9bd2feb7e355cf
+
+# The official 2.9.0 runtime image intentionally omits the CSV database source.
+# Add only the CSVs from the matching, immutable upstream commit for build_all.
+USER root
+ADD --checksum=sha256:1f948b77e927c02a3c30751cd50f3e93cc1c94240ec1f66e90d9004688866230 \
+  https://github.com/PokeAPI/pokeapi/archive/41c48560b317ce91020c18cddb44adedb13a576d.tar.gz \
+  /tmp/pokeapi-source.tar.gz
+RUN tar -xzf /tmp/pokeapi-source.tar.gz -C /tmp \
+  && cp -R /tmp/pokeapi-41c48560b317ce91020c18cddb44adedb13a576d/data/v2/csv /code/data/v2/csv \
+  && rm -rf /tmp/pokeapi-source.tar.gz /tmp/pokeapi-41c48560b317ce91020c18cddb44adedb13a576d
