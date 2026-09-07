@@ -18,7 +18,8 @@
     "snippet:08": "bun run src/snippets/08-pokedex.ts",
     "snippet:09": "bun run src/snippets/09-model-router.ts",
     "all": "bun run src/run-all.ts",
-    "snippet:16": "bun src/snippets/16-fanout-node.ts"
+    "snippet:16": "bun src/snippets/16-fanout-node.ts",
+    "snippet:17": "bun run src/snippets/17-business-advice.ts"
   },
   "dependencies": {
     "ai": "^7.0.93",

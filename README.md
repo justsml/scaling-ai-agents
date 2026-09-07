@@ -1,50 +1,132 @@
-# scaling-ai-agents
+# Scaling AI Agents
 
-Reference implementations of the five parallelism axes from the talk *Rethinking Parallelization in the Agentic Era*, built three times on three TypeScript stacks so the tradeoffs are visible side by side.
+Runnable TypeScript examples of parallel generation, model routing, scoped tools, durable jobs, and the checks that decide whether an agent's work is acceptable. Compare **AI SDK**, **LangChain + LangGraph**, and **Mastra** on the same tasks.
 
-> Compete: many solutions, one problem
-> Decompose: many sub-problems, many workers
-> Constrain: caps on time and money as first-class inputs
-> Distribute: hardware, providers, regions
-> Compile: turn the winning path into deterministic code
+More attempts are useful when they produce a better accepted result. These examples make the tradeoffs visible: which work starts, what passes, what costs money, and what remains unknown after cancellation.
 
-| Stack | Directory | Historical design notes |
-| --- | --- | --- |
-| Mastra | [`mastra/`](mastra/) | [mastra/PLAN.md](mastra/PLAN.md) |
-| Vercel AI SDK | [`ai-sdk/`](ai-sdk/) | [ai-sdk/PLAN.md](ai-sdk/PLAN.md) |
-| LangChain.js + LangGraph.js | [`langchain/`](langchain/) | [langchain/PLAN.md](langchain/PLAN.md) |
+[Browse the examples](#example-index) · [Compare frameworks](#compare-the-frameworks) · [Watch the talks](https://danlevy.net/talks/) · [Read the architecture review](docs/talk-architecture-review-2026-09-06.md)
 
-Every directory is a self-contained Bun project: its own `package.json`, lockfile, `node_modules`, tsconfig and tests. No directory imports from another. The shared inputs are [`shared/TASK.md`](shared/TASK.md), the worked example each stack implements, and [`shared/fixtures/`](shared/fixtures/), JSON that each stack copies into its own `src/fixtures/` at setup time so the three implementations are comparable without being coupled.
+## Start here: no API key
 
-## The newer talk architecture
+With [Bun](https://bun.sh/) installed:
 
-The September 6 talks place these axes inside a scoped job contract. Shared services own tool authority, admission, validation and recovery. The agent proposes work and compute within those limits.
-
-Start with the [architecture review](docs/talk-architecture-review-2026-09-06.md) and the [offline contract examples](examples/README.md): scoped address repair (`10`), durable batch admission (`11`), compute catalog resolution (`12`), execution memory (`13`), Council of Guards (`14`), evaluator validity (`15`), and bounded fan-out (`16`). These live in a separate Bun package and make no model calls. The three framework stacks remain independent.
-
-Each framework also has an offline `snippet:16`. Run `AGENT_FANOUT=1 bun run snippet:16` for the baseline and `AGENT_FANOUT=3 bun run snippet:16` for the bounded batch. See [native framework patterns and the eval contract](docs/fanout-node.md). The older `PLAN.md` files record pre-implementation proposals; use package READMEs and current code for runnable APIs.
-
-## Findings worth knowing before you read the code
-
-- Only Mastra ships first-party A2A. The AI SDK package hand-rolls an A2A JSON-RPC client and server. LangGraph's local dev server does not serve A2A at all (measured against `@langchain/langgraph-cli` 1.4.5); it lives in the hosted Agent Server, so the LangChain package falls back to Agent Protocol and takes the A2A branch automatically when `A2A_BASE_URL` is set.
-- An aborted call does not always throw. Mastra's `generate` resolves on abort, and LangGraph resolves before cancelled workers unwind. Both packages check the signal explicitly so cancelled workers are not reported as passing.
-- Missing usage after cancellation is unknown billing. The stack ledgers are local estimates with different `billedAnyway` meanings; zero is not proof of no charge. Example `11` retains unresolved reservations until confirmed reconciliation.
-- All three now ship provider fallback, and all three ship it as data, not as an agent decision. Mastra 1.64 accepts `model: [{ model, maxRetries }, ...]` on the `Agent` (docs: fails over on 5xx, rate limit, and per-step timeout; a whole-run `totalMs` timeout ends the run without trying fallbacks). LangChain 1.5 does it with `modelFallbackMiddleware(...)` on `createAgent` (the older `.withFallbacks()` wrapper is no longer accepted as the model). The AI SDK 7 has no in-SDK fallback; `maxRetries` retries the same model and cross-model failover lives in AI Gateway via `providerOptions.gateway.models`, which also returns a `modelAttempts` trail. The Mastra package builds its chain from the residency-filtered pool and hands it to the native array; the AI SDK `04-distribute` example still walks its filtered provider pool in application code. One consequence seen live: a structured-output validation failure does not walk the chain, because it is a contract failure, not a wire failure. The old hand-rolled chain used to mask that by retrying it on the next provider.
-
-## Running
-
-```bash
-cd mastra && bun install && bun run all     # original demo batch; may call providers
-AGENT_FANOUT=3 bun run snippet:16            # standalone offline fan-out demo
+```sh
+git clone https://github.com/justsml/scaling-ai-agents.git
+cd scaling-ai-agents/examples
+AGENT_FANOUT=3 bun run snippet:16
 ```
 
-Snippets print results for review: the candidates, the judge's table, the ledger of cost and time, and the reason the run stopped. Model calls default to OpenAI via `OPENAI_API_KEY`. Snippets that need a second provider or a remote endpoint say so in their header and skip cleanly when the dependency is absent.
+No dependency install is needed for this demo. Three fixed drafts compete. The highest-scoring draft omits a required deadline and loses. The output compares ranking, racing, synthesis, and failure inspection, including costs that cancellation cannot erase.
 
-## Rules shared by all three
+Try the single-attempt baseline:
 
-- One snippet per axis plus one router, one remote-worker, one batching snippet, a Pokédex tool-use snippet (`08`), and a model-router snippet (`09`) implementing the patterns reviewed in [`shared/MODEL-ROUTER.md`](shared/MODEL-ROUTER.md). Snippets are single scripts of up to 600 to 1000 lines; the largest reusable chunks move into `src/lib/` biggest-first so each snippet reads top to bottom. Shorter is fine when the mechanism is fully shown.
-- Every worker gets one span with `profile`, `costUsd`, `latencyMs`, `outcome`, and `whyItExisted`.
-- Caps are inputs. Framework snippets accept `--budget-usd` and `--deadline-ms`; the offline contract examples use explicit fixture caps. Stops must retain partial artifacts and explain the reason. Local estimated-cost controls are not durable provider billing.
-- The judge never writes its own rubric. Deterministic checks first, an LLM rubric judge only for survivors, and the rubric text lives in a fixture file.
-- Consequential actions route to a human regardless of remaining budget.
-- Nothing here is production auth, production billing or a benchmark. Costs are estimates from token usage and a static price table.
+```sh
+AGENT_FANOUT=1 bun run snippet:16
+```
+
+That draft fails the gate. Returning no accepted answer is a valid outcome. These are scripted teaching cases, so the difference does not establish that three model calls outperform one.
+
+Next, run a job that survives a worker restart:
+
+```sh
+bun run snippet:11
+```
+
+Four callers share one job. A lost provider response keeps its reservation until reconciliation. Retrying a notification never regenerates the work. The demo creates and removes its own temporary SQLite database.
+
+## Example index
+
+### Contracts and failure cases: all offline
+
+Run these from `examples/` with `bun run snippet:NN`. Every title links directly to its source.
+
+| # | Example | What to look for |
+| --- | --- | --- |
+| 10 | [Scoped repair](examples/src/10-scoped-repair.ts) | Discover a tool before using it; preserve postal-code meaning; quarantine ambiguity; promote within a bounded canary. |
+| 11 | [Durable admission](examples/src/11-durable-admission.ts) | Atomic reservations, tenant isolation, request deduplication, restart recovery, unknown outcomes, and a notification outbox. |
+| 12 | [Compute requests](examples/src/12-compute-request.ts) | Resolve a job's compute request against a fixed catalog, budget, region and egress policy. Returns a quote. |
+| 13 | [Execution memory](examples/src/13-execution-memory.ts) | Distinguish generated, executed, verified and unknown work; retain correction evidence without granting new authority. |
+| 14 | [Council of Guards](examples/src/14-council-of-guards.ts) | Inspect judge disagreement and missing evidence. Unanimous approval cannot rescue a failed deterministic gate. |
+| 15 | [Evaluator validity](examples/src/15-evaluator-validity.ts) | Expose misleading agreement, unjudged retrieval results, small-sample assumptions and review queue delay. |
+| 16 | [Bounded fan-out](examples/src/16-fanout-node.ts) | Race, synthesize, rank or inspect a batch; account for losing attempts; keep a switch back to one. |
+
+[Contract example guide](examples/README.md) · [Offline tests](examples/test/)
+
+### Compare the frameworks
+
+The same numbered example solves the same kind of problem in each stack. Click a framework name in a row to open the implementation.
+
+| # | Pattern | What it demonstrates | AI SDK | LangGraph | Mastra |
+| --- | --- | --- | --- | --- | --- |
+| 00 | Router | Choose lookup, generation, parallel work or human review. | [Code](ai-sdk/src/snippets/00-router.ts) | [Code](langchain/src/snippets/00-router.ts) | [Code](mastra/src/snippets/00-router.ts) |
+| 01 | Compete | Generate complete alternatives; certify before rubric ranking. | [Code](ai-sdk/src/snippets/01-compete.ts) | [Code](langchain/src/snippets/01-compete.ts) | [Code](mastra/src/snippets/01-compete.ts) |
+| 02 | Decompose | Split an investigation into tasks, then merge the evidence. | [Code](ai-sdk/src/snippets/02-decompose.ts) | [Code](langchain/src/snippets/02-decompose.ts) | [Code](mastra/src/snippets/02-decompose.ts) |
+| 03 | Constrain | Apply time and estimated-spend limits; retain partial results. | [Code](ai-sdk/src/snippets/03-constrain.ts) | [Code](langchain/src/snippets/03-constrain.ts) | [Code](mastra/src/snippets/03-constrain.ts) |
+| 04 | Distribute | Select providers under policy and handle fallback. | [Code](ai-sdk/src/snippets/04-distribute.ts) | [Code](langchain/src/snippets/04-distribute.ts) | [Code](mastra/src/snippets/04-distribute.ts) |
+| 05 | Compile | Replay a certified artifact for a matching input, with zero model calls. | [Code](ai-sdk/src/snippets/05-compile.ts) | [Code](langchain/src/snippets/05-compile.ts) | [Code](mastra/src/snippets/05-compile.ts) |
+| 06 | Remote work | Send a task across an agent/protocol boundary. | [Code](ai-sdk/src/snippets/06-remote-a2a.ts) | [Code](langchain/src/snippets/06-remote.ts) | [Code](mastra/src/snippets/06-remote-a2a.ts) |
+| 07 | Batching | Compare tool-call concurrency and batched/background work. | [Code](ai-sdk/src/snippets/07-batching.ts) | [Code](langchain/src/snippets/07-batching.ts) | [Code](mastra/src/snippets/07-batching.ts) |
+| 08 | Pokédex investigation | Discover tools, page and search records, then cite the evidence. | [Code](ai-sdk/src/snippets/08-pokedex.ts) | [Code](langchain/src/snippets/08-pokedex.ts) | [Code](mastra/src/snippets/08-pokedex.ts) |
+| 09 | Model routing | Make model selection and fallback explicit. | [Code](ai-sdk/src/snippets/09-model-router.ts) | [Code](langchain/src/snippets/09-model-router.ts) | [Code](mastra/src/snippets/09-model-router.ts) |
+| 16 | Bounded fan-out | Encapsulate parallel drafts in one workflow component. | [Code](ai-sdk/src/snippets/16-fanout-node.ts) | [Code](langchain/src/snippets/16-fanout-node.ts) | [Code](mastra/src/snippets/16-fanout-node.ts) |
+| 17 | Business advice | Three independent business advisors and an orchestrator that compares and synthesizes their proposals. | [Code](ai-sdk/src/snippets/17-business-advice.ts) | [Code](langchain/src/snippets/17-business-advice.ts) | [Code](mastra/src/snippets/17-business-advice.ts) |
+
+`05` and `16` run offline in all three stacks after installing their dependencies. Other snippets may call providers, require credentials or need a running remote service. Check the package guide before running them:
+
+[AI SDK setup](ai-sdk/README.md) · [LangChain + LangGraph setup](langchain/README.md) · [Mastra setup](mastra/README.md)
+
+To compare the offline fan-out implementations, choose one directory from the repository root:
+
+```sh
+cd ai-sdk                       # or langchain, or mastra
+bun install
+AGENT_FANOUT=3 bun run snippet:16
+bun run snippet:05
+```
+
+AI SDK uses a bounded set of promises and offers a one-shot `generateText` adapter. LangGraph uses a `Send` subgraph and a reducer. Mastra uses `.foreach()` with an explicit concurrency limit. The batch implementations gather results before selecting an artifact; the separate contract example demonstrates a first-acceptable-result race. See [framework patterns and the eval contract](docs/fanout-node.md).
+
+For a live, capped tournament, configure `OPENAI_API_KEY` using the chosen package's `.env.example`, then run from that package:
+
+```sh
+bun run snippet:01 -- --budget-usd 0.10 --deadline-ms 60000
+```
+
+Live calls spend provider credits. Cost caps here use local estimates; they are not a guarantee about the final provider invoice. `bun run all` runs the older demo batch and may make multiple paid calls, so individual snippets are the clearest starting point.
+
+## What the examples have in common
+
+The original five axes still organize the framework examples: **compete** on complete answers, **decompose** independent tasks, **constrain** work, **distribute** execution, and **compile** repeated work into reusable artifacts.
+
+The surrounding job contract matters just as much. Independent checks decide eligibility before preferences rank candidates. Tool execution checks authority. Admission owns reservations. An unknown provider outcome stays unknown until reconciled. A synthesized artifact needs fresh checks, and machine-generated alternatives collapse to at most one selected artifact before human review.
+
+The [readiness challenge](shared/TASK.md) supplies buggy source, fixed tests, a rubric and a reference artifact. The three framework packages keep their own implementations and copies of the shared inputs. You can study or run one without importing another. The [domain vocabulary](CONTEXT.md) distinguishes reference artifacts, certified artifacts and conformance evidence.
+
+These are teaching implementations, not production authorization, billing or isolation systems. Passing the included tests proves their stated cases, not general model quality. The [fan-out eval contract](docs/fanout-node.md#eval-contract) spells out what a live comparison must measure across quality, total cost, accepted-result latency and recovery.
+
+## Test and explore further
+
+Run the complete offline contract suite:
+
+```sh
+cd examples                    # from the repository root
+bun install
+bun test test
+bun run check
+```
+
+Each framework also has its own tests and type check. Its full test command may include live smoke tests; use the package guide to choose the checks you need.
+
+- [Pokédex evaluation](docs/pokedex-evaluation.md) explains investigation completion, citations and comparable evidence. The [conformance harness](harness/) drives stack agents and records results.
+- [Model-routing contract](shared/MODEL-ROUTER.md) and [routing research](docs/research/llm-routing-patterns.md) explain the routing examples.
+- [Architecture review](docs/talk-architecture-review-2026-09-06.md) records the talk clarifications, implementation boundaries and validation. Historical `PLAN.md` files describe earlier proposals; package READMEs and code describe what runs now.
+
+## Talks behind the code
+
+[Open the slide collection](https://danlevy.net/talks/), including the 15-, 30- and 40-minute routes, or jump to:
+
+- [Dynamic Scaling of Agentic Workloads](https://danlevy.net/talks/dynamic-scaling.html): bounded attempts, placement, recovery and the Council of Guards.
+- [Adaptive, agentic apps](https://danlevy.net/talks/adaptive-systems.html): scoped jobs, tool discovery, repair evidence and execution memory.
+- [Code Is Cheap. Judgment Is Expensive.](https://danlevy.net/talks/judgment.html): protect review capacity and measure time to acceptance.
+
+[Run the browser demo kit](https://danlevy.net/talks/demos/) · [Read the talk sources](https://github.com/justsml/dans-blog/tree/main/artifacts/speaking-portfolio-expanded)

@@ -1,4 +1,6 @@
-# Contracts from the September 6 talks
+# Scaling AI Agents: offline contracts
+
+[All examples](../README.md#example-index) · [Talk slides](https://danlevy.net/talks/)
 
 Offline, executable examples of the boundaries around a generated agent. These use Bun and TypeScript, make no model or cloud calls, and require no credentials. They complement the three framework implementations without importing from them.
 

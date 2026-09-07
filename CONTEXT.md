@@ -1,4 +1,4 @@
-# Agentic Parallelism Lab
+# Scaling AI Agents
 
 This repository compares agentic execution patterns across independent stacks using the same worked examples.
 

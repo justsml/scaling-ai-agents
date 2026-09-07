@@ -1,4 +1,6 @@
-# LangChain.js + LangGraph.js
+# Scaling AI Agents: LangChain + LangGraph
+
+[All examples](../README.md#example-index) · [Talk slides](https://danlevy.net/talks/)
 
 The five parallelism axes from *Rethinking Parallelization in the Agentic Era*, implemented on
 LangChain.js v1 (`createAgent`, middleware) and LangGraph.js (`StateGraph`, `Send`, subgraphs,
@@ -16,7 +18,7 @@ cp .env.example .env       # then set OPENAI_API_KEY
 bun run setup              # copies ../shared/fixtures into src/fixtures (already present)
 bun run check              # tsc --noEmit
 bun run test               # bun test test/
-bun run all                # every snippet, in order, with a total spend at the end
+bun run all                # original demo batch; may make paid calls
 ```
 
 One snippet at a time:
@@ -25,8 +27,7 @@ One snippet at a time:
 bun run snippet:01 -- --budget-usd 0.10 --deadline-ms 60000
 ```
 
-Every snippet accepts `--budget-usd` and `--deadline-ms`, stops honestly when either is hit,
-and prints a one-screen table. Every attempt, worker and judge call produces one span carrying
+The original live demos accept `--budget-usd` and `--deadline-ms`. Offline `05` certifies reference artifacts; `16` uses fixture caps and `AGENT_FANOUT`. Those two need no credentials. Live attempt, worker and judge calls record spans carrying
 `profile`, `costUsd`, `latencyMs`, `outcome` and `whyItExisted`.
 
 ## What each snippet prints
@@ -222,3 +223,19 @@ environment; nothing here requires them.
 `05` is now entirely offline. It uses a finite demo request vocabulary plus exact source bytes. Lookup caching never skips certification. No tournament provenance or automatic promotion is claimed for the shipped reference, and the tool returns a patch without applying it.
 
 See [the fan-out contract](../docs/fanout-node.md). The generator is a deterministic fixture, not a model-quality experiment.
+
+## Business advice council
+
+`bun run snippet:17` runs three independent advisors, then a business advice
+orchestrator. It requires `OPENAI_API_KEY` and makes four paid model calls.
+Pass a quoted business brief to replace the built-in SaaS example:
+
+```sh
+bun run snippet:17 -- "Should our two-person SaaS team build an enterprise integration or improve onboarding?"
+bun test test/business-advice.test.ts
+```
+
+Pennypincher uses `gpt-5.6-luna`, Battle-scarred Operator uses
+`gpt-5.6-terra`, and Product Visionary uses `gpt-5.6-sol`. The orchestrator
+uses Sol. Every agent explicitly requests reasoning effort `none`.
+See the [business advice contract and evaluation cases](../docs/business-advice.md).

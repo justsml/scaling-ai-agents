@@ -22,7 +22,8 @@
     "snippet:07": "bun run src/snippets/07-batching.ts",
     "snippet:08": "bun run src/snippets/08-pokedex.ts",
     "snippet:09": "bun run src/snippets/09-model-router.ts",
-    "snippet:16": "bun src/snippets/16-fanout-node.ts"
+    "snippet:16": "bun src/snippets/16-fanout-node.ts",
+    "snippet:17": "bun run src/snippets/17-business-advice.ts"
   },
   "dependencies": {
     "@mastra/client-js": "latest",

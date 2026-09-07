@@ -1,4 +1,6 @@
-# Vercel AI SDK — scaling-ai-agents
+# Scaling AI Agents: AI SDK
+
+[All examples](../README.md#example-index) · [Talk slides](https://danlevy.net/talks/)
 
 Implements [`../shared/TASK.md`](../shared/TASK.md) (the "flaky integration suite" /
 readiness.ts scenario) on the AI SDK. Verified against the live docs at
@@ -19,14 +21,16 @@ bun install                       # or: bun run setup
 bun run check                     # tsc --noEmit
 bun run test                      # lib + a2a + judge tests (test/ only)
 bun run snippet:00                # ... through snippet:07
-bun run all                       # every snippet in order, spend summary at the end
+bun run all                       # original demo batch; may make paid calls
 ```
 
-Every snippet accepts `--budget-usd` and `--deadline-ms` (defaults vary by
+The original framework demos accept `--budget-usd` and `--deadline-ms` (defaults vary by
 snippet; see `src/run-all.ts` for the values `bun run all` uses). Set
 `OTEL_CONSOLE=1` to also print every OpenTelemetry span to stderr as it ends.
 
-`.env.example` lists `OPENAI_API_KEY` (required), `AI_GATEWAY_API_KEY` and
+The offline `05` and `16` demos need no credentials. `16` uses fixture caps and `AGENT_FANOUT` rather than the original CLI budget flags.
+
+`.env.example` lists `OPENAI_API_KEY` (required for live OpenAI calls), `AI_GATEWAY_API_KEY` and
 `LOCAL_OPENAI_BASE_URL` (both optional — features that need them print
 `skipped: <reason>` and exit 0 when absent), and `MODEL_WORKER` /
 `MODEL_JUDGE` / `MODEL_FRONTIER` overrides. All three default to
@@ -183,3 +187,19 @@ For disagreement and evaluator counterexamples, see [examples 14–15](../exampl
 `AGENT_FANOUT=3 bun run snippet:16` gathers bounded independent attempts, then selects only a passing draft. The default `AGENT_FANOUT=1` runs the baseline. The CLI uses a fixture generator; the exported `modelGenerator(model)` shows a one-shot `generateText` adapter with `maxRetries: 0`, `maxOutputTokens`, and the caller's `abortSignal`. It reports unknown cost until a price-aware caller accounts for usage.
 
 See [the fan-out contract](../docs/fanout-node.md). The fixture preference score is not a live judge, and a failed attempt does not erase another attempt's output.
+
+## Business advice council
+
+`bun run snippet:17` runs three independent advisors, then a business advice
+orchestrator. It requires `OPENAI_API_KEY` and makes four paid model calls.
+Pass a quoted business brief to replace the built-in SaaS example:
+
+```sh
+bun run snippet:17 -- "Should our two-person SaaS team build an enterprise integration or improve onboarding?"
+bun test test/business-advice.test.ts
+```
+
+Pennypincher uses `gpt-5.6-luna`, Battle-scarred Operator uses
+`gpt-5.6-terra`, and Product Visionary uses `gpt-5.6-sol`. The orchestrator
+uses Sol. Every agent explicitly requests reasoning effort `none`.
+See the [business advice contract and evaluation cases](../docs/business-advice.md).

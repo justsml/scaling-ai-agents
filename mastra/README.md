@@ -1,8 +1,10 @@
-# Mastra implementation
+# Scaling AI Agents: Mastra
+
+[All examples](../README.md#example-index) · [Talk slides](https://danlevy.net/talks/)
 
 The five parallelism axes from *Rethinking Parallelization in the Agentic Era*, built on Mastra, against the worked example in [`../shared/TASK.md`](../shared/TASK.md).
 
-Eight snippets. Each one runs on its own, prints a table you can read aloud without scrolling, and stops honestly when it runs out of money or time.
+Eleven standalone snippets cover the five axes, routing, remote work, batching, Pokédex investigations and bounded fan-out. Start with `05` or `16` for an offline run.
 
 ## Running
 
@@ -157,3 +159,19 @@ Every worker in every snippet gets one span carrying `profile`, `costUsd`, `late
 `AGENT_FANOUT=3 bun run snippet:16` uses native `.foreach(step, { concurrency: 3 })` to gather a batch before ranking. `AGENT_FANOUT=1` is the default and baseline. The fixture generator makes no model calls. The injected generator receives the caller's abort signal; a provider exception becomes an unknown outcome, so the other branch results remain available.
 
 The quote includes machine review and a possible synthesis check. One selected artifact proceeds to human review. See [the fan-out contract](../docs/fanout-node.md) for race versus barrier semantics, evidence, costs and limits.
+
+## Business advice council
+
+`bun run snippet:17` runs three independent advisors, then a business advice
+orchestrator. It requires `OPENAI_API_KEY` and makes four paid model calls.
+Pass a quoted business brief to replace the built-in SaaS example:
+
+```sh
+bun run snippet:17 -- "Should our two-person SaaS team build an enterprise integration or improve onboarding?"
+bun test test/business-advice.test.ts
+```
+
+Pennypincher uses `gpt-5.6-luna`, Battle-scarred Operator uses
+`gpt-5.6-terra`, and Product Visionary uses `gpt-5.6-sol`. The orchestrator
+uses Sol. Every agent explicitly requests reasoning effort `none`.
+See the [business advice contract and evaluation cases](../docs/business-advice.md).
