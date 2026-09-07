@@ -117,6 +117,116 @@
         "requiredErrors": ["UPSTREAM_UNAVAILABLE"],
         "requiresRetry": true
       }
+    },
+    "reasoning-four-records": {
+      "claims": [
+        {
+          "path": "names",
+          "operator": "set-equals",
+          "value": ["ivysaur", "venusaur"],
+          "support": {
+            "operator": "contains-all",
+            "values": [69, 130, 1000, 85]
+          }
+        }
+      ],
+      "evidence": {
+        "requiredTools": ["pokedex_list", "pokedex_get"],
+        "efficiency": {
+          "initialTool": "pokedex_list",
+          "initialArguments": {
+            "resource": "pokemon",
+            "pageSize": 4
+          },
+          "selection": "all",
+          "maxParallel": 4,
+          "requireParallel": true
+        }
+      }
+    },
+    "reasoning-limited-followups": {
+      "claims": [
+        {
+          "path": "names",
+          "operator": "set-equals",
+          "value": ["ivysaur"],
+          "support": {
+            "operator": "contains-all",
+            "values": [69, 130]
+          }
+        }
+      ],
+      "evidence": {
+        "requiredTools": ["pokedex_list", "pokedex_get"],
+        "efficiency": {
+          "initialTool": "pokedex_list",
+          "initialArguments": {
+            "resource": "pokemon",
+            "pageSize": 4
+          },
+          "selection": "first-within-budget",
+          "maxParallel": 4,
+          "requireParallel": true
+        }
+      }
+    },
+    "reasoning-selective-comparison": {
+      "claims": [
+        {
+          "path": "heavier",
+          "operator": "equals",
+          "value": "charmander",
+          "support": {
+            "operator": "contains-all",
+            "values": [69, 85]
+          }
+        },
+        {
+          "path": "difference",
+          "operator": "equals",
+          "value": 16,
+          "support": {
+            "operator": "contains-all",
+            "values": [69, 85]
+          }
+        }
+      ],
+      "evidence": {
+        "requiredTools": ["pokedex_list", "pokedex_get"],
+        "efficiency": {
+          "initialTool": "pokedex_list",
+          "initialArguments": {
+            "resource": "pokemon",
+            "pageSize": 4
+          },
+          "selection": "names",
+          "names": ["bulbasaur", "charmander"],
+          "maxParallel": 4,
+          "requireParallel": true
+        }
+      }
+    },
+    "reasoning-no-followup": {
+      "claims": [
+        {
+          "path": "names",
+          "operator": "set-equals",
+          "value": ["bulbasaur", "ivysaur", "venusaur"]
+        }
+      ],
+      "evidence": {
+        "requiredTools": ["pokedex_list"],
+        "efficiency": {
+          "initialTool": "pokedex_list",
+          "initialArguments": {
+            "resource": "pokemon",
+            "pageSize": 4
+          },
+          "selection": "none",
+          "maxParallel": 4,
+          "requireParallel": false
+        }
+      }
     }
   }
 }

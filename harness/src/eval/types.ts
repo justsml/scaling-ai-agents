@@ -52,6 +52,14 @@ export interface ExpectedClaim {
   support?: { operator: "contains-all"; values: unknown[] };
 }
 export interface EvidenceRules {
+  efficiency?: {
+    initialTool: "pokedex_list" | "pokedex_search";
+    initialArguments: Record<string, unknown>;
+    selection: "all" | "first-within-budget" | "names" | "none";
+    names?: string[];
+    maxParallel: number;
+    requireParallel?: boolean;
+  };
   requiredTools?: PokedexToolName[];
   minimumGets?: number;
   minimumPages?: number;
@@ -95,7 +103,8 @@ export type GateName =
   | "pagination"
   | "cascade"
   | "retry"
-  | "budget";
+  | "budget"
+  | "efficiency";
 export interface GateResult {
   gate: GateName;
   passed: boolean;

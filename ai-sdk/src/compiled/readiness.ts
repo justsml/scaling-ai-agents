@@ -1,5 +1,4 @@
-// The "winning patch" from Compete (01), promoted to a deterministic tool by
-// Compile (05). This file is intentionally standalone (no imports from
+// The shipped reference artifact used by the offline Compile (05) replay. This file is intentionally standalone (no imports from
 // src/fixtures) so it can be copied next to the fixture tests and run in CI
 // exactly as shipped -- see src/compiled/readiness.test.ts and
 // registry.json in this directory.
@@ -39,11 +38,20 @@ export async function runWhenReady(
   let delay = baseDelayMs;
   let lastCode: string | undefined;
 
+  const deadlineOutcome = (): ReadinessOutcome => ({
+    status: "deadline",
+    attempts,
+    partial: true,
+    reason: `gave up after ${attempts} attempt(s) and ${now() - start}ms (deadline ${options.deadlineMs}ms); last error ${lastCode ?? "none"}`,
+  });
+
   while (true) {
+    if (now() - start >= options.deadlineMs) return deadlineOutcome();
     attempts++;
     const result = await probe();
 
     if (result.ok) {
+      if (now() - start >= options.deadlineMs) return deadlineOutcome();
       await run();
       return { status: "ran", attempts };
     }

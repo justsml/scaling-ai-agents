@@ -7,8 +7,6 @@ import {
   answerSchema,
   investigationRequestSchema,
   loadPokedexToolContract,
-  normalizeInvestigationAnswer,
-  validateCitations,
   type InvestigationEvidence,
   type InvestigationRequest,
 } from "../lib/pokedex";
@@ -34,7 +32,6 @@ export async function investigatePokedex(
 ): Promise<InvestigationEvidence> {
   const request = investigationRequestSchema.parse(input);
   const session = new PokedexGatewaySession(request, "ai-sdk");
-  const started = Date.now();
   try {
     const contract = await loadPokedexToolContract();
     const tools = createPokedexTools(contract, session);
@@ -45,63 +42,22 @@ export async function investigatePokedex(
       stopWhen: isStepCount(request.maxToolCalls + 1),
       abortSignal: session.signal,
       providerOptions: { openai: { reasoningEffort: "none", store: false } },
-      system:
-        "Investigate only with the supplied Pokédex tools. Follow normalized refs; never construct URLs. Call pokedex_list_resources only when the request explicitly asks for resource discovery. For a named entity, search once and then get the exact returned ref; do not fall back to listing. Omit cursor entirely on the first pokedex_list or pokedex_search call—there is no starting cursor. For later pages, copy the exact nextCursor byte-for-byte; never invent, decode, edit, or shorten a cursor. Retry only errors marked retryable. Every factual claim must cite requestIds from successful tool results. Preserve exact raw API names, casing, numbers, and PokéAPI units; never capitalize names or convert units. Use only the requested canonical lowerCamelCase claim paths without namespace prefixes: searchable, listOnly, name, height, weight, types, abilities, hiddenAbility, heavier, difference, names, laterSpecies, region, pokedexes, baseExperience, or color. Use searchable/listOnly for resource discovery and laterSpecies for evolution descendants.",
+      system: `Investigate only with the supplied Pokédex tools. Follow normalized refs; never construct URLs. Call pokedex_list_resources only when the request explicitly asks for resource discovery. When the request starts from a named entity rather than a page, search once and then get the exact returned ref; do not fall back to listing. Omit cursor entirely on the first pokedex_list or pokedex_search call—there is no starting cursor. For later pages, copy the exact nextCursor byte-for-byte; never invent, decode, edit, or shorten a cursor. Retry only errors marked retryable. Every factual claim must cite requestIds from successful tool results. For comparisons and filters, put citations for ALL examined records on the conclusion claim itself, including excluded candidates. Return only the requested claim paths; examination scope belongs in the summary, not extra names claims. Preserve exact raw API names, casing, numbers, and PokéAPI units; never capitalize names or convert units. Use only the requested canonical lowerCamelCase claim paths without namespace prefixes: searchable, listOnly, name, height, weight, types, abilities, hiddenAbility, heavier, difference, names, laterSpecies, region, pokedexes, baseExperience, or color. Use searchable/listOnly for resource discovery and laterSpecies for evolution descendants. When the useful followups depend on a search or list result, make that single call first and wait for its result. Read only returned refs whose detail fields are needed; if the result already answers the question, stop. Each tool result includes remainingToolCalls from the local session. If it is zero, return your final supported answer immediately without calling any more tools. Before each tool turn, use that remaining count, or the total allowance before the first call. Once independent useful refs are known, choose at most min(4, remaining calls, useful refs) and request only that selected set together. A page of four candidates does not authorize four reads if fewer calls remain. The allowance counts individual tool calls, not model turns. Dependent relationship reads must wait for their issuing result; do not guess future refs or spend calls just because they remain. If limits prevent a complete investigation, report only supported findings and state which records were not examined. Total tool-call allowance: ${request.maxToolCalls}; count every attempt, including failed calls.`,
       prompt: request.prompt,
     });
-    const answer = normalizeInvestigationAnswer(
-      result.output ?? null,
-      request.prompt,
-      session.evidence,
-    );
     const usage = result.totalUsage as unknown as {
       inputTokens?: number;
       outputTokens?: number;
       reasoningTokens?: number;
     };
     const finishReason = String(result.finishReason);
-    return {
-      stack: "ai-sdk",
-      answer,
-      toolCalls: session.evidence,
+    return session.finish({
+      answer: result.output ?? null,
       usage: normalizeUsage(usage),
-      latencyMs: Date.now() - started,
-      stopReason: session.signal.aborted
-        ? "deadline"
-        : session.limitExceeded
-          ? "max-tool-calls"
-          : validateCitations(answer, session.evidence)
-            ? finishReason
-            : "invalid-evidence",
-      stopMetadata: {
-        finishReason,
-        toolCallAttempts: session.evidence.length,
-        maxToolCalls: request.maxToolCalls,
-        deadlineMs: request.deadlineMs,
-      },
-    };
+      finishReason,
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      stack: "ai-sdk",
-      answer: null,
-      toolCalls: session.evidence,
-      usage: usageFromError(error),
-      latencyMs: Date.now() - started,
-      stopReason: session.signal.aborted
-        ? "deadline"
-        : session.limitExceeded
-          ? "max-tool-calls"
-          : `error:${message}`,
-      stopMetadata: {
-        error: message,
-        toolCallAttempts: session.evidence.length,
-        maxToolCalls: request.maxToolCalls,
-        deadlineMs: request.deadlineMs,
-      },
-    };
-  } finally {
-    session.close();
+    return session.finish({ error, usage: usageFromError(error) });
   }
 }
 function normalizeUsage(usage: {

@@ -2,15 +2,14 @@
  * The regression test for the COMPILE axis.
  *
  * A compiled path is a decision nobody re-examines. That is the whole benefit and the whole
- * risk. These tests are the re-examination: the frozen patch is run against the same fixture
- * tests that chose it, the live implementation is exercised on all four dependency states,
+ * risk. These tests are the re-examination: the reference patch is run against independent fixture
+ * tests, the live implementation is exercised on all four dependency states,
  * and every negative case the matcher must keep missing is asserted.
  */
 
 import { describe, expect, test } from "bun:test";
 import {
   COMPILED_PATCH,
-  compiledCacheKey,
   matchesCompiledFix,
   runWhenReady,
   type Probe,
@@ -27,7 +26,7 @@ function clock() {
   };
 }
 
-describe("compiled patch: the contract that chose it still holds", () => {
+describe("compiled patch: the shipped reference satisfies its contract", () => {
   test("COMPILED_PATCH passes all five fixture tests", async () => {
     const result = await runCandidate(COMPILED_PATCH);
     expect(result.failed).toBe(0);
@@ -164,9 +163,21 @@ describe("matcher: narrow on purpose", () => {
     expect(m.matched).toBe(false);
     expect(m.reason).toContain("does not name runWhenReady");
   });
+});
 
-  test("cache key is stable across whitespace and case, and distinct across requests", () => {
-    expect(compiledCacheKey("Fix runWhenReady")).toBe(compiledCacheKey("  fix RUNWHENREADY  "));
-    expect(compiledCacheKey("Fix runWhenReady")).not.toBe(compiledCacheKey("Fix something else"));
-  });
+test("a late successful probe cannot start work after deadline", async () => {
+  const c = clock();
+  let ran = false;
+  const result = await runWhenReady(
+    async () => {
+      await c.sleep(100);
+      return { ok: true };
+    },
+    async () => {
+      ran = true;
+    },
+    { deadlineMs: 50, ...c },
+  );
+  expect(result.status).toBe("deadline");
+  expect(ran).toBe(false);
 });

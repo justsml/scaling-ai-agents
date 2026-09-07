@@ -4,7 +4,6 @@ import {
   PokedexGatewaySession,
   investigationRequestSchema,
   loadPokedexToolContract,
-  validateCitations,
   type InvestigationRequest,
 } from "../src/lib/pokedex.js";
 import { createPokedexTools } from "../src/snippets/08-pokedex.js";
@@ -99,7 +98,7 @@ describe("Pokédex investigation seam", () => {
       expect(evidence.latencyMs).toBe(evidence.endedAt - evidence.startedAt);
     }
   });
-  test("enforces call budget and evidence citations", async () => {
+  test("enforces call budget", async () => {
     const server = Bun.serve({
       port: 0,
       fetch() {
@@ -115,11 +114,5 @@ describe("Pokédex investigation seam", () => {
     session.close();
     expect(session.evidence).toHaveLength(2);
     expect(session.evidence[1]).toMatchObject({ disposition: "blocked" });
-    expect(
-      validateCitations(
-        { summary: "x", claims: [{ path: "name", value: "x", requestIds: ["gw-1"] }] },
-        session.evidence,
-      ),
-    ).toBeTrue();
   });
 });

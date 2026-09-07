@@ -90,6 +90,97 @@
       "deadlineMs": 30000,
       "maxToolCalls": 7,
       "faults": [{ "type": "500", "tool": "pokedex_get", "occurrence": 2, "retryAfterMs": 5 }]
+    },
+    {
+      "id": "reasoning-four-records",
+      "group": "reasoning-efficiency",
+      "prompt": "From the first page of four Pokémon, which weigh more than 100 PokéAPI weight units? Report their names. Establish the candidate set before reading details, check every candidate, and avoid unrelated lookups. Return only a names claim for the matching records, with all examined records cited on that claim. Put the examination scope in the summary, not in another names claim.",
+      "deadlineMs": 30000,
+      "maxToolCalls": 5,
+      "faults": [
+        {
+          "type": "delay",
+          "tool": "pokedex_get",
+          "occurrence": 1,
+          "ref": "pokemon/1",
+          "delayMs": 200
+        },
+        {
+          "type": "delay",
+          "tool": "pokedex_get",
+          "occurrence": 1,
+          "ref": "pokemon/2",
+          "delayMs": 200
+        },
+        {
+          "type": "delay",
+          "tool": "pokedex_get",
+          "occurrence": 1,
+          "ref": "pokemon/3",
+          "delayMs": 200
+        },
+        {
+          "type": "delay",
+          "tool": "pokedex_get",
+          "occurrence": 1,
+          "ref": "pokemon/4",
+          "delayMs": 200
+        }
+      ]
+    },
+    {
+      "id": "reasoning-limited-followups",
+      "group": "reasoning-efficiency",
+      "prompt": "Inspect the first page of four Pokémon. With only three tool calls total, read as many of those records as the remaining allowance permits, in page order. Among the records you actually read, which weigh more than 100 PokéAPI weight units? Report their names and state the limited scope in your summary; do not claim anything about unread candidates. Return only a names claim for the matching records, with all examined records cited on that claim. Put the examination scope in the summary, not in another names claim.",
+      "deadlineMs": 30000,
+      "maxToolCalls": 3,
+      "faults": [
+        {
+          "type": "delay",
+          "tool": "pokedex_get",
+          "occurrence": 1,
+          "ref": "pokemon/1",
+          "delayMs": 200
+        },
+        {
+          "type": "delay",
+          "tool": "pokedex_get",
+          "occurrence": 1,
+          "ref": "pokemon/2",
+          "delayMs": 200
+        }
+      ]
+    },
+    {
+      "id": "reasoning-selective-comparison",
+      "group": "reasoning-efficiency",
+      "prompt": "From the first page of four Pokémon, compare only the entries named Bulbasaur and Charmander. Which is heavier, and by how much in PokéAPI weight units? Use the returned candidate records to choose useful followups; spare calls are not a reason to read unrelated records.",
+      "deadlineMs": 30000,
+      "maxToolCalls": 6,
+      "faults": [
+        {
+          "type": "delay",
+          "tool": "pokedex_get",
+          "occurrence": 1,
+          "ref": "pokemon/1",
+          "delayMs": 200
+        },
+        {
+          "type": "delay",
+          "tool": "pokedex_get",
+          "occurrence": 1,
+          "ref": "pokemon/4",
+          "delayMs": 200
+        }
+      ]
+    },
+    {
+      "id": "reasoning-no-followup",
+      "group": "reasoning-efficiency",
+      "prompt": "From the first page of four Pokémon, report the names ending in \"saur\". Use only the information needed to answer this name question; spare calls are not a reason to read details. Return only a names claim for the matching records, with all examined records cited on that claim. Put the examination scope in the summary, not in another names claim.",
+      "deadlineMs": 30000,
+      "maxToolCalls": 5,
+      "faults": []
     }
   ]
 }

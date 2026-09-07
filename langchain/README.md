@@ -38,7 +38,7 @@ and prints a one-screen table. Every attempt, worker and judge call produces one
 | `snippet:02` | Decompose | Three compiled subgraphs added as nodes, parallel edges from `START`, join on `reviewer`; `artifacts` reducer throws on a duplicate key | The three artifacts with citations; the merge record with the collision rule exercised live; the reviewer's verdict scored 0–2 against ground truth; optionally the `createDeepAgent` and async-subagent variants |
 | `snippet:03` | Constrain | `Ledger.reserve()` before the fan-out, `releaseAndCharge()` after; deadline as `config.signal`; `modelCallLimitMiddleware`, `toolCallLimitMiddleware`, a custom `wrapModelCall`; `humanInTheLoopMiddleware` | Three runs (generous, `--budget-usd 0.02`, `--deadline-ms 3000`) with reserved-vs-actual per worker and `billed anyway`; the consequential action's interrupt payload and denial |
 | `snippet:04` | Distribute | `selectProvider()` filters by `region` and `dataClass` before any call; `modelFallbackMiddleware`; `RemoteGraph` as one competitor | The pool; the routing decision for every request with rejection reasons; a tournament with a remote competitor; the fallback firing against a real 404; the `eu`+`restricted` request stopping; the A2A probe |
-| `snippet:05` | Compile | The winner frozen in `src/compiled/`, a narrow matcher, `cachePolicy` + `InMemoryCache` on the first graph node | Request one (tournament, N model calls); the promotion table; request two (compiled, zero model calls); `__metadata__: {cached:true}` on a repeat; the negative cases that must keep missing |
+| `snippet:05` | Compile | Cached exact-source lookup, then a separate uncached certification node | Reference replay, fresh checks on repeats, changed-source and consequential-request misses; zero model calls |
 | `snippet:06` | Remote | `langgraphjs dev` started as a child process; A2A probe; Agent Protocol via `@langchain/langgraph-sdk`; `RemoteGraph` | The registered assistants; **the A2A finding, measured**; a streamed run, run status, and a cancellation; `RemoteGraph` as a Runnable |
 | `snippet:07` | Batching | One agent turn emitting six tool calls under a semaphore of 3; `Runnable.batch({maxConcurrency})`; `Send` fan-out with `config.maxConcurrency` | Three ASCII timelines with the observed max overlap; a comparison table; a plain statement about provider batch APIs |
 
@@ -187,11 +187,12 @@ src/
     models.ts        model ids, verified against the API
     print.ts         the one-screen table
   graphs/
-    compete.ts       the Send map-reduce shared by 00, 01, 03, 04, 05
+    compete.ts       the Send map-reduce shared by 00, 01, 03, 04
     evidence.ts      the decompose subgraphs and the collision reducer
     remote-worker.ts the two graphs registered in langgraph.json
   compiled/
-    readiness-fix.ts the frozen winner, its matcher, and its cache key
+    readiness-fix.ts reference source and exact-input matching
+    readiness.ts     the single executable reference implementation
   snippets/          00..07
   scripts/           setup.ts, all.ts
 test/
@@ -213,3 +214,11 @@ Verified against the OpenAI API on 2026-09-05 with a one-token call each:
 
 No fallback ids were needed. `LANGSMITH_API_KEY` and Anthropic keys are not available in this
 environment; nothing here requires them.
+
+## Bounded generation inside one node
+
+`AGENT_FANOUT=3 bun run snippet:16` runs a `Send` map/reduce subgraph with an append reducer and `maxConcurrency: 3`. A parent workflow can add this compiled graph as one node. The default is `AGENT_FANOUT=1`. An isolated branch failure becomes a typed unknown result; selection sees the surviving artifacts.
+
+`05` is now entirely offline. It uses a finite demo request vocabulary plus exact source bytes. Lookup caching never skips certification. No tournament provenance or automatic promotion is claimed for the shipped reference, and the tool returns a patch without applying it.
+
+See [the fan-out contract](../docs/fanout-node.md). The generator is a deterministic fixture, not a model-quality experiment.

@@ -78,13 +78,11 @@ One competitor runs out of process entirely, on a second Mastra server over A2A,
 
 Prints: the pool, eligibility per fixture request, the restricted case spelled out, which provider served each worker and why, the remote task events, the ledger.
 
-### `05-compile` — the winning path becomes code
+### `05-compile`: certified reference replay
 
-The winner from the tournament is frozen as a tool keyed by a SHA-256 prefix of the exact source it fixes, registered as a persisted dynamic workflow via `mastra.addDynamicWorkflow()`, and put in front of the router. Then the same request runs twice: miss → tournament → compile, then hit → zero model calls.
+An offline `createWorkflow().then(createStep(compiledReadinessTool)).commit()` runs the real tool path. Exact fixture bytes must match before the registry lookup. The tool certifies the selected patch before returning it, and throws on failed or cancelled certification. An existing tournament entry takes precedence over the shipped reference.
 
-The negative case is the part worth arguing about: a different broken module with the same symptom and the same function name must **not** match, because a compiled rule that fires on lookalikes returns a confident wrong answer for free. `runEvals` gates the compiled tool against the same fixture tests before it is allowed to serve.
-
-Prints: the registry, both runs side by side with model-call counts, the negative case, the eval gate verdict.
+The demo leaves the registry intact, runs a hit twice, and declines changed source. It does not stage a tournament, persist a dynamic workflow, or apply a patch. `01` remains the live tournament and promotion example.
 
 ### `06-remote-a2a` — an agent behind a protocol boundary
 
@@ -120,11 +118,10 @@ The plan was written against `@mastra/core@1.34.0`. This was built against **`@m
 | Plan said | What is installed | What this does instead |
 | --- | --- | --- |
 | `new Observability({ configs: … })` from core | `Observability`, `MastraStorageExporter`, `SensitiveDataFilter` live in **`@mastra/observability`**, which is not a dependency of `@mastra/core` | added `@mastra/observability` explicitly; config otherwise as planned |
-| `models` array on the agent/generate for fallback | **Stale finding, corrected 2026-09-05.** `@mastra/core` 1.64 types `Agent.model` as `MastraModelConfig \| ModelWithRetries[]` (`dist/agent/types.d.ts`), each entry `{ id?, model, maxRetries?, enabled?, modelSettings?, providerOptions? }`. Docs: fails over on 500, rate limit, or timeout; `modelSettings.timeout.stepMs` advances to the next model, `totalMs` ends the run without fallback | `lib/pool.ts` (`withFallback`) still walks the pool in code so the attempt trail is printed. TODO: switch 04 to the native array and read the served model from the trace, or keep both and show the difference |
+| `models` array on the agent/generate for fallback | **Stale finding, corrected 2026-09-05.** `@mastra/core` 1.64 types `Agent.model` as `MastraModelConfig \| ModelWithRetries[]` (`dist/agent/types.d.ts`), each entry `{ id?, model, maxRetries?, enabled?, modelSettings?, providerOptions? }`. Docs: fails over on 500, rate limit, or timeout; `modelSettings.timeout.stepMs` advances to the next model, `totalMs` ends the run without fallback | `lib/pool.ts` filters and ranks the pool (`fallbackChainFor`) and returns it as the agent's `model` array; the hand-rolled `withFallback` was removed 2026-09-05. The served entry is read back from `response.modelId` (`providerForModelId`). Mastra does not return the attempt trail on the result; per-attempt evidence is on the trace. A schema validation failure is reported as a contract failure and does not walk the chain |
 | `streamUntilIdle()` | **deprecated** in 1.64 | `stream(msg, { untilIdle: { maxIdleMs } })` |
 | `mastra dev --port 4112` for the remote | the installed CLI (1.27.3) has **no `--port` flag**, and `mastra dev` bundles the project first | `src/remote/server.ts` mounts the `@mastra/hono` adapter on `Bun.serve` and starts in milliseconds; `--request-context-presets` *does* exist and `bun run dev` uses it |
 | agent card at `/.well-known/<agent>/agent-card.json` | the default `apiPrefix` is part of the path | `/api/.well-known/competitor-remote/agent-card.json` |
-| `runEvals({ target: compiledTool wrapper, gates: [checks.noToolErrors()] })` | `runEvals` targets an **`Agent` or a `Workflow`**, never a bare tool; `@mastra/evals/checks` are written against agent trajectories and have no tool-call trace to inspect on a workflow target | the compiled tool is wrapped in a one-step `createWorkflow`, gated with the deterministic `fixtureScorer`. The `target` needs an `as never` because the Workflow overload does not match steps whose schemas were inferred |
 | — | not in the plan | `new MastraServer({ app, mastra })` does **not** create an A2A task store. Without `taskStore: new InMemoryTaskStore()` every `message/stream` request dies inside `claimInterruptedTaskResume` and the client sees an empty stream rather than an error |
 | — | not in the plan | `declineToolCall()` / `approveToolCall()` need the run to be **fully drained first** — the run is only suspended once the turn has finished emitting — and the agent must be **registered on the Mastra instance** so it has storage for the snapshot. Both mistakes fail with "could not find a suspended run". This is why the HITL agents live in `src/mastra/agents.ts` |
 | — | not in the plan | an **aborted `generate()` resolves rather than throwing**. Without an explicit `signal.aborted` check a cancelled worker reports "ok, 0/5 tests" instead of "cancelled", which is exactly the dishonesty the deadline exists to expose. See the `wasAborted` branch in `01-compete.ts` |
@@ -154,3 +151,9 @@ test/                  bun tests for lib
 Every worker in every snippet gets one span carrying `profile`, `costUsd`, `latencyMs`, `outcome` and `whyItExisted`. The last one is the interesting field: a fan-out where every worker's reason for existing is "we fanned out" is a fan-out nobody can prune later.
 
 `bun run dev` opens Studio at `localhost:4111`; `presets.json` gives it three request-context presets (`default`, `eu-restricted`, `frontier`) so the region and data-class paths can be exercised by hand.
+
+## Bounded generation inside one node
+
+`AGENT_FANOUT=3 bun run snippet:16` uses native `.foreach(step, { concurrency: 3 })` to gather a batch before ranking. `AGENT_FANOUT=1` is the default and baseline. The fixture generator makes no model calls. The injected generator receives the caller's abort signal; a provider exception becomes an unknown outcome, so the other branch results remain available.
+
+The quote includes machine review and a possible synthesis check. One selected artifact proceeds to human review. See [the fan-out contract](../docs/fanout-node.md) for race versus barrier semantics, evidence, costs and limits.

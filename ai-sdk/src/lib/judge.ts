@@ -29,8 +29,20 @@ const rubricSchema = z.object({
 
 export type RubricScore = z.infer<typeof rubricSchema>;
 
+/** Model arithmetic is not evidence. Derive ranking totals from the rubric items. */
+export function normalizeRubricScore(value: unknown): RubricScore {
+  const score = rubricSchema.parse(value);
+  return {
+    ...score,
+    total: score.disqualified
+      ? 0
+      : Object.values(score.scores).reduce((sum, item) => sum + item, 0),
+  };
+}
+
 export interface RubricJudgeResult {
   score: RubricScore;
+  reportedTotal: number;
   costUsd: number;
   latencyMs: number;
 }
@@ -62,7 +74,8 @@ export async function judgeCandidate(
   });
   const latencyMs = Date.now() - start;
   return {
-    score: result.output,
+    score: normalizeRubricScore(result.output),
+    reportedTotal: result.output.total,
     costUsd: costUsd(judgeModelId(), result.usage),
     latencyMs,
   };

@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "agentic-parallelism-langchain",
+      "name": "scaling-ai-agents-langchain",
       "dependencies": {
         "@langchain/core": "latest",
         "@langchain/langgraph": "latest",

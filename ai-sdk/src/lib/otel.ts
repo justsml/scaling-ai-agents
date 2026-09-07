@@ -36,12 +36,12 @@ export function initTelemetry(): {
       spanProcessors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()));
     }
     tracerProvider = new NodeTracerProvider({ spanProcessors });
-    const tracer = tracerProvider.getTracer("agentic-parallelism-ai-sdk");
+    const tracer = tracerProvider.getTracer("scaling-ai-agents-ai-sdk");
     registerTelemetry(new OpenTelemetry({ tracer, usage: true }));
     initialized = true;
   }
   return {
-    tracer: tracerProvider!.getTracer("agentic-parallelism-ai-sdk"),
+    tracer: tracerProvider!.getTracer("scaling-ai-agents-ai-sdk"),
     exporter: memoryExporter!,
   };
 }

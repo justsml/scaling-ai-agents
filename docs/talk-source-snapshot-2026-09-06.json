@@ -1,0 +1,69 @@
+{
+  "review": "third pass",
+  "capturedAt": "2026-09-07T01:55:27.664809+00:00",
+  "sourceRepository": "dans-blog",
+  "head": "f1d08472e961879ed2c55d3d43b9bd885eed995a",
+  "includesWorkingTreeEdits": true,
+  "sources": [
+    {
+      "path": "artifacts/speaking-portfolio-expanded/outlines/adaptive-systems-40min.md",
+      "sha256": "57ea30a5832294c956f1bf9d3bae9b150409b15c66ac4ff9a2c4345e93aaa955"
+    },
+    {
+      "path": "artifacts/speaking-portfolio-expanded/outlines/benchmarks-40min.md",
+      "sha256": "14fbd1b16c182d1d595b2f977e3530cff908dd3394ed66ed745beec0535221dd"
+    },
+    {
+      "path": "artifacts/speaking-portfolio-expanded/outlines/dynamic-scaling-40min.md",
+      "sha256": "a37351e9ad837474becf58a2b41a3a00d00d4e84924a5c8038b72a4dfb519ae9"
+    },
+    {
+      "path": "artifacts/speaking-portfolio-expanded/outlines/evidence-learning-40min.md",
+      "sha256": "0fa9c631f9d5510b67d26ef935060692ade5cae787c4b789ea5313a1686549df"
+    },
+    {
+      "path": "artifacts/speaking-portfolio-expanded/outlines/failure-improvement-40min.md",
+      "sha256": "6b5e5ff1fd40c7b0e1108a3042147d6183971f6c7fc2efe05d7dab718ae4ccfa"
+    },
+    {
+      "path": "artifacts/speaking-portfolio-expanded/outlines/free-tier-40min.md",
+      "sha256": "18bbca2408cd73e227e6d7724fca825e75dd90d03340a95994cc76339df59c39"
+    },
+    {
+      "path": "artifacts/speaking-portfolio-expanded/outlines/judgment-40min.md",
+      "sha256": "9dacc0a1d242d3ed1cd8c84665efa1a927020b40bc39829677ca9eeb13e65a21"
+    },
+    {
+      "path": "artifacts/speaking-portfolio-expanded/outlines/product-engineering-40min.md",
+      "sha256": "1b22a0723e39b20153c6ca60e107d31ba8a188ae56d0447c45da044580d77b35"
+    },
+    {
+      "path": "artifacts/speaking-portfolio-expanded/outlines/retrieval-40min.md",
+      "sha256": "50ccdb6a331752b51c019f490477d590f2bf61c47fa705f2c4b23a937792725b"
+    },
+    {
+      "path": "artifacts/speaking-portfolio-expanded/packets/adaptive-systems/contracts.md",
+      "sha256": "f1b0b56fc3ff9552c84b753e89b407827196f1cd0caa832a850e3eb66b789057"
+    },
+    {
+      "path": "artifacts/speaking-portfolio-expanded/packets/adaptive-systems/memory-pattern.md",
+      "sha256": "36483538db0ab2c2e12ea2e91dc97bd0e87041cb0b6584dfd6a517b7f08718ae"
+    },
+    {
+      "path": "artifacts/speaking-portfolio-expanded/packets/dynamic-scaling/contracts.md",
+      "sha256": "6ff0dc58d1b40eaef41a0d09f87422880f7b6f4550808e61d447f6676ee3b9d0"
+    },
+    {
+      "path": "artifacts/speaking-portfolio-expanded/packets/dynamic-scaling/demo.md",
+      "sha256": "1d61800af79b704a6a2c0f2b00d1761dcf88370f35287e9ff980607cc74305e6"
+    },
+    {
+      "path": "artifacts/speaking-portfolio-expanded/shorts/barrel-of-monkeys.md",
+      "sha256": "900bd3f2a6044f1c997829a09c1767030461f640c6a61c9dfcb07edc29d74ed5"
+    },
+    {
+      "path": "artifacts/speaking-portfolio-expanded/shorts/council-of-guards.md",
+      "sha256": "655e855384baccb65557c7e5fec8952217ea8be09b61402aa54aeb65aa23d110"
+    }
+  ]
+}

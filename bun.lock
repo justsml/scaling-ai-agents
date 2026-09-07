@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "agentic-parallelism",
+      "name": "scaling-ai-agents",
       "devDependencies": {
         "@biomejs/biome": "2.5.12",
       },

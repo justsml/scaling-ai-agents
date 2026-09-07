@@ -1,4 +1,4 @@
-# Vercel AI SDK — agentic-parallelism
+# Vercel AI SDK — scaling-ai-agents
 
 Implements [`../shared/TASK.md`](../shared/TASK.md) (the "flaky integration suite" /
 readiness.ts scenario) on the AI SDK. Verified against the live docs at
@@ -58,10 +58,10 @@ snippet; see `src/run-all.ts` for the values `bun run all` uses). Set
   filtered by region+dataClass per request, which slot actually served each
   request (with try-next fallback in code, since `AI_GATEWAY_API_KEY` isn't
   set here), and the remote A2A competitor's task id/outcome.
-- **05-compile**: three requests against `src/compiled/registry.json` — an
-  unregistered variant and a negative case each cost exactly one model call,
-  the exact certified input costs zero, plus a contract check that
-  `src/compiled/readiness.ts` still passes all five fixture tests.
+- **05-compile**: an offline replay of three requests against the fixture registry.
+  The matching input uses the independently checked reference artifact. Two changed
+  inputs return a miss decision. All three make zero model calls; use `01` for the
+  live tournament. The registry records fixture provenance, not an observed winner.
 - **06-remote-a2a**: starts the hand-rolled A2A server on a random port and
   self-tests `message/send`, `message/stream` (SSE), `tasks/get`, and
   `tasks/cancel` against it.
@@ -159,25 +159,27 @@ snippet; see `src/run-all.ts` for the values `bun run all` uses). Set
    Evaluator-Optimizer), used as the basis for 02's fixed-plan
    orchestrator-worker pattern.
 
-## Snippet line counts vs. the 600–1000 line rule
+## Example scope
 
-Every `src/snippets/*.ts` file here is 177–254 lines — short of the
-600–1000 target. Each one is complete: it runs standalone, demonstrates its
-axis's actual mechanism end-to-end against live model calls, respects both
-caps, emits worker spans, and prints a one-screen table. Padding them to
-600+ lines would mean either (a) inlining `src/lib/*` helpers back into each
-snippet (working against the plan's own "biggest chunk moves to lib first"
-rule), or (b) adding unrelated example variations that don't teach the axis
-any better. Per PLAN.md's own escape hatch — "Shorter is acceptable only if
-the mechanism is fully shown with section comments naming the axis" — each
-snippet opens with a comment block naming its axis and explaining the
-mechanism before any code; that bar is met, and the line count is not.
+Keep snippets as short as the mechanism allows. `05` is an offline registry replay;
+other snippets may make live calls or skip absent providers. Static prices and local
+ledgers estimate cost. They do not implement durable provider billing.
 
-## Total spend
+The [September 6 contract examples](../examples/README.md) demonstrate scoped tool
+invocation, semantic repair checks, shared admission and compute request policy.
+The [architecture review](../docs/talk-architecture-review-2026-09-06.md) explains
+which guarantees belong below the model and which remain outside these examples.
 
-Cumulative spend across every live call made while building this package
-(model-id verification, live debugging of the rubric-judge schema error,
-every snippet run individually during development, and one full `bun run
-all`) was approximately **$0.15–0.20**, well under the $2 budget. A single
-`bun run all` costs about **$0.03** (see the per-snippet `totalCostUsd` /
-`totalSpentUsd` lines it prints).
+## Judge arithmetic
+
+`lib/judge.ts` derives `score.total` from the rubric item values. A model-reported
+sum cannot inflate a ranking, and disqualified outputs receive zero. The original
+sum remains in `reportedTotal` for inspection. `test/rubric-score.test.ts` checks
+this boundary offline; it does not claim the model's criterion judgments are correct.
+For disagreement and evaluator counterexamples, see [examples 14–15](../examples/README.md).
+
+## Bounded generation inside one node
+
+`AGENT_FANOUT=3 bun run snippet:16` gathers bounded independent attempts, then selects only a passing draft. The default `AGENT_FANOUT=1` runs the baseline. The CLI uses a fixture generator; the exported `modelGenerator(model)` shows a one-shot `generateText` adapter with `maxRetries: 0`, `maxOutputTokens`, and the caller's `abortSignal`. It reports unknown cost until a price-aware caller accounts for usage.
+
+See [the fan-out contract](../docs/fanout-node.md). The fixture preference score is not a live judge, and a failed attempt does not erase another attempt's output.

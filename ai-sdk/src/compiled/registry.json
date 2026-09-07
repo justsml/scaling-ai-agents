@@ -1,9 +1,9 @@
 {
-  "_note": "Maps sha256(buggy readiness.ts source) -> the compiled tool that already won a Compete tournament for that exact input. Populated once, offline, after 01-compete.ts picks a winner; 05-compile.ts only reads it.",
-  "ecdcd2ebc8410539cf40f102e060e21362e1c2e733afd3cec5cad69d1d4f412a": {
+  "_note": "Fixture registry for the offline Compile replay. This points to the shipped reference artifact; no live tournament provenance is asserted. 05 rechecks the independent fixture contract before use. A source hash identifies input bytes, not semantic equivalence or promotion authority.",
+  "4465df528c2d9c88c39bfc1188b8db97d874460e40256fa073c8318140f02b2b": {
     "tool": "compiledReadiness",
     "compiledPath": "src/compiled/readiness.ts",
     "testPath": "src/compiled/readiness.test.ts",
-    "wonTournamentOn": "2026-09-05"
+    "referenceRecordedOn": "2026-09-05"
   }
 }

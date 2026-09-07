@@ -19,12 +19,17 @@ describe("canonical Pokédex fixtures", () => {
     }
   });
 
-  test("has exactly ten scenarios and expectations for each", async () => {
+  test("preserves the ten regression scenarios and adds four reasoning-efficiency scenarios", async () => {
     const scenarios = await Bun.file(resolve(fixtures, "pokedex-scenarios.json")).json();
     const expected = await Bun.file(resolve(fixtures, "pokedex-expected.json")).json();
-    expect(scenarios.scenarios).toHaveLength(10);
+    expect(scenarios.scenarios).toHaveLength(14);
+    expect(
+      scenarios.scenarios.filter(
+        (scenario: { group: string }) => scenario.group === "reasoning-efficiency",
+      ),
+    ).toHaveLength(4);
     const ids = scenarios.scenarios.map((scenario: { id: string }) => scenario.id);
-    expect(new Set(ids).size).toBe(10);
+    expect(new Set(ids).size).toBe(14);
     expect(Object.keys(expected.expected).sort()).toEqual([...ids].sort());
     expect(
       scenarios.scenarios.filter((scenario: { group: string }) => scenario.group === "ordinary"),

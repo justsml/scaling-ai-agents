@@ -43,3 +43,28 @@ The buggy module retries `denied` forever and has no deadline. Tests live in `sh
 - `requests.json`: sample requests tagged lookup, routine, novel, consequential
 
 Each stack copies these into `<stack>/src/fixtures/` at setup. Copy, do not import.
+
+## September 6 architecture additions
+
+The five axes remain the comparison exercise. The newer talks add the controls
+around them: generated jobs with minimum tools, independent semantic validation,
+shared admission, durable unresolved outcomes, and catalog-bounded compute requests.
+See [the review](../docs/talk-architecture-review-2026-09-06.md) and
+[offline examples 10–15](../examples/README.md).
+
+Compile implementations have different demonstration scopes. Mastra runs and stores
+a tournament artifact. LangChain demonstrates the shipped reference and graph cache.
+The `05` demos are offline certified replay paths with explicit misses; they do not pretend
+that an explanatory model call produced or certified a new artifact. A match must
+still pass independent checks before serving, and does not authorize deployment.
+
+The second September 6 review adds runner-owned execution observations, council
+disagreement, and checks on the evaluator itself. Memory can inform a new proposal;
+it cannot establish execution, semantic correctness or authority. Multiple judges
+can direct review; their agreement cannot override a failed deterministic gate.
+
+The newest generation example is `16` in all three stacks. Keep the copied
+`src/lib/fanout-contract.ts` files synchronized with `shared/fanout-contract.ts`.
+Generation fans out inside one workflow component and collapses to at most one
+selected artifact before human review. `AGENT_FANOUT=1` is the default baseline.
+The contract example also distinguishes race, synthesis, rank and failure inspection.

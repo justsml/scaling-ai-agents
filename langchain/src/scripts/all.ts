@@ -110,12 +110,12 @@ async function main() {
       ? new Set(args.flags.only.split(",").map((s) => s.trim()))
       : null;
 
-  const dir = await mkdtemp(join(tmpdir(), "agentic-parallelism-all-"));
+  const dir = await mkdtemp(join(tmpdir(), "scaling-ai-agents-all-"));
   const spendFile = join(dir, "spend.tsv");
   await writeFile(spendFile, "", "utf8");
 
   header(
-    "agentic-parallelism / langchain — all snippets",
+    "scaling-ai-agents / langchain — all snippets",
     `run started ${new Date().toISOString()}`,
   );
 

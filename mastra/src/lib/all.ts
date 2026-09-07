@@ -142,7 +142,7 @@ const only = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const selected = only.length > 0 ? PLAN.filter((p) => only.some((o) => p.id.includes(o))) : PLAN;
 
 header(
-  "agentic-parallelism · Mastra · full pass",
+  "scaling-ai-agents · Mastra · full pass",
   `${selected.length} snippets · total budget ${usd(selected.reduce((s, p) => s + p.budgetUsd, 0))}`,
 );
 

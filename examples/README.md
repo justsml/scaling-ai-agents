@@ -1,0 +1,95 @@
+# Contracts from the September 6 talks
+
+Offline, executable examples of the boundaries around a generated agent. These use Bun and TypeScript, make no model or cloud calls, and require no credentials. They complement the three framework implementations without importing from them.
+
+```bash
+cd examples
+bun install
+bun run snippet:10
+bun run snippet:11
+bun run snippet:12
+bun run snippet:13
+bun run snippet:14
+bun run snippet:15
+AGENT_FANOUT=3 bun run snippet:16
+bun run test
+bun run check
+```
+
+No install is needed to run the snippets themselves with Bun. The development dependencies provide TypeScript checks. The batch demo creates and removes its own temporary SQLite database.
+
+| Example | What to watch | Checks |
+| --- | --- | --- |
+| [10: scoped repair](src/10-scoped-repair.ts) | A rename proposal passes fixed semantic fixtures; email is denied; an unknown status is quarantined; promotion has a 100-record canary | Tool discovery and invocation, deadline, attempt cap, forged scores, leading zeroes, stale parent, canary exhaustion, rollback |
+| [11: durable admission](src/11-durable-admission.ts) | Four callers get one job; another request is denied while its budget is held; a lost response remains unresolved after restart | Four competing OS processes, tenant accounting, deduplication conflict, rate versus concurrency, stale workers, retry cap, outbox deduplication |
+| [12: compute request](src/12-compute-request.ts) | Eight workers for six minutes resolve to a 96-cent fixture quote; billing identity comes from server policy | Catalog, size, shape, residency, egress, deadline and budget denials |
+| [13: execution memory](src/13-execution-memory.ts) | A missing tenant predicate is recorded and corrected; execution and result verification remain separate | Tenant/project/version isolation, denied execution, wrong totals, unknown responses, durable intent, correction references |
+| [14: Council of Guards](src/14-council-of-guards.ts) | Three judges disagree on the maintainer; every original design still fails a gate | Missing judges, repeated model identity, score/reason disagreement, fresh synthesis evidence, cost and review-capacity limits |
+| [15: evaluator validity](src/15-evaluator-validity.ts) | An always-pass judge scores 90% agreement; an unjudged document depresses naive precision | Confusion matrix, undefined kappa, majority disagreement, IID assumption, judgment coverage, queue wait versus service time |
+| [16: bounded fan-out](src/16-fanout-node.ts) | Race, synthesize, rank or inspect a bounded set; one selected artifact reaches review | Fan-out one, failed branches, fresh synthesis gate, unknown charges and late race settlement |
+
+Example 10 accepts a tiny mapping grammar instead of executing generated code. Only `postal_code` to `postalCode` by string copy is allowed under the fixture contract. Expected outputs belong to the validator. All input records receive an accepted or quarantined disposition. The proposing job cannot promote its own artifact; the demo calls promotion separately as the trusted owner.
+
+Example 11 uses integer cents and reserves two ten-cent attempts per item. Its printed ledger follows the talk:
+
+| State | Settled | Held | Available |
+| --- | ---: | ---: | ---: |
+| Ten items admitted | 0 | 200 | 0 |
+| Nine complete; final response unknown | 90 | 20 | 90 |
+| Final completion reconciled | 100 | 0 | 100 |
+
+A provider slot represents outstanding remote work. Abandoning a local worker leaves that slot and its money held. The persisted intent contains the stable attempt key even when the provider response was lost before its job ID could be recorded. Only confirmed failure can create a retry. Completing an item and creating its notification record happen in one transaction; notification delivery never dispatches generation.
+
+Transactions use Bun's [SQLite immediate transactions](https://bun.com/docs/runtime/sqlite#transactions). The tests exercise a shared database across separate Bun processes. Production authentication and remote provider behavior are outside this example.
+
+Example 12 resolves a compute request; it does not grant a lease. The trusted scheduler still needs to reserve that quote atomically, provision the worker, and record expiry and teardown. Worker expiry does not settle remote provider charges. The fixture catalog permits only `sandbox-small` in `us-east` with named egress hosts.
+
+See the [architecture review](../docs/talk-architecture-review-2026-09-06.md) for source talks, integration points, evaluation criteria and the limits of these demonstrations.
+
+## Execution evidence and evaluation
+
+Example 13 implements the smaller memory pattern added to the adaptive talk. The
+[copyable prompt](src/fixtures/execution-memory-instructions.txt) comes from the handout;
+it complements the runner checks and grants no execution permissions. The
+runner writes append-only observations to SQLite and logs dispatch intent before
+calling the execution adapter. The fixture query builder binds the authenticated
+tenant; it does not attempt to validate arbitrary SQL with a regular expression.
+The model-facing input is a report plan. Execution and verification adapters belong
+to the trusted runner. Observations contain hashes, named checks and correction
+references, without raw query results or exception bodies. Retrieval restricts the
+tenant and project, excludes stale schema/tool versions from current counts, and
+reports how much historical evidence it excluded. Old successes grant no authority.
+
+The demo uses a scripted correction and result adapters. It demonstrates bookkeeping
+and preflight enforcement, not measured learning. For a live memory comparison,
+replay the same tasks with and without retrieval. Include stale versions, a misleading
+success, denied authority and a lost response. Compare recurring mistakes, false
+corrections, verified results and unresolved outcomes, plus lookup/logging cost and
+elapsed time. Keep the checks identical in both arms.
+
+Example 14 consumes stipulated council outputs and gate evidence. Majority disagreement
+is the minority share of known verdicts. Reason overlap is pairwise Jaccard overlap
+of fixed rubric issue IDs, not textual similarity of private reasoning. Both-empty
+reason sets provide no evidence of agreement. Missing results, unknown charges,
+repeated model identity or disagreement require review. A failed gate still rejects
+the candidate. Evidence includes the artifact hash so a synthesized design needs
+fresh checks. The output is eligibility for selection, never deployment approval.
+Generation planning includes all judges and available review slots under a fixture
+budget. It can select zero alternatives when money or review capacity is exhausted.
+This is a planning calculation, not a second durable reservation service.
+
+Example 15 ports the new talks' arithmetic into tested functions. It distinguishes
+unjudged from judged nonrelevant documents, and shows the misleading score alongside
+judgment coverage. It keeps false approvals visible even when raw agreement is high.
+The zero-failure bound is returned only when the caller explicitly asserts representative
+IID sampling; that flag records an assumption and cannot establish it. Queue waiting
+time excludes hands-on service time. These are teaching fixtures, not population
+estimates from the repository's unit tests.
+
+## 16: one fan-out node, four consumers
+
+`AGENT_FANOUT=1` runs the baseline; `3` adds contrasting fixed drafts. The first draft omits a deadline and gets rejected despite having the highest preference score. Rank selects a whole passing draft, synthesis runs a fresh gate, race waits for the first passing result, and inspection retains failures and unknown charges. This is a four-word lifecycle fixture, not an evaluator for architecture prose.
+
+The local quote reserves generation, machine review, synthesis and its check. It requires a human review slot for the one selected artifact. It does not reserve provider funds or tune its own policy from measured outcomes. [Each framework implements the batch node](../docs/fanout-node.md).
+
+The scoped-repair example now starts without `run-fixtures`. Execution fails until tool discovery records a policy-approved grant. Discovery and invocation both check the job deadline and call cap; the quality floor keeps every input record accounted for.

@@ -3,13 +3,9 @@ import { readFile } from "node:fs/promises";
 import { runSandbox } from "../src/lib/sandbox";
 import { judgeCandidate } from "../src/lib/judge";
 
-// "The judge never writes its own rubric: deterministic checks first, an LLM
-// rubric judge only for survivors." This test proves the order is enforced
-// structurally, not just by convention: a candidate that fails the
-// deterministic sandbox is never even eligible for judgeCandidate() in
-// 01-compete.ts (see the `survivors = candidates.filter(...)` line there).
-// This test also exercises the one live LLM call this file makes, kept to a
-// single call against the known-good compiled patch to bound spend.
+// These are a failing-fixture regression and a live judge smoke test.
+// They do not instrument the tournament call path or establish judge quality.
+// rubric-score.test.ts checks deterministic score handling without a model call.
 describe("judge order", () => {
   test("a sandbox failure never reaches the rubric judge (deterministic gate)", async () => {
     const buggySource = await readFile(

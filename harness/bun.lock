@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "agentic-parallelism-conformance-harness",
+      "name": "scaling-ai-agents-conformance-harness",
       "devDependencies": {
         "@earendil-works/pi-ai": "0.85.1",
         "@earendil-works/pi-coding-agent": "0.85.1",

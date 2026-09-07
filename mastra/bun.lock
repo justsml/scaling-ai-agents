@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "agentic-parallelism-mastra",
+      "name": "scaling-ai-agents-mastra",
       "dependencies": {
         "@mastra/client-js": "latest",
         "@mastra/core": "latest",

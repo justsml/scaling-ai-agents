@@ -28,3 +28,31 @@ describe("Ledger", () => {
     expect(ledger.summary().billedAnyway).toBeGreaterThan(0);
   });
 });
+
+test("settled spend replaces estimates when admitting later workers", () => {
+  const ledger = new Ledger(0.1);
+  ledger.reserve("first", 0.001);
+  const actual = ledger.settle("first", "openai/gpt-5.6-luna", {
+    inputTokens: 1000,
+    outputTokens: 500,
+  });
+  expect(ledger.reservedUsd).toBe(0);
+  expect(ledger.remainingUsd).toBeCloseTo(0.1 - actual);
+  expect(ledger.reserve("second", ledger.remainingUsd + 0.00001)).toBe(false);
+});
+test("cancellation keeps unknown charges reserved and duplicate IDs cannot erase them", () => {
+  const ledger = new Ledger(0.1);
+  ledger.reserve("first", 0.08);
+  ledger.cancel("first");
+  expect(ledger.remainingUsd).toBeCloseTo(0.02);
+  expect(() => ledger.reserve("first", 0.001)).toThrow("duplicate");
+  expect(ledger.reserve("second", 0.03)).toBe(false);
+});
+test("invalid money and mutation of returned rows cannot corrupt admission", () => {
+  expect(() => new Ledger(Number.NaN)).toThrow();
+  const ledger = new Ledger(1);
+  expect(() => ledger.reserve("bad", -1)).toThrow();
+  ledger.reserve("first", 0.5);
+  ledger.rows()[0]!.reservedUsd = 0;
+  expect(ledger.remainingUsd).toBe(0.5);
+});

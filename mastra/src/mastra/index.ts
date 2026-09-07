@@ -19,7 +19,7 @@ import {
 import { backgroundAgent, consequentialAgent, probeAgent, routineAgent } from "./agents.js";
 import { fixtureScorer, rubricJudgeScorer } from "../lib/judge.js";
 
-export const SERVICE_NAME = "agentic-parallelism-mastra";
+export const SERVICE_NAME = "scaling-ai-agents-mastra";
 
 export const storage = new LibSQLStore({
   id: "lab",

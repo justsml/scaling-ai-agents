@@ -18,6 +18,7 @@ const GATES: GateName[] = [
   "cascade",
   "retry",
   "budget",
+  "efficiency",
 ];
 
 export function buildReport(

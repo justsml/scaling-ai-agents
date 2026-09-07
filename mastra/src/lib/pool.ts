@@ -7,12 +7,14 @@
  * nicely not to log", not "prompted to be careful". If nothing is eligible,
  * the request fails with a reason rather than silently downgrading.
  */
+import type { ModelWithRetries } from "@mastra/core/agent";
 import {
   FRONTIER_MODEL,
   JUDGE_MODEL,
   LOCAL_MODEL_ID,
-  WORKER_MODEL,
+  localModelConfig,
   localSlotAvailable,
+  WORKER_MODEL,
 } from "./models.js";
 
 export type Region = "us" | "eu";
@@ -88,6 +90,8 @@ export interface Requirement {
 
 export interface Resolution {
   provider: ProviderEntry | null;
+  /** Every eligible entry, best first. This is the fallback chain. */
+  eligible: ProviderEntry[];
   /** Every entry considered, with the reason it was kept or dropped. */
   considered: Array<{ id: string; eligible: boolean; reason: string }>;
   reason: string;
@@ -143,6 +147,7 @@ export function resolveProvider(req: Requirement, opts: { exclude?: string[] } =
   const provider = eligible[0] ?? null;
   return {
     provider,
+    eligible,
     considered,
     reason: provider
       ? `${provider.id} (${provider.why})`
@@ -154,40 +159,52 @@ export function resolveProvider(req: Requirement, opts: { exclude?: string[] } =
 }
 
 /**
- * Fallback chain in code.
+ * The fallback chain, as data.
  *
- * @mastra/core 1.64 does accept `model: ModelWithRetries[]` on `Agent` (per-entry
- * `maxRetries`, fails over on 5xx, rate limit, or per-step timeout). This
- * hand-rolled chain predates that and is kept because it prints the attempt
- * trail and applies the pool's region and data-class filter before each try.
- * TODO: show the native array alongside it, or replace this with it.
+ * `@mastra/core` walks a `model` array on the Agent by itself: on a 5xx, a
+ * rate limit, or a per-step timeout it moves to the next entry after that
+ * entry's `maxRetries` is spent. A whole-run `timeout.totalMs` is a hard
+ * deadline and does not try the next entry. So the only job left for this
+ * code is to decide who is in the chain and in what order, which is the
+ * residency filter above. Nothing here retries anything.
  */
-export async function withFallback<T>(
-  req: Requirement,
-  attempt: (provider: ProviderEntry) => Promise<T>,
-  opts: { maxAttempts?: number } = {},
-): Promise<{
-  value: T | null;
-  served: ProviderEntry | null;
-  trail: Array<{ id: string; error?: string }>;
-}> {
-  const maxAttempts = opts.maxAttempts ?? 2;
-  const trail: Array<{ id: string; error?: string }> = [];
-  const tried: string[] = [];
+export function toFallbackChain(entries: ProviderEntry[]): ModelWithRetries[] {
+  return entries.map((entry) => ({
+    id: entry.id,
+    // The local slot is an OpenAI-compatible endpoint, not a router id, so it
+    // is passed as a model config object rather than a "provider/model" string.
+    model: (entry.kind === "local" ? (localModelConfig() ?? entry.model) : entry.model) as never,
+    // One retry on the same provider before moving on. Transient errors are
+    // worth one more try; a second failure is a signal to change provider.
+    maxRetries: entry.kind === "local" ? 0 : 1,
+  }));
+}
 
-  for (let i = 0; i < maxAttempts; i++) {
-    const { provider } = resolveProvider(req, { exclude: tried });
-    if (!provider) break;
-    tried.push(provider.id);
-    try {
-      const value = await attempt(provider);
-      trail.push({ id: provider.id });
-      return { value, served: provider, trail };
-    } catch (err) {
-      trail.push({ id: provider.id, error: err instanceof Error ? err.message : String(err) });
-    }
-  }
-  return { value: null, served: null, trail };
+/** Filter, rank, and hand the ranked list to Mastra as the agent's `model`. */
+export function fallbackChainFor(req: Requirement): {
+  entries: ProviderEntry[];
+  chain: ModelWithRetries[];
+} {
+  const entries = resolveProvider(req).eligible;
+  return { entries, chain: toFallbackChain(entries) };
+}
+
+/**
+ * Which pool entry served a response. Mastra reports the provider's own model
+ * id on `response.modelId`; the pool keys entries by router string, so match
+ * on the id after the slash as well as on the full string.
+ */
+export function providerForModelId(
+  modelId: string | undefined,
+  candidates: ProviderEntry[] = POOL,
+): ProviderEntry | null {
+  if (!modelId) return null;
+  const bare = modelId.includes("/") ? modelId.slice(modelId.lastIndexOf("/") + 1) : modelId;
+  return (
+    candidates.find((c) => c.model === modelId) ??
+    candidates.find((c) => c.model.slice(c.model.lastIndexOf("/") + 1) === bare) ??
+    null
+  );
 }
 
 /**

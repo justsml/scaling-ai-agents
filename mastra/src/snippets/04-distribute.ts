@@ -18,10 +18,10 @@
  *      on the Agent, so the routing decision is visible in the agent
  *      definition rather than buried in the call site.
  *
- *   3. Fallback in code, on purpose. @mastra/core 1.64 accepts
- *      `model: [{ model, maxRetries }, ...]` on Agent natively; `withFallback`
- *      in lib/pool.ts is used instead so the region/data-class filter runs
- *      before every attempt and the trail is printed. TODO: show both.
+ *   3. Fallback as data. The Agent's `model` is Mastra's native
+ *      `[{ model, maxRetries }, ...]` array, built from the eligible pool for
+ *      the request. Mastra walks it on 5xx, rate limit, or per-step timeout;
+ *      nothing in this file retries. `response.modelId` says who served it.
  *
  *   4. One competitor that is not in this process at all: it runs on a second
  *      Mastra server over A2A, reached through MastraClient.getA2A(). Its task
@@ -37,15 +37,25 @@
 import { Agent } from "@mastra/core/agent";
 import { RequestContext } from "@mastra/core/request-context";
 import {
-  parseCaps,
+  ArtifactAssembler,
+  normalizeEvent,
+  REMOTE_AGENT_ID,
+  REMOTE_CARD_URL,
+  startRemoteServer,
+  userMessage,
+} from "../lib/a2a.js";
+import type { StopReason } from "../lib/caps.js";
+import {
   deadlineHit,
   deadlineSignal,
   describeCaps,
   hasOpenAiKey,
+  parseCaps,
   remainingMs,
 } from "../lib/caps.js";
-import type { StopReason } from "../lib/caps.js";
-import { Ledger, estimateWorkerCost, usdFromUsage } from "../lib/ledger.js";
+import { estimateWorkerCost, Ledger, usdFromUsage } from "../lib/ledger.js";
+import { localSlotAvailable } from "../lib/models.js";
+import { fallbackChainFor, POOL, providerForModelId, resolveProvider } from "../lib/pool.js";
 import {
   bullet,
   header,
@@ -57,19 +67,9 @@ import {
   table,
   usd,
 } from "../lib/print.js";
-import { POOL, type ProviderEntry, resolveProvider, withFallback } from "../lib/pool.js";
 import { buildTaskPrompt, cleanPatch, patchSchema } from "../lib/profiles.js";
 import { readinessChallenge } from "../lib/readiness-challenge.js";
 import { loadRequests } from "../lib/router.js";
-import { localSlotAvailable } from "../lib/models.js";
-import {
-  ArtifactAssembler,
-  REMOTE_AGENT_ID,
-  REMOTE_CARD_URL,
-  normalizeEvent,
-  startRemoteServer,
-  userMessage,
-} from "../lib/a2a.js";
 import {
   contextOf,
   endWorkerSpan,
@@ -93,6 +93,19 @@ interface ServedWorker {
   costUsd: number;
   latencyMs: number;
   outcome: string;
+}
+
+/**
+ * Mastra raises a MastraError with this id when the model returned something
+ * that does not validate against `structuredOutput.schema`. It is a contract
+ * failure, not a provider failure, so the native fallback chain is (correctly)
+ * not walked. Labelled separately for the same reason the router labels it.
+ */
+function isContractFailure(message: string): boolean {
+  return (
+    message.includes("STRUCTURED_OUTPUT_SCHEMA_VALIDATION_FAILED") ||
+    message.includes("Structured output validation failed")
+  );
 }
 
 async function main(): Promise<void> {
@@ -245,87 +258,115 @@ async function main(): Promise<void> {
     rc.set("dataClass", w.dataClass);
     rc.set("requestId", "r4");
 
-    // The fallback chain lives in code; each attempt records which provider it
-    // tried and what went wrong.
-    const attempt = await withFallback(
-      { region: w.region, dataClass: w.dataClass },
-      async (provider: ProviderEntry) => {
-        const agent = new Agent({
-          id: `distributed-${w.id}`,
-          name: `Distributed worker ${w.id}`,
-          instructions:
-            "Rewrite readiness.ts so the contract holds. Return the complete file. No imports, no markdown fences.",
-          // Routing rule, in the agent definition. The request context decides.
-          model: ({ requestContext }) => {
-            const region = requestContext.get("region" as never) as string | undefined;
-            const dataClass = requestContext.get("dataClass" as never) as string | undefined;
-            const chosen = resolveProvider({
-              region: (region as "us" | "eu") ?? "us",
-              dataClass: (dataClass as "public" | "internal" | "restricted") ?? "public",
-              exclude: undefined,
-            } as never).provider;
-            return (chosen?.model ?? provider.model) as never;
-          },
-        });
-        return agent.generate(prompt, {
-          structuredOutput: { schema: patchSchema },
-          abortSignal: signal,
-          requestContext: rc,
-          tracingContext: contextOf(span),
-          tracingOptions: {
-            metadata: { profile: w.id, provider: provider.id, whyItExisted: w.why },
-            requestContextKeys: ["profile", "region", "dataClass"],
-            tags: ["distribute"],
-          },
-          modelSettings: {
-            timeout: { totalMs: Math.max(1000, remainingMs(caps)) },
-            maxOutputTokens: 2500,
-          },
-        });
+    // The fallback chain is data on the Agent. Every eligible provider for
+    // this request, ranked, becomes an entry in Mastra's `model` array. The
+    // whole-run timeout below is a hard deadline: it does not try the next
+    // entry, which is exactly what the ledger wants.
+    const chainEntries = fallbackChainFor({ region: w.region, dataClass: w.dataClass }).entries;
+    const first = chainEntries[0] ?? resolution.provider;
+    bullet(`${w.id}: chain ${chainEntries.map((e) => e.id).join(" → ")}`);
+
+    const agent = new Agent({
+      id: `distributed-${w.id}`,
+      name: `Distributed worker ${w.id}`,
+      instructions:
+        "Rewrite readiness.ts so the contract holds. Return the complete file. No imports, no markdown fences.",
+      // Routing rule, in the agent definition. The request context decides
+      // who is eligible; the array order decides who is tried first.
+      model: ({ requestContext }) => {
+        const region = requestContext.get("region" as never) as "us" | "eu" | undefined;
+        const dataClass = requestContext.get("dataClass" as never) as
+          | "public"
+          | "internal"
+          | "restricted"
+          | undefined;
+        return fallbackChainFor({
+          region: region ?? w.region,
+          dataClass: dataClass ?? w.dataClass,
+        }).chain as never;
       },
-    );
+    });
+
+    const run = () =>
+      agent.generate(prompt, {
+        structuredOutput: { schema: patchSchema },
+        abortSignal: signal,
+        requestContext: rc,
+        tracingContext: contextOf(span),
+        tracingOptions: {
+          metadata: {
+            profile: w.id,
+            chain: chainEntries.map((e) => e.id).join(","),
+            whyItExisted: w.why,
+          },
+          requestContextKeys: ["profile", "region", "dataClass"],
+          tags: ["distribute"],
+        },
+        modelSettings: {
+          timeout: { totalMs: Math.max(1000, remainingMs(caps)) },
+          maxOutputTokens: 2500,
+        },
+      });
+    let result: Awaited<ReturnType<typeof run>> | null = null;
+    let failure = "";
+    try {
+      result = await run();
+    } catch (err) {
+      failure = err instanceof Error ? err.message : String(err);
+    }
 
     const latencyMs = Date.now() - started;
-    if (!attempt.value || !attempt.served) {
+    if (!result) {
+      // Two different failures end up here, and the table must not confuse
+      // them. A contract failure (the model answered, but not to the schema)
+      // does not trigger Mastra's fallback, and should not: the next provider
+      // would be asked the same question. Only a wire failure walks the chain.
+      const contract = isContractFailure(failure);
+      const outcome = contract ? "contract failure, no fallback" : "all providers failed";
       ledger.reconcile(w.id, {
         latencyMs,
         outcome: "failed",
-        note: "every eligible provider failed",
+        note: contract
+          ? "model answered off-schema; not a provider error, so the chain was not walked"
+          : "every entry in the chain failed",
       });
       served.push({
         worker: w.id,
         requestedRegion: w.region,
         requestedDataClass: w.dataClass,
-        provider: "none",
-        model: "-",
-        why: attempt.trail.map((t) => `${t.id}: ${t.error ?? "ok"}`).join(" → "),
+        provider: contract ? first.id : "none",
+        model: contract ? first.model : "-",
+        why: contract
+          ? `${first.id} answered off-schema: ${failure}`
+          : `chain ${chainEntries.map((e) => e.id).join(" → ")} exhausted: ${failure}`,
         tests: "-",
         costUsd: 0,
         latencyMs,
-        outcome: "all providers failed",
+        outcome,
       });
       endWorkerSpan(span, {
         profile: w.id,
         costUsd: 0,
         latencyMs,
-        outcome: "all-providers-failed",
+        outcome: contract ? "contract-failure" : "all-providers-failed",
         whyItExisted: w.why,
+        provider: contract ? first.id : "none",
       });
       continue;
     }
 
-    const result = attempt.value;
-    const costUsd = usdFromUsage(attempt.served.priceKey, result.usage);
+    // Mastra does not hand back the attempt trail on the result; the per-model
+    // attempts are on the trace. What it does report is who answered.
+    const servedBy = providerForModelId(result.response?.modelId, chainEntries) ?? first;
+    const fellBack = servedBy.id !== first.id;
+    const costUsd = usdFromUsage(servedBy.priceKey, result.usage);
     const aborted = signal.aborted;
     ledger.reconcile(w.id, {
       usage: result.usage,
       latencyMs,
       outcome: aborted ? "aborted" : "ok",
-      model: attempt.served.priceKey,
-      note:
-        attempt.trail.length > 1
-          ? `fell back after ${attempt.trail.length - 1} failure(s)`
-          : undefined,
+      model: servedBy.priceKey,
+      note: fellBack ? `fell back from ${first.id} to ${servedBy.id}` : undefined,
     });
 
     const patch = cleanPatch(result.object?.patch ?? result.text ?? "");
@@ -342,9 +383,9 @@ async function main(): Promise<void> {
       worker: w.id,
       requestedRegion: w.region,
       requestedDataClass: w.dataClass,
-      provider: attempt.served.id,
-      model: attempt.served.model,
-      why: attempt.served.why,
+      provider: servedBy.id,
+      model: servedBy.model,
+      why: fellBack ? `${servedBy.why} (after ${first.id} failed)` : servedBy.why,
       tests: sandbox ? `${sandbox.pass}/${sandbox.pass + sandbox.fail}` : (dq ?? "aborted"),
       costUsd,
       latencyMs,
@@ -356,11 +397,10 @@ async function main(): Promise<void> {
       latencyMs,
       outcome: aborted ? "aborted" : sandbox?.green ? "green" : "not green",
       whyItExisted: w.why,
-      provider: attempt.served.id,
+      provider: servedBy.id,
+      fellBack,
     });
-    bullet(
-      `${w.id}: served by ${attempt.served.id} (${attempt.served.model}) — ${attempt.served.why}`,
-    );
+    bullet(`${w.id}: served by ${servedBy.id} (${servedBy.model}) — ${servedBy.why}`);
   }
 
   // -------------------------------------------------------------------------
@@ -449,14 +489,12 @@ async function main(): Promise<void> {
 
       section("remote task events");
       table(
-        events
-          .slice(0, 12)
-          .map((e, i) => ({
-            "#": i,
-            kind: e.kind,
-            state: e.state ?? "-",
-            taskId: e.taskId ?? "-",
-          })),
+        events.slice(0, 12).map((e, i) => ({
+          "#": i,
+          kind: e.kind,
+          state: e.state ?? "-",
+          taskId: e.taskId ?? "-",
+        })),
       );
       bullet(
         `task id: ${taskId ?? "(not surfaced by this event shape)"} · ${events.length} events`,

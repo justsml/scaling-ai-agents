@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "agentic-parallelism-ai-sdk",
+      "name": "scaling-ai-agents-ai-sdk",
       "dependencies": {
         "@ai-sdk/openai": "^4.0.59",
         "@ai-sdk/openai-compatible": "^3.0.44",

@@ -14,7 +14,7 @@
     },
     {
       "name": "pokedex_list",
-      "description": "List one page of an allowlisted Pokédex resource. Continue only with the opaque nextCursor returned by this tool. Do not finalize until the requested item count is collected or nextCursor is null; always continue an empty page when nextCursor is non-null.",
+      "description": "List one page of an allowlisted Pokédex resource. Continue only with the opaque nextCursor returned by this tool. While calls and time remain, continue until the requested item count is collected or nextCursor is null; an empty page with non-null nextCursor still has a continuation. Respect the remaining tool-call budget and deadline: stop with an explicitly scoped partial answer when either prevents further paging. Read details only when the question requires fields absent from the page.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -97,7 +97,8 @@
       "message": { "type": "string" },
       "retryable": { "type": "boolean" },
       "retryAfterMs": { "type": ["integer", "null"], "minimum": 0 },
-      "requestId": { "type": "string" }
+      "requestId": { "type": "string" },
+      "remainingToolCalls": { "type": "integer", "minimum": 0 }
     },
     "required": ["code", "message", "retryable", "retryAfterMs", "requestId"],
     "additionalProperties": false

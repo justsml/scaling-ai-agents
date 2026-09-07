@@ -1,5 +1,5 @@
 {
-  "name": "agentic-parallelism-mastra",
+  "name": "scaling-ai-agents-mastra",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -21,7 +21,8 @@
     "snippet:06": "bun run src/snippets/06-remote-a2a.ts",
     "snippet:07": "bun run src/snippets/07-batching.ts",
     "snippet:08": "bun run src/snippets/08-pokedex.ts",
-    "snippet:09": "bun run src/snippets/09-model-router.ts"
+    "snippet:09": "bun run src/snippets/09-model-router.ts",
+    "snippet:16": "bun src/snippets/16-fanout-node.ts"
   },
   "dependencies": {
     "@mastra/client-js": "latest",

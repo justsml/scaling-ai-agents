@@ -1,5 +1,5 @@
 {
-  "name": "agentic-parallelism",
+  "name": "scaling-ai-agents",
   "private": true,
   "scripts": {
     "format": "biome format --write .",

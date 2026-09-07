@@ -1,5 +1,5 @@
 {
-  "name": "agentic-parallelism-ai-sdk",
+  "name": "scaling-ai-agents-ai-sdk",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,7 +17,8 @@
     "snippet:07": "bun run src/snippets/07-batching.ts",
     "snippet:08": "bun run src/snippets/08-pokedex.ts",
     "snippet:09": "bun run src/snippets/09-model-router.ts",
-    "all": "bun run src/run-all.ts"
+    "all": "bun run src/run-all.ts",
+    "snippet:16": "bun src/snippets/16-fanout-node.ts"
   },
   "dependencies": {
     "ai": "^7.0.93",

@@ -1,3 +1,4 @@
+import { readinessChallenge } from "./readiness-challenge.js";
 /**
  * The compiled registry: the Compile axis in one file.
  *
@@ -64,10 +65,6 @@ export function listCompiled(): CompiledRule[] {
   return Object.values(loadRegistry());
 }
 
-export function clearCompiled(): void {
-  saveRegistry({});
-}
-
 /**
  * Return the patch for a hash, falling back to the explicitly loaded Reference
  * artifact when the hash is its target fixture. The caller owns loading that
@@ -78,4 +75,47 @@ export function compiledPatchFor(sourceHash: string, fallback?: ReferenceArtifac
   if (stored) return stored.patch;
   if (fallback && sourceHash === fallback.targetIdentity) return fallback.source;
   return "";
+}
+
+/** Resolve and certify before returning any executable patch. */
+export async function serveCompiled(source: string, signal?: AbortSignal) {
+  signal?.throwIfAborted();
+  const sourceHash = hashSource(source);
+  const [buggy, reference] = await Promise.all([
+    readinessChallenge.load("buggy"),
+    readinessChallenge.load("reference"),
+  ]);
+  if (source !== buggy.source)
+    return {
+      matched: false,
+      sourceHash,
+      patch: "",
+      reason: "exact demo source required",
+      modelCalls: 0,
+    };
+  const patch = compiledPatchFor(sourceHash, reference);
+  if (!patch)
+    return {
+      matched: false,
+      sourceHash,
+      patch: "",
+      reason: "no registered source identity",
+      modelCalls: 0,
+    };
+  await certifyCompiledPatch(patch, signal);
+  return {
+    matched: true,
+    sourceHash,
+    patch,
+    reason: "source identity matched; fixture contract passed",
+    modelCalls: 0,
+  };
+}
+
+export async function certifyCompiledPatch(patch: string, signal?: AbortSignal) {
+  const check = await readinessChallenge.certify(patch, { abortSignal: signal });
+  if (check.outcome !== "certified" || signal?.aborted) {
+    throw new Error(`compiled artifact refused: ${check.outcome}`);
+  }
+  return check;
 }

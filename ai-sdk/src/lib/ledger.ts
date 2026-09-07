@@ -21,6 +21,7 @@ export class Ledger {
   private exceededAt: number | undefined;
 
   constructor(budgetUsd: number) {
+    if (!Number.isFinite(budgetUsd) || budgetUsd < 0) throw new Error("invalid budget");
     this.budgetUsd = budgetUsd;
   }
 
@@ -28,10 +29,12 @@ export class Ledger {
     return this.abortController.signal;
   }
 
-  /** Total reserved (whether or not settled yet). */
+  /** Open reservations, including cancelled calls whose charge is unknown. */
   get reservedUsd(): number {
     let sum = 0;
-    for (const e of this.entries.values()) sum += e.reservedUsd;
+    for (const e of this.entries.values()) {
+      if (e.status !== "settled") sum += e.reservedUsd;
+    }
     return sum;
   }
 
@@ -43,7 +46,7 @@ export class Ledger {
   }
 
   get remainingUsd(): number {
-    return this.budgetUsd - this.reservedUsd;
+    return this.budgetUsd - this.spentUsd - this.reservedUsd;
   }
 
   get exceeded(): boolean {
@@ -52,7 +55,9 @@ export class Ledger {
 
   /** Reserve a slice of budget for a worker before it starts. Returns false if there isn't room. */
   reserve(worker: string, estimateUsd: number): boolean {
-    if (this.remainingUsd < estimateUsd) return false;
+    if (!Number.isFinite(estimateUsd) || estimateUsd < 0) throw new Error("invalid reservation");
+    if (this.entries.has(worker)) throw new Error(`duplicate worker: ${worker}`);
+    if (this.signal.aborted || this.remainingUsd < estimateUsd) return false;
     this.entries.set(worker, { worker, reservedUsd: estimateUsd, status: "reserved" });
     return true;
   }
@@ -76,10 +81,10 @@ export class Ledger {
         status: "settled",
       });
     }
-    if (this.spentUsd > this.budgetUsd && this.exceededAt === undefined) {
+    if (this.remainingUsd < 0 && this.exceededAt === undefined) {
       this.exceededAt = Date.now();
       this.abortController.abort(
-        new Error(`ledger exceeded budget: spent ${this.spentUsd.toFixed(4)} > ${this.budgetUsd}`),
+        new Error(`ledger commitments exceed budget: remaining ${this.remainingUsd.toFixed(4)}`),
       );
     }
     return actual;
@@ -91,7 +96,7 @@ export class Ledger {
   }
 
   rows(): LedgerEntry[] {
-    return [...this.entries.values()];
+    return [...this.entries.values()].map((entry) => ({ ...entry }));
   }
 
   summary() {
@@ -99,7 +104,8 @@ export class Ledger {
       budgetUsd: this.budgetUsd,
       reservedUsd: this.reservedUsd,
       spentUsd: this.spentUsd,
-      billedAnyway: this.exceeded ? this.spentUsd - this.budgetUsd : 0,
+      // Legacy field: this measures observed overspend, not all cancelled-call billing.
+      billedAnyway: Math.max(0, this.spentUsd - this.budgetUsd),
       exceeded: this.exceeded,
       rows: this.rows(),
     };

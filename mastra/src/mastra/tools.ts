@@ -5,11 +5,11 @@
  *  - `applyPatchTool` is consequential. It carries `requireApproval: true`, so
  *    the agent cannot execute it however much budget is left.
  *  - `compiledReadinessTool` is the Compile axis: a deterministic function that
- *    replaces the tournament once the tournament has been won.
+ *    returns a certified registry artifact or the shipped reference.
  */
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
-import { compiledPatchFor, hashSource } from "../lib/compiled.js";
+import { serveCompiled } from "../lib/compiled.js";
 import { readinessChallenge } from "../lib/readiness-challenge.js";
 
 /** Lookup class: a deterministic answer, no model in the path at all. */
@@ -119,7 +119,7 @@ export const slowAuditTool = createTool({
 });
 
 /**
- * 05 Compile: the winning path frozen into code.
+ * 05 Compile: certify the selected artifact before returning it.
  *
  * It is keyed by a hash of the buggy source. A different broken file with a
  * similar error message hashes differently and misses the rule — that negative
@@ -129,7 +129,7 @@ export const slowAuditTool = createTool({
 export const compiledReadinessTool = createTool({
   id: "compiled-readiness",
   description:
-    "Apply the known-good readiness fix to a source file. Only matches the exact buggy module the fix was compiled from.",
+    "Return a certified readiness patch without applying it. Only matches the exact buggy module the fix was compiled from.",
   inputSchema: z.object({
     source: z.string().optional().describe("full file contents; defaults to the fixture module"),
   }),
@@ -140,28 +140,8 @@ export const compiledReadinessTool = createTool({
     reason: z.string(),
     modelCalls: z.number(),
   }),
-  execute: async ({ source }) => {
-    const [buggy, reference] = await Promise.all([
-      readinessChallenge.load("buggy"),
-      readinessChallenge.load("reference"),
-    ]);
-    const text = source ?? buggy.source;
-    const sourceHash = hashSource(text);
-    const patch = compiledPatchFor(sourceHash, reference);
-    return patch
-      ? {
-          matched: true,
-          sourceHash,
-          patch,
-          reason: "hash matched the compiled rule",
-          modelCalls: 0,
-        }
-      : {
-          matched: false,
-          sourceHash,
-          patch: "",
-          reason: "no compiled rule for this source hash; escalate to the tournament",
-          modelCalls: 0,
-        };
+  execute: async ({ source }, context) => {
+    const text = source ?? (await readinessChallenge.load("buggy")).source;
+    return serveCompiled(text, context?.abortSignal);
   },
 });
