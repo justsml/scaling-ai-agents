@@ -1,5 +1,13 @@
-// Offline compile path using a native tool step. Never
-// clears or rewrites the registry.
+/**
+ * 05 — Compile (Mastra)
+ *
+ * An exact input can replay a shipped, independently
+ * tested artifact through a native tool step.
+ *
+ *   bun run snippet:05
+ *
+ * Zero model calls. No API key needed.
+ */
 import {
   createStep,
   createWorkflow,

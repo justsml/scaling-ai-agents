@@ -1,6 +1,22 @@
-// Arithmetic fixtures from the benchmark, retrieval and
-// judgment talks. No sampled data.
-import { disagreement } from "./14-council-of-guards";
+/**
+ * 15 — Evaluator validity
+ *
+ * Small calculations expose four evaluation traps:
+ * agreement without correctness, hand-picked trials,
+ * unjudged retrieval results, and review queues.
+ *
+ *   bun run snippet:15
+ *
+ * Synthetic arithmetic only. No API key.
+ */
+function disagreement(verdicts: boolean[]) {
+  if (verdicts.length < 2) return null;
+  const passes = verdicts.filter(Boolean).length;
+  return (
+    Math.min(passes, verdicts.length - passes) /
+    verdicts.length
+  );
+}
 export function judgeAgreement(
   expert: boolean[],
   judge: boolean[],

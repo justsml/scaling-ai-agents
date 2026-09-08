@@ -1,156 +1,54 @@
-#!/usr/bin/env bun
-// Runs every snippet in order (00..07) as a child
-// process, each with a small per-snippet budget, and
-// prints a final spend summary. A snippet that throws
-// does not stop the rest -- the report distinguishes
-// "ran", "failed" and "skipped: <reason>" (a snippet
-// exits 0 with that message printed when a dependency,
-// like AI_GATEWAY_API_KEY, is absent).
-interface RunResult {
-  snippet: string;
-  status: "ran" | "failed";
-  exitCode: number;
-  durationMs: number;
-}
-
-const SNIPPETS: Array<{
-  file: string;
-  args: string[];
-}> = [
-  {
-    file: "00-router.ts",
-    args: [
-      "--budget-usd",
-      "0.05",
-      "--deadline-ms",
-      "30000",
-    ],
-  },
-  {
-    file: "01-compete.ts",
-    args: [
-      "--budget-usd",
-      "0.3",
-      "--deadline-ms",
-      "60000",
-    ],
-  },
-  {
-    file: "02-decompose.ts",
-    args: [
-      "--budget-usd",
-      "0.2",
-      "--deadline-ms",
-      "60000",
-    ],
-  },
-  {
-    file: "03-constrain.ts",
-    args: [
-      "--budget-usd",
-      "0.05",
-      "--deadline-ms",
-      "20000",
-    ],
-  },
-  {
-    file: "04-distribute.ts",
-    args: [
-      "--budget-usd",
-      "0.1",
-      "--deadline-ms",
-      "60000",
-    ],
-  },
-  {
-    file: "05-compile.ts",
-    args: [
-      "--budget-usd",
-      "0.05",
-      "--deadline-ms",
-      "30000",
-    ],
-  },
-  {
-    file: "06-remote-a2a.ts",
-    args: [
-      "--budget-usd",
-      "0.05",
-      "--deadline-ms",
-      "30000",
-    ],
-  },
-  {
-    file: "07-batching.ts",
-    args: [
-      "--budget-usd",
-      "0.05",
-      "--deadline-ms",
-      "30000",
-    ],
-  },
+/**
+ * Run the standalone 00–07 examples in order.
+ *
+ *   bun run all
+ *   bun run all -- 01 03
+ *
+ * Each example is a child process, so one failure does
+ * not hide the remaining examples. See each snippet's
+ * opening comment for calls and credentials. Examples
+ * 08 and 09 use the evaluation harness instead.
+ */
+const snippets = [
+  "00-router.ts",
+  "01-compete.ts",
+  "02-decompose.ts",
+  "03-constrain.ts",
+  "04-distribute.ts",
+  "05-compile.ts",
+  "06-remote-a2a.ts",
+  "07-batching.ts",
 ];
+const selected = process.argv
+  .slice(2)
+  .filter((arg) => arg !== "--");
+const files = selected.length
+  ? snippets.filter((file) =>
+      selected.some((id) => file.startsWith(id)),
+    )
+  : snippets;
 
-async function runOne(
-  file: string,
-  args: string[],
-): Promise<RunResult> {
-  const start = Date.now();
-  const proc = Bun.spawn({
-    cmd: [
-      "bun",
-      "run",
-      `src/snippets/${file}`,
-      ...args,
-    ],
-    stdout: "inherit",
-    stderr: "inherit",
-    env: { ...process.env },
+const results = [];
+for (const file of files) {
+  console.log(`\n=== ${file} ===`);
+  const started = Date.now();
+  const child = Bun.spawn(
+    ["bun", "run", `src/snippets/${file}`],
+    {
+      stdout: "inherit",
+      stderr: "inherit",
+      env: process.env,
+    },
+  );
+  results.push({
+    file,
+    exitCode: await child.exited,
+    durationMs: Date.now() - started,
   });
-  const exitCode = await proc.exited;
-  return {
-    snippet: file,
-    status: exitCode === 0 ? "ran" : "failed",
-    exitCode,
-    durationMs: Date.now() - start,
-  };
 }
 
-async function main() {
-  const results: RunResult[] = [];
-  for (const { file, args } of SNIPPETS) {
-    console.log(
-      `\n\n========================================`,
-    );
-    console.log(`RUNNING: ${file} ${args.join(" ")}`);
-    console.log(
-      `========================================`,
-    );
-    const result = await runOne(file, args);
-    results.push(result);
-  }
+console.table(results);
+if (results.some((result) => result.exitCode !== 0))
+  process.exitCode = 1;
 
-  console.log(
-    "\n\n========== run-all summary ==========",
-  );
-  for (const r of results) {
-    console.log(
-      `${r.snippet.padEnd(20)} ${r.status.padEnd(8)} exit=${r.exitCode}  ${r.durationMs}ms`,
-    );
-  }
-  const failed = results.filter(
-    (r) => r.status === "failed",
-  );
-  if (failed.length > 0) {
-    console.log(
-      `\n${failed.length} snippet(s) failed: ${failed.map((f) => f.snippet).join(", ")}`,
-    );
-    process.exitCode = 1;
-  } else {
-    console.log(
-      "\nAll snippets ran (a snippet may still have printed its own 'skipped: <reason>' internally, e.g. for gateway-only features).",
-    );
-  }
-}
-
-main();
+export {};

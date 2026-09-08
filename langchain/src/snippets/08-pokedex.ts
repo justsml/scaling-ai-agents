@@ -1,15 +1,28 @@
-#!/usr/bin/env bun
-import { ChatOpenAI } from "@langchain/openai";
+/**
+ * 08 — Pokédex investigator (LangChain)
+ *
+ * The model investigates through four local tools. The
+ * session owns deadlines, call limits, opaque cursors,
+ * and citation checks; the model only chooses calls.
+ *
+ *   bun run snippet:08 < request.json
+ *
+ * One paid agent loop, with the tool-call count set by
+ * request.json. Needs OPENAI_API_KEY and the local
+ * Pokédex gateway named in that request.
+ */
+
 import { tool } from "@langchain/core/tools";
+import { ChatOpenAI } from "@langchain/openai";
 import { createAgent } from "langchain";
 import {
-  POKEDEX_TOOLS,
-  PokedexGatewaySession,
   answerSchema,
-  investigationRequestSchema,
-  loadPokedexToolContract,
   type InvestigationEvidence,
   type InvestigationRequest,
+  investigationRequestSchema,
+  loadPokedexToolContract,
+  POKEDEX_TOOLS,
+  PokedexGatewaySession,
 } from "../lib/pokedex.ts";
 
 export function createPokedexTools(

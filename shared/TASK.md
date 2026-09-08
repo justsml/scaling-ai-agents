@@ -13,25 +13,32 @@ A repository has a small TypeScript module, `readiness.ts`, and a test file. The
 | denied | `EACCES` | stop, do not retry, report |
 | deadline | never ready before the cap | stop, explain, return partial |
 
-The buggy module retries `denied` forever and has no deadline. Tests live in `shared/fixtures/readiness.test.ts` and are the deterministic judge for the whole exercise.
+The buggy module retries `denied` forever and has no deadline. Tests live in
+`shared/fixtures/readiness.test.ts`; they support the offline Compile examples and
+deeper library tests. The deliberately small Compete snippets compare proposals but do
+not claim those proposals were executed or certified.
 
 ## What each axis does with it
 
-**Compete.** Three profiles of one model (minimal-diff, best-practices, performance) and one alternate model each propose a patch to `readiness.ts`. Every candidate is run against the fixture tests in a sandboxed child process. Survivors go to an LLM rubric judge whose rubric is `shared/fixtures/rubric.md`. Output: a table with profile, tests passed, rubric score, cost, latency, and the picked winner.
+**Compete.** Three competitors propose complete fixes for the same readiness problem in parallel. A fourth call sees all three answers and chooses one winner. The snippet keeps the problem, roles, calls and join together so the fan-out is easy to compare across frameworks.
 
-**Decompose.** A separate incident, "intermittent WebSocket disconnects", is investigated by workers split by evidence source: `network.log`, `app.log`, `state.json`. Each worker answers one question, returns one artifact, and has one exit condition. A reviewer reads all three and looks for evidence against the favored hypothesis. Two workers must never write the same file. Output: the three artifacts, the reviewer's verdict, and the merge record.
+**Decompose.** A separate incident, "intermittent WebSocket disconnects", is investigated by three workers, each with one evidence source. A fourth call combines their findings into a diagnosis and first safe mitigation.
 
-**Constrain.** The compete tournament again, but with `--budget-usd 0.05 --deadline-ms 20000`. Spend is reserved per worker before fan-out and reconciled after. The deadline cancels dispatch and in-flight calls and records what was billed anyway. One extra path, "apply the patch to main", is a consequential action and requires human approval even with budget left. Output: the ledger, the reason for stopping, and the approval prompt.
+**Constrain.** Three jobs are requested, but code admits only the two useful ones. Both admitted calls share one deadline; the skipped job remains visible in the result. This is a small example of admission before fan-out, not a provider billing system.
 
-**Distribute.** The same tournament with a provider pool: OpenAI primary, one fallback model, one local OpenAI-compatible slot (LM Studio or Ollama) that is used when present and skipped when absent, and a `region` and `dataClass` on the request that filters providers in code before any call. One competitor runs as a remote worker over A2A on a second local server process. Output: which provider served each worker and why, plus the remote worker's task id and status events.
+**Distribute.** Three independent jobs are assigned to explicit Luna, Terra and Sol model lanes, then started together. The example teaches placement and concurrent dispatch; it does not claim provider failover, residency enforcement or remote execution.
 
-**Compile.** The winning patch from Compete becomes a deterministic tool with the fixture tests as its contract, registered so the next matching request runs the tool before any agent starts. Keep one negative case that must still miss the rule. Output: request one shows the tournament, request two shows zero model calls.
+**Compile.** An exact known input replays a shipped artifact with zero model calls. Changed input misses. Where the stack exposes certification, the replay is checked again rather than trusting a cache entry.
 
-**Router (before the axes).** A deterministic classifier over the request picks lookup, routine or novel and hands off to a tool, one agent, or the tournament. Costs and caps are attached to the plan as a contract object the executor validates.
+**Router (before the axes).** A small deterministic classifier chooses lookup, generation, parallel work or human review before expensive work begins.
 
-**Remote.** The A2A worker used in Distribute, stood up as its own snippet: agent card, `message/stream`, task status events, cancellation.
+**Remote.** Put one worker behind a process and protocol boundary. AI SDK hand-rolls the small A2A subset it needs; Mastra uses its A2A client/server support; LangGraph probes A2A availability and uses `RemoteGraph` against the local Agent Protocol server.
 
-**Batching and parallel tool calls.** One agent turn that emits several tool calls, executed concurrently with a concurrency cap; a fan-out over the fixture list with a bounded pool; and, where the stack supports it, a provider batch API call that is optional and skipped without credentials.
+**Batching and parallel tool calls.** Compare model-planned parallel tool calls with application-planned bounded work. AI SDK also shows its optional provider Batch API path. LangChain's `Runnable.batch` is client-side concurrency; Mastra uses workflow `.foreach()`.
+
+**Pokédex investigation.** A model chooses among four local tools while a session outside the model owns deadlines, tool-call limits, opaque cursors and citation validation. The conformance harness supplies JSON on stdin and the local gateway.
+
+**Model routing.** Run the same fixture cases with deterministic routing rules off and on. Approval rules remain enabled in both runs so a destructive request cannot bypass human review.
 
 ## Fixtures
 
@@ -39,7 +46,7 @@ The buggy module retries `denied` forever and has no deadline. Tests live in `sh
 
 - `readiness.ts` (buggy), `readiness.test.ts`, `rubric.md`
 - `incident/network.log`, `incident/app.log`, `incident/state.json`, `incident/ground-truth.md`
-- `prices.json`: a static per-model USD price table for cost estimates
+- `prices.json`: a historical static price table still used by deeper library tests
 - `requests.json`: sample requests tagged lookup, routine, novel, consequential
 
 Each stack copies these into `<stack>/src/fixtures/` at setup. Copy, do not import.
@@ -52,19 +59,15 @@ shared admission, durable unresolved outcomes, and catalog-bounded compute reque
 See [the review](../docs/talk-architecture-review-2026-09-06.md) and
 [offline examples 10–15](../examples/README.md).
 
-Compile implementations have different demonstration scopes. Mastra runs and stores
-a tournament artifact. LangChain demonstrates the shipped reference and graph cache.
-The `05` demos are offline certified replay paths with explicit misses; they do not pretend
-that an explanatory model call produced or certified a new artifact. A match must
-still pass independent checks before serving, and does not authorize deployment.
+The `05` demos are offline certified replay paths with explicit misses; they do not
+pretend that an explanatory model call produced or certified a new artifact. A match
+must still pass independent checks before serving, and does not authorize deployment.
 
 The second September 6 review adds runner-owned execution observations, council
 disagreement, and checks on the evaluator itself. Memory can inform a new proposal;
 it cannot establish execution, semantic correctness or authority. Multiple judges
 can direct review; their agreement cannot override a failed deterministic gate.
 
-The newest generation example is `16` in all three stacks. Keep the copied
-`src/lib/fanout-contract.ts` files synchronized with `shared/fanout-contract.ts`.
-Generation fans out inside one workflow component and collapses to at most one
-selected artifact before human review. `AGENT_FANOUT=1` is the default baseline.
-The contract example also distinguishes race, synthesis, rank and failure inspection.
+The newest generation example is `16` in all three stacks. Each snippet keeps its
+small fixture, gate and selection next to the framework-native fan-out. Generation
+collapses to at most one selected artifact. `AGENT_FANOUT=1` is the baseline.

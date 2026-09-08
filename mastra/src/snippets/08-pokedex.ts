@@ -1,14 +1,26 @@
-#!/usr/bin/env bun
+/**
+ * 08 — Pokédex investigator (Mastra)
+ *
+ * The model investigates through four local tools. The
+ * session owns deadlines, call limits, opaque cursors,
+ * and citation checks; the model only chooses calls.
+ *
+ *   bun run snippet:08 < request.json
+ *
+ * One paid agent loop, with the tool-call count set by
+ * request.json. Needs OPENAI_API_KEY and the local
+ * Pokédex gateway named in that request.
+ */
 import { Agent } from "@mastra/core/agent";
 import { createTool } from "@mastra/core/tools";
 import {
-  POKEDEX_TOOLS,
-  PokedexGatewaySession,
   answerSchema,
-  investigationRequestSchema,
-  loadPokedexToolContract,
   type InvestigationEvidence,
   type InvestigationRequest,
+  investigationRequestSchema,
+  loadPokedexToolContract,
+  POKEDEX_TOOLS,
+  PokedexGatewaySession,
 } from "../lib/pokedex.js";
 
 export function createPokedexTools(

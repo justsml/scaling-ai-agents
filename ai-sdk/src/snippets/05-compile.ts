@@ -1,10 +1,13 @@
-#!/usr/bin/env bun
-// Compile: an exact known input can use a
-// fixture-certified reference artifact. This offline
-// replay does not run or persist a tournament. Use 01
-// for that experiment. A miss returns a routing
-// decision, never an agent with the compiled tool
-// attached.
+/**
+ * 05 — Compile (AI SDK)
+ *
+ * An exact input can replay a shipped, independently
+ * tested artifact. Changed input is a cache miss.
+ *
+ *   bun run snippet:05
+ *
+ * Zero model calls. No API key needed.
+ */
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import registry from "../compiled/registry.json";

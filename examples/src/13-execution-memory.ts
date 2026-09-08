@@ -1,5 +1,15 @@
-// Offline runner observations. Memory is evidence, not
-// an executable instruction.
+/**
+ * 13 — Execution memory
+ *
+ * A reporting runner remembers what was generated,
+ * executed, verified, or left uncertain. Retrieved
+ * memory is evidence, never permission or executable
+ * instructions.
+ *
+ *   bun run snippet:13
+ *
+ * Local SQLite simulation. No API key.
+ */
 import { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 

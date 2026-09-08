@@ -1,7 +1,14 @@
-// Resolve generated compute requests against
-// server-owned policy. No cloud API calls. Resolution
-// is a quote; the scheduler must atomically reserve it
-// before provisioning.
+/**
+ * 12 — Compute request
+ *
+ * An agent asks for workers. Server-owned policy turns
+ * that untrusted request into a bounded compute quote.
+ * Provisioning would happen only after reservation.
+ *
+ *   bun run snippet:12
+ *
+ * Local policy check with fixture prices. No API key.
+ */
 export interface ComputeRequest {
   shape: string;
   class: string;

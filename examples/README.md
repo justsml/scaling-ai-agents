@@ -28,7 +28,7 @@ No install is needed to run the snippets themselves with Bun. The development de
 | [13: execution memory](src/13-execution-memory.ts) | A missing tenant predicate is recorded and corrected; execution and result verification remain separate | Tenant/project/version isolation, denied execution, wrong totals, unknown responses, durable intent, correction references |
 | [14: Council of Guards](src/14-council-of-guards.ts) | Three judges disagree on the maintainer; every original design still fails a gate | Missing judges, repeated model identity, score/reason disagreement, fresh synthesis evidence, cost and review-capacity limits |
 | [15: evaluator validity](src/15-evaluator-validity.ts) | An always-pass judge scores 90% agreement; an unjudged document depresses naive precision | Confusion matrix, undefined kappa, majority disagreement, IID assumption, judgment coverage, queue wait versus service time |
-| [16: bounded fan-out](src/16-fanout-node.ts) | Race, synthesize, rank or inspect a bounded set; one selected artifact reaches review | Fan-out one, failed branches, fresh synthesis gate, unknown charges and late race settlement |
+| [16: bounded fan-out](src/16-fanout-node.ts) | Generate a bounded set concurrently and select only a draft that passes the lifecycle gate | Fan-out bounds, invalid high scorer, failed-branch isolation |
 
 Example 10 accepts a tiny mapping grammar instead of executing generated code. Only `postal_code` to `postalCode` by string copy is allowed under the fixture contract. Expected outputs belong to the validator. All input records receive an accepted or quarantined disposition. The proposing job cannot promote its own artifact; the demo calls promotion separately as the trusted owner.
 
@@ -88,10 +88,10 @@ IID sampling; that flag records an assumption and cannot establish it. Queue wai
 time excludes hands-on service time. These are teaching fixtures, not population
 estimates from the repository's unit tests.
 
-## 16: one fan-out node, four consumers
+## 16: one bounded fan-out node
 
-`AGENT_FANOUT=1` runs the baseline; `3` adds contrasting fixed drafts. The first draft omits a deadline and gets rejected despite having the highest preference score. Rank selects a whole passing draft, synthesis runs a fresh gate, race waits for the first passing result, and inspection retains failures and unknown charges. This is a four-word lifecycle fixture, not an evaluator for architecture prose.
+`AGENT_FANOUT=1` runs the baseline; `3` adds contrasting fixed drafts. The first draft omits a deadline and gets rejected despite having the highest preference score. One failed branch becomes `null` without erasing the surviving drafts. This is a four-word lifecycle fixture, not an evaluator for architecture prose.
 
-The local quote reserves generation, machine review, synthesis and its check. It requires a human review slot for the one selected artifact. It does not reserve provider funds or tune its own policy from measured outcomes. [Each framework implements the batch node](../docs/fanout-node.md).
+The example bounds fan-out at nine and collapses the joined batch to at most one passing artifact. It does not reserve provider funds or tune its own policy from measured outcomes. [Each framework implements the same batch node](../docs/fanout-node.md).
 
 The scoped-repair example now starts without `run-fixtures`. Execution fails until tool discovery records a policy-approved grant. Discovery and invocation both check the job deadline and call cap; the quality floor keeps every input record accounted for.

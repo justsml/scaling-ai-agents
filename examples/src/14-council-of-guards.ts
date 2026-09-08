@@ -1,5 +1,14 @@
-// Synthetic council outputs. Gate reports come from
-// trusted checks, not the judges.
+/**
+ * 14 — Council of guards
+ *
+ * Several judges review the same candidate. Their
+ * votes can prioritize human review, but trusted gates
+ * decide whether an artifact is eligible.
+ *
+ *   bun run snippet:14
+ *
+ * Synthetic votes and fixture prices. No API key.
+ */
 import { createHash } from "node:crypto";
 export const GATES = [
   "restart",

@@ -1,7 +1,14 @@
-// Offline provider simulation with real SQLite
-// persistence. Prices are fixtures in cents. Only the
-// trusted dispatcher/reconciler owns this object. An
-// agent gets a job ID.
+/**
+ * 11 — Durable admission
+ *
+ * A SQLite ledger admits work before dispatch. It
+ * reserves budget once, survives restarts, and keeps
+ * uncertain provider attempts from being retried.
+ *
+ *   bun run snippet:11
+ *
+ * Local simulation with fixture prices. No API key.
+ */
 import { Database } from "bun:sqlite";
 import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";

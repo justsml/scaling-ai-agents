@@ -1,17 +1,24 @@
-// Offline policy example. Proposed mappings are
-// untrusted data, never executable code. A framework
-// agent may propose this JSON; authorization and
-// validation stay here.
+/**
+ * 10 — Scoped repair
+ *
+ * An agent proposes a tiny data repair. The server
+ * limits its tools, tests the proposal, canaries it,
+ * and keeps rollback outside the agent's authority.
+ *
+ *   bun run snippet:10
+ *
+ * No model calls. No API key.
+ */
 import { strict as assert } from "node:assert";
 
-const CONTRACT = "vendor-address-v8";
-const POLICY = "equivalent-address-rename-canary-v1";
-const TOOLS = [
+const contract = "vendor-address-v8";
+const policy = "equivalent-address-rename-canary-v1";
+const tools = [
   "read-contract",
   "propose-mapping",
   "run-fixtures",
 ] as const;
-type ToolName = (typeof TOOLS)[number];
+
 export type Candidate = {
   version: string;
   parent: string;
@@ -25,20 +32,20 @@ export type Disposition =
   | { kind: "accepted"; value: Address }
   | { kind: "quarantined"; reason: string };
 
-function record(
+const record = (
   value: unknown,
-): Record<string, unknown> | null {
-  return value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value)
+): Record<string, unknown> | null =>
+  value !== null &&
+  typeof value === "object" &&
+  !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
-}
 
+/** Accept one data-only operation—not generated code. */
 export function parseCandidate(
   value: unknown,
 ): Candidate {
-  const r = record(value);
+  const candidate = record(value);
   const keys = [
     "version",
     "parent",
@@ -48,80 +55,74 @@ export function parseCandidate(
     "operation",
   ];
   if (
-    !r ||
-    Object.keys(r).length !== keys.length ||
-    keys.some((k) => typeof r[k] !== "string")
-  ) {
+    !candidate ||
+    Object.keys(candidate).length !== keys.length ||
+    keys.some(
+      (key) => typeof candidate[key] !== "string",
+    )
+  )
     throw new Error("invalid mapping artifact");
-  }
   if (
     !/^address-map-v8-[a-z0-9-]+$/.test(
-      r.version as string,
+      candidate.version as string,
     ) ||
-    r.contract !== CONTRACT ||
-    r.from !== "postal_code" ||
-    r.to !== "postalCode" ||
-    r.operation !== "copy-string"
-  ) {
+    candidate.contract !== contract ||
+    candidate.from !== "postal_code" ||
+    candidate.to !== "postalCode" ||
+    candidate.operation !== "copy-string"
+  )
     throw new Error(
       "mapping outside approved rename policy",
     );
-  }
-  return r as Candidate;
+  return candidate as Candidate;
 }
 
 export function mapAddress(
   input: unknown,
 ): Disposition {
-  const r = record(input);
+  const row = record(input);
   if (
-    !r ||
-    typeof r.country !== "string" ||
-    !r.country.trim()
-  ) {
+    !row ||
+    typeof row.country !== "string" ||
+    !row.country.trim()
+  )
     return {
       kind: "quarantined",
       reason: "missing-country",
     };
-  }
-  // The contract fixture gives no approved
-  // interpretation for a status field.
-  if ("status" in r)
+  if ("status" in row)
     return {
       kind: "quarantined",
       reason: "ambiguous-semantics",
     };
   if (
-    typeof r.postal_code !== "string" ||
-    !r.postal_code.trim()
-  ) {
+    typeof row.postal_code !== "string" ||
+    !row.postal_code.trim()
+  )
     return {
       kind: "quarantined",
       reason: "postal-code-must-be-a-string",
     };
-  }
   if (
-    ("zip" in r && r.zip !== r.postal_code) ||
-    ("postalCode" in r &&
-      r.postalCode !== r.postal_code)
-  ) {
+    ("zip" in row && row.zip !== row.postal_code) ||
+    ("postalCode" in row &&
+      row.postalCode !== row.postal_code)
+  )
     return {
       kind: "quarantined",
       reason: "conflicting-postal-fields",
     };
-  }
   return {
     kind: "accepted",
     value: {
-      country: r.country,
-      postalCode: r.postal_code,
+      country: row.country,
+      postalCode: row.postal_code,
     },
   };
 }
 
-// Server-owned cases. A proposer cannot submit a
-// passing score or replace this suite.
-const FIXTURES: Array<[unknown, Disposition]> = [
+// The server owns both the cases and expected results.
+const fixtures: Array<[unknown, Disposition]> = [
   [
     { country: "US", postal_code: "02108" },
     {
@@ -171,17 +172,14 @@ const FIXTURES: Array<[unknown, Disposition]> = [
   ],
 ];
 
-export function certify(value: unknown): Candidate {
+export function certify(value: unknown) {
   const candidate = parseCandidate(value);
-  // This DSL only permits the server-owned copy-string
-  // implementation above. Adding an operation requires
-  // new independent expected outputs, not an agent
-  // score.
-  for (const [input, expected] of FIXTURES)
+  for (const [input, expected] of fixtures)
     assert.deepEqual(mapAddress(input), expected);
   return { ...candidate };
 }
 
+/** The agent sees only this job-scoped tool surface. */
 export class RepairJobs {
   private jobs = new Map<
     string,
@@ -197,10 +195,9 @@ export class RepairJobs {
     allowed: boolean;
     reason: string;
   }> = [];
+
   constructor(private now: () => number = Date.now) {}
 
-  // Called by the authenticated orchestrator, never
-  // exposed as an agent tool.
   create(
     jobId: string,
     deadline: number,
@@ -208,7 +205,6 @@ export class RepairJobs {
   ) {
     if (
       this.jobs.has(jobId) ||
-      !Number.isFinite(deadline) ||
       deadline <= this.now() ||
       !Number.isSafeInteger(maxCalls) ||
       maxCalls < 1
@@ -225,15 +221,11 @@ export class RepairJobs {
     return Object.freeze({
       jobId,
       tools: ["read-contract", "propose-mapping"],
-      qualityFloor:
-        "every record repaired, quarantined or unresolved",
-      policy: POLICY,
+      policy,
       riskClass: "read-and-propose",
     });
   }
 
-  // Discovery and invocation use the same check. Tool
-  // names do not confer permission.
   request(
     jobId: string,
     tool: string,
@@ -247,7 +239,9 @@ export class RepairJobs {
         ? "deadline"
         : job.callsLeft <= 0
           ? "attempt-cap"
-          : !TOOLS.includes(tool as ToolName)
+          : !tools.includes(
+                tool as (typeof tools)[number],
+              )
             ? "outside-job-tools"
             : !discovery && !job.grants.has(tool)
               ? "tool-not-granted"
@@ -262,11 +256,11 @@ export class RepairJobs {
     job!.callsLeft--;
     if (discovery) {
       job!.grants.add(tool);
-      return { tool, policy: POLICY };
+      return { tool, policy };
     }
     if (tool === "read-contract")
       return {
-        contract: CONTRACT,
+        contract,
         rename: "postal_code -> postalCode",
         operation: "copy-string",
       };
@@ -274,28 +268,25 @@ export class RepairJobs {
       return parseCandidate(args);
     return {
       candidate: certify(args),
-      fixturesPassed: FIXTURES.length,
+      fixturesPassed: fixtures.length,
     };
   }
 }
 
+/** Promotion and rollback stay on the trusted side. */
 export class MappingRegistry {
   private active = "address-map-v7";
   private versions = new Map<string, Candidate>();
-  private canary:
-    | {
-        version: string;
-        parent: string;
-        remaining: number;
-      }
-    | undefined;
+  private canary?: {
+    version: string;
+    parent: string;
+    remaining: number;
+  };
 
   get activeVersion() {
     return this.active;
   }
 
-  // Trusted promotion job only. No generated agent
-  // receives this method as a tool.
   promote(value: unknown, expectedParent: string) {
     const candidate = certify(value);
     if (
@@ -316,17 +307,14 @@ export class MappingRegistry {
     return {
       version: this.active,
       maxRecords: 100,
-      policy: POLICY,
+      policy,
     };
   }
 
-  process(
-    contract: string,
-    inputs: unknown[],
-  ): Disposition[] {
+  process(inputContract: string, inputs: unknown[]) {
     if (
       !this.canary ||
-      contract !== CONTRACT ||
+      inputContract !== contract ||
       inputs.length > this.canary.remaining
     )
       throw new Error("outside-canary-scope");
@@ -339,8 +327,6 @@ export class MappingRegistry {
       throw new Error("stale-rollback");
     this.active = this.canary.parent;
     this.canary = undefined;
-    // The caller must retain raw input and disposition
-    // IDs for replay/reconciliation.
     return {
       active: this.active,
       reconcilePriorOutputs: true,
@@ -351,46 +337,34 @@ export class MappingRegistry {
 export const renameCandidate: Candidate = {
   version: "address-map-v8-candidate-1",
   parent: "address-map-v7",
-  contract: CONTRACT,
+  contract,
   from: "postal_code",
   to: "postalCode",
   operation: "copy-string",
 };
 
-export function demo() {
+if (import.meta.main) {
   const jobs = new RepairJobs(() => 0);
-  const contract = jobs.create(
-    "ingest-1042",
-    120_000,
-    4,
-  );
+  const job = jobs.create("ingest-1042", 120_000, 4);
   const proposal = jobs.request(
-    contract.jobId,
+    job.jobId,
     "propose-mapping",
     renameCandidate,
   );
   jobs.request(
-    contract.jobId,
+    job.jobId,
     "run-fixtures",
     undefined,
     true,
   );
-  jobs.request(
-    contract.jobId,
-    "run-fixtures",
-    proposal,
-  );
-  try {
-    jobs.request(contract.jobId, "send-email");
-  } catch {
-    /* Printed in the denied-request log. */
-  }
+  jobs.request(job.jobId, "run-fixtures", proposal);
+
   const registry = new MappingRegistry();
   const activation = registry.promote(
     proposal,
     "address-map-v7",
   );
-  const dispositions = registry.process(CONTRACT, [
+  const dispositions = registry.process(contract, [
     { country: "US", postal_code: "02108" },
     {
       country: "US",
@@ -398,21 +372,10 @@ export function demo() {
       status: "pending",
     },
   ]);
-  assert.equal(dispositions.length, 2);
-  console.log(
-    JSON.stringify(
-      {
-        contract,
-        activation,
-        dispositions,
-        audit: jobs.audit,
-        rollback: registry.rollback(activation.version),
-        modelCalls: 0,
-        costUsd: 0,
-      },
-      null,
-      2,
-    ),
-  );
+  console.log({
+    activation,
+    dispositions,
+    rollback: registry.rollback(activation.version),
+    modelCalls: 0,
+  });
 }
-if (import.meta.main) demo();

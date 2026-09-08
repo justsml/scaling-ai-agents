@@ -1,447 +1,187 @@
 /**
- * 01 — COMPETE: many solutions, one problem
+ * 01 — Compete (LangGraph)
  *
- * The plan node returns one Send per profile, so all
- * four attempts run in a single superstep. That is the
- * parallelism, and it is structural rather than a
- * Promise.all hidden inside one node.
+ * Three competitors solve the same problem in parallel.
+ * A judge sees every answer and chooses one winner.
  *
- * Judging is ordered and the order is the point: free
- * string checks, then fixture tests in a sandboxed
- * child process, then an LLM rubric for survivors only.
- * The judge does not write its own rubric.
+ *   bun run snippet:01 -- "your problem"
  *
- *   bun run snippet:01 -- --budget-usd 0.20
- *
- * Roughly $0.04-$0.09.
+ * Four paid calls. Needs OPENAI_API_KEY.
  */
-
 import {
   HumanMessage,
   SystemMessage,
 } from "@langchain/core/messages";
-import { Caps } from "../lib/caps.ts";
-import { Ledger, runSpan } from "../lib/ledger.ts";
-import { hasOpenAIKey } from "../lib/models.ts";
 import {
-  estimateCostUsd,
-  readUsage,
-  usd,
-} from "../lib/prices.ts";
-import {
-  PROFILES,
-  modelForProfile,
-  profileByName,
-  stripFences,
-} from "../lib/profiles.ts";
-import {
-  candidateRows,
-  rubricTotal,
-  type Candidate,
-} from "../lib/judge.ts";
-import { readBuggyModule } from "../lib/sandbox.ts";
-import {
-  runMetadata,
-  stampRun,
-  startTracing,
-} from "../lib/trace.ts";
-import {
-  buildCompeteGraph,
-  latestByProfile,
-  type AttemptResult,
-  type CompeteDeps,
-} from "../graphs/compete.ts";
-import {
-  header,
-  kv,
-  ledgerTable,
-  note,
-  section,
-  skip,
-  stopLine,
-  table,
-} from "../lib/print.ts";
+  END,
+  START,
+  ReducedValue,
+  StateGraph,
+  StateSchema,
+} from "@langchain/langgraph";
+import { ChatOpenAI } from "@langchain/openai";
+import { z } from "zod";
 
-// ----------------------------------------
-// COMPETE / one attempt.
-//
-// This is the unit the whole axis is built from, and it
-// is deliberately small: build a model for the profile,
-// ask for a complete replacement file, price the answer
-// from `usage_metadata`, and return a span carrying the
-// five standard keys.
-//
-// Snippets 03 and 04 replace exactly this function — 03
-// to reserve budget before the call, 04 to choose a
-// provider first — and reuse everything else unchanged.
-// That is the point of injecting it into the graph
-// rather than hard-coding it.
-// ----------------------------------------
+const problem = `A Node.js readiness check retries forever,
+including on EACCES. Propose a small fix that stops on
+permission errors, retries transient errors, and enforces
+a deadline.`;
 
-export interface AttemptContext {
-  caps: Caps;
-  ledger: Ledger;
-  callbacks: unknown[];
-  /** Overrides the profile's own model. Used by 04 when the pool picks a provider. */
-  modelOverride?: { id: string; provider: string };
-  /**
-   * Set false when the caller settles money itself.
-   * Snippet 03 reserves budget before the call and
-   * settles with `reservation.releaseAndCharge`, so it
-   * must not be charged twice.
-   */
-  chargeLedger?: boolean;
-}
+type Role = { id: string; instructions: string };
+type Candidate = { id: string; answer: string };
 
-export async function attemptOnce(
-  profileName: string,
-  buggySource: string,
-  ctx: AttemptContext,
-): Promise<AttemptResult> {
-  const profile = profileByName(profileName);
-  if (!profile) {
-    return {
-      kind: "skipped",
-      profile: profileName,
-      reason: "unknown profile",
-    };
-  }
+const competitors: Role[] = [
+  {
+    id: "minimal-diff",
+    instructions:
+      "Propose the smallest safe patch. Include code and one tradeoff.",
+  },
+  {
+    id: "maintainable",
+    instructions:
+      "Optimize for clarity and testability. Include code and one tradeoff.",
+  },
+  {
+    id: "defensive",
+    instructions:
+      "Optimize for failure handling. Include code and one tradeoff.",
+  },
+];
+const judge: Role = {
+  id: "judge",
+  instructions:
+    "Choose exactly one candidate. Check EACCES, transient retries, and the deadline. Explain briefly.",
+};
 
-  // Honest stop #1: do not dispatch work we cannot pay
-  // for or finish.
-  const stop = ctx.caps.stopReason();
-  if (stop) {
-    return {
-      kind: "skipped",
-      profile: profileName,
-      reason: `${stop.kind}: ${stop.detail}`,
-    };
-  }
-  if (!ctx.caps.canAfford(profile.estimateUsd)) {
-    return {
-      kind: "skipped",
-      profile: profileName,
-      reason: `needs ~${usd(profile.estimateUsd)}, only ${usd(ctx.caps.remainingUsd)} left`,
-    };
-  }
-
-  const modelId =
-    ctx.modelOverride?.id ?? profile.modelId;
-  const provider =
-    ctx.modelOverride?.provider ?? "openai-primary";
-
-  const { span, value, error } = await runSpan(
-    ctx.ledger,
-    {
-      id: `attempt:${profileName}`,
-      profile: profileName,
-      whyItExisted: profile.whyItExisted,
-      model: modelId,
-      provider,
-    },
-    async () => {
-      const llm = await modelForProfile({
-        ...profile,
-        modelId,
-      });
-      const response = await llm.invoke(
-        [
-          new SystemMessage(profile.systemPrompt),
-          new HumanMessage(
-            [
-              "Here is the current, buggy readiness.ts. Return the complete corrected file.",
-              "",
-              "=== readiness.ts ===",
-              buggySource,
-            ].join("\n"),
-          ),
-        ],
-        {
-          // The run's deadline is a real AbortSignal,
-          // so this call is cancelled in flight rather
-          // than merely ignored when time runs out.
-          signal: ctx.caps.signal,
-          callbacks: ctx.callbacks as never,
-          // The five standard keys, attached to the
-          // RUN. `costUsd`/`latencyMs` go in as
-          // placeholders (they are not known at run
-          // start) and are re-stamped below.
-          metadata: runMetadata({
-            profile: profileName,
-            whyItExisted: profile.whyItExisted,
-            model: modelId,
-            provider,
-          }),
-          tags: ["compete", "attempt", profileName],
-          runName: `attempt:${profileName}`,
-        },
-      );
-
-      const usage = readUsage(response);
-      const costUsd = estimateCostUsd(modelId, usage);
-      ctx.caps.charge(costUsd);
-      if (ctx.chargeLedger !== false)
-        ctx.ledger.charge(costUsd);
-
-      const text =
-        typeof response.content === "string"
-          ? response.content
-          : JSON.stringify(response.content);
-      return {
-        value: {
-          patch: stripFences(text),
-          rationale: `${profile.name}: ${usage.inputTokens}in/${usage.outputTokens}out tokens`,
-          costUsd,
-        },
-        costUsd,
-      };
-    },
+export async function ask(
+  role: Role,
+  prompt: string,
+  signal: AbortSignal,
+) {
+  const model = new ChatOpenAI({
+    model: "gpt-5.6-luna",
+    maxRetries: 0,
+  });
+  const { text } = await model.invoke(
+    [
+      new SystemMessage(role.instructions),
+      new HumanMessage(prompt),
+    ],
+    { signal },
   );
+  if (!text.trim())
+    throw new Error(`${role.id} returned nothing`);
+  return text;
+}
+export type Ask = typeof ask;
 
-  if (error || !value) {
-    return {
-      kind: "skipped",
-      profile: profileName,
-      reason:
-        span.outcome === "cancelled"
-          ? "cancelled by a cap"
-          : (span.note ?? "failed"),
-    };
-  }
-
-  const candidate: Candidate = {
-    profile: profileName,
-    modelId,
-    provider,
-    patch: value.patch,
-    rationale: value.rationale,
-    costUsd: value.costUsd,
-    latencyMs: span.latencyMs,
-    whyItExisted: profile.whyItExisted,
-  };
-  return { kind: "candidate", candidate };
+export function competition(
+  signal: AbortSignal,
+  call: Ask,
+) {
+  const state = new StateSchema({
+    problem: z.string(),
+    candidates: new ReducedValue(
+      z.array(z.custom<Candidate>()).default(() => []),
+      {
+        reducer: (a, b) => [...a, ...b],
+      },
+    ),
+    decision: z.string().default(""),
+  });
+  const compete =
+    (role: Role) => async (s: typeof state.State) => ({
+      candidates: [
+        {
+          id: role.id,
+          answer: await call(role, s.problem, signal),
+        },
+      ],
+    });
+  return new StateGraph(state)
+    .addNode("minimal", compete(competitors[0]!))
+    .addNode("maintainable", compete(competitors[1]!))
+    .addNode("defensive", compete(competitors[2]!))
+    .addNode("judge", async (s) => ({
+      decision: await call(
+        judge,
+        JSON.stringify({
+          problem: s.problem,
+          candidates: s.candidates,
+        }),
+        signal,
+      ),
+    }))
+    .addEdge(START, "minimal")
+    .addEdge(START, "maintainable")
+    .addEdge(START, "defensive")
+    .addEdge(
+      ["minimal", "maintainable", "defensive"],
+      "judge",
+    )
+    .addEdge("judge", END)
+    .compile();
 }
 
-// ----------------------------------------
-// COMPETE / the tournament.
-//
-// Exported so snippet 00 can mount it as the
-// `tournament` branch of the router and snippet 05 can
-// take its winner. Everything a caller can vary is a
-// parameter; nothing is read from argv in here.
-// ----------------------------------------
+export async function runCompetition(
+  input = problem,
+  signal = AbortSignal.timeout(90_000),
+  call: Ask = ask,
+) {
+  const task = input.trim();
+  if (!task) throw new Error("Problem is empty");
+  const { candidates, decision } = await competition(
+    signal,
+    call,
+  ).invoke({ problem: task }, { signal });
+  return { candidates, decision };
+}
 
-export interface TournamentOptions {
-  caps: Caps;
-  ledger: Ledger;
-  callbacks: unknown[];
+/** Compatibility entrypoint used by snippet 00's novel route. */
+export async function runTournament(options: {
   request: string;
   profileNames?: string[];
-  rubricEnabled?: boolean;
-  /** 03 and 04 pass their own; 01 uses `attemptOnce`. */
-  attempt?: CompeteDeps["attempt"];
-}
-
-export interface TournamentResult {
-  candidates: Candidate[];
-  skipped: { profile: string; reason: string }[];
-  winner: Candidate | null;
-  stopReason: string;
-}
-
-export async function runTournament(
-  opts: TournamentOptions,
-): Promise<TournamentResult> {
-  const buggySource = await readBuggyModule();
-  const profileNames =
-    opts.profileNames ?? PROFILES.map((p) => p.name);
-
-  const ctx: AttemptContext = {
-    caps: opts.caps,
-    ledger: opts.ledger,
-    callbacks: opts.callbacks,
-  };
-
-  const deps: CompeteDeps = {
-    caps: opts.caps,
-    ledger: opts.ledger,
-    callbacks: opts.callbacks,
-    profileNames,
-    rubricEnabled: opts.rubricEnabled,
-    attempt:
-      opts.attempt ??
-      ((name, source) =>
-        attemptOnce(name, source, ctx)),
-  };
-
-  const graph = buildCompeteGraph(deps).compile();
-
-  const final = await graph.invoke(
-    { request: opts.request, buggySource },
-    {
-      signal: opts.caps.signal,
-      callbacks: opts.callbacks as never,
-      // recursionLimit is a second, independent cap:
-      // even if every other check is wrong, the graph
-      // cannot loop forever.
-      recursionLimit: 12,
-      metadata: {
-        profile: "tournament",
-        whyItExisted:
-          "compete: four candidates for one problem",
-        outcome: "pending",
-        costUsd: 0,
-        latencyMs: 0,
-      },
-      runName: "compete-tournament",
-    },
+  [key: string]: unknown;
+}) {
+  const result = await runCompetition(options.request);
+  const winner = result.candidates.find((candidate) =>
+    result.decision
+      .toLowerCase()
+      .includes(candidate.id.toLowerCase()),
   );
-
+  const compatibleWinner: {
+    profile: string;
+    answer: string;
+    sandbox?: { passed: number; total: number };
+  } | null = winner
+    ? { profile: winner.id, answer: winner.answer }
+    : null;
   return {
-    candidates: latestByProfile(
-      final.candidates as Candidate[],
-    ),
-    skipped: final.skipped as {
-      profile: string;
-      reason: string;
-    }[],
-    winner: (final.winner as Candidate | null) ?? null,
-    stopReason: final.stopReason as string,
+    candidates: result.candidates,
+    skipped: [],
+    winner: compatibleWinner,
+    stopReason: "all candidates completed",
   };
-}
-
-// ----------------------------------------
-// CLI
-// ----------------------------------------
-
-async function main() {
-  const caps = Caps.fromArgv();
-  if (!hasOpenAIKey())
-    skip("OPENAI_API_KEY is not set");
-
-  const ledger = new Ledger(caps.budgetUsd);
-  const tracing = startTracing();
-
-  header(
-    "01 COMPETE — many solutions, one problem",
-    `caps: ${caps.describe()}   tracing: ${tracing.destination} (${tracing.reason})`,
-  );
-
-  section("competitors");
-  table(
-    ["profile", "model", "est. cost", "whyItExisted"],
-    PROFILES.map((p) => [
-      p.name,
-      p.modelId,
-      usd(p.estimateUsd),
-      p.whyItExisted,
-    ]),
-  );
-  note(
-    "three profiles of one model plus one frontier model: the spread is the point, " +
-      "not four samples of the same distribution",
-  );
-
-  const result = await runTournament({
-    caps,
-    ledger,
-    callbacks: tracing.callbacks,
-    request:
-      "Fix runWhenReady so all readiness tests pass.",
-  });
-
-  // ----------------------------------------
-  // The table a speaker reads aloud.
-  // ----------------------------------------
-  section("tournament");
-  table(
-    [
-      "profile",
-      "tests",
-      "rubric",
-      "cost",
-      "ms",
-      "note",
-    ],
-    candidateRows(result.candidates, result.winner),
-  );
-
-  if (result.skipped.length > 0) {
-    section("did not run");
-    table(
-      ["profile", "reason"],
-      result.skipped.map((s) => [s.profile, s.reason]),
-    );
-  }
-
-  section("winner");
-  if (result.winner) {
-    const w = result.winner;
-    kv("profile", w.profile);
-    kv("model", w.modelId);
-    kv(
-      "fixture tests",
-      `${w.sandbox?.passed ?? 0}/${w.sandbox?.total ?? 0}`,
-    );
-    kv(
-      "rubric",
-      w.rubric
-        ? `${rubricTotal(w.rubric)}/10 — ${w.rubric.reason}`
-        : "not scored",
-    );
-    kv("cost", usd(w.costUsd + (w.rubricCostUsd ?? 0)));
-    kv("latency", `${w.latencyMs}ms`);
-    kv(
-      "tie-break",
-      "tests passed > rubric total > cost > latency (deterministic)",
-    );
-    if (w.sandbox && !w.sandbox.green) {
-      note(
-        `the winner is still not green: ${w.sandbox.failures.join("; ") || "see sandbox output"}`,
-      );
-    }
-  } else {
-    console.log(
-      "  no winner: every candidate was disqualified, failed, or never ran",
-    );
-  }
-
-  // ----------------------------------------
-  // Trace. One run per attempt, each carrying the five
-  // standard keys.
-  // ----------------------------------------
-  for (const c of result.candidates) {
-    stampRun(tracing.handler, c.profile, {
-      costUsd: Number(
-        (c.costUsd + (c.rubricCostUsd ?? 0)).toFixed(6),
-      ),
-      latencyMs: c.latencyMs,
-      outcome: c.disqualifiedFor ? "failed" : "ok",
-    });
-  }
-  section(`trace (${tracing.destination})`);
-  tracing.handler.print();
-  const check = tracing.handler.verifyStandardKeys();
-  note(
-    check.ok
-      ? "every labelled run carries profile, costUsd, latencyMs, outcome, whyItExisted"
-      : `labelled runs missing keys: ${check.missing.join(", ")}`,
-  );
-  note(
-    "graph nodes inherit the invoke-level metadata, so the four `attempt` chain rows all " +
-      "read profile=tournament; the per-competitor keys live on the ChatOpenAI runs beneath " +
-      "them and on the `attempt:<profile>` rows at the bottom",
-  );
-
-  ledgerTable(ledger, caps);
-  stopLine(
-    caps,
-    result.stopReason ||
-      "completed: four attempts judged, winner picked",
-  );
-  caps.dispose();
 }
 
 if (import.meta.main) {
-  await main();
+  const args = process.argv.slice(2);
+  const words: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (
+      ["--budget-usd", "--deadline-ms"].includes(
+        args[i]!,
+      )
+    )
+      i++;
+    else if (args[i] !== "--") words.push(args[i]!);
+  }
+  const arg = words.join(" ");
+  console.log(
+    JSON.stringify(
+      await runCompetition(arg.trim() || problem),
+      null,
+      2,
+    ),
+  );
 }

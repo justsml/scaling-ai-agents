@@ -1,5 +1,14 @@
-// Offline reference replay. Lookup caching never caches
-// the certification gate.
+/**
+ * 05 — Compile (LangGraph)
+ *
+ * An exact input can replay a shipped, independently
+ * tested artifact. The lookup may cache; certification
+ * always runs again.
+ *
+ *   bun run snippet:05
+ *
+ * Zero model calls. No API key needed.
+ */
 import {
   END,
   START,
