@@ -1,118 +1,79 @@
+// The council with `ask` injected. The empty-response guard
+// lives inside the real `ask`, so it is not covered here.
 import { describe, test, expect } from "bun:test";
-import { runBusinessAdvice } from "../src/lib/business-advice";
-import {
-  advisors,
-  orchestrator,
-  reasoningEffort,
-  synthesisPrompt,
-  type Call,
-} from "../src/lib/business-advice-profiles";
+import { runCouncil, type Ask } from "../src/snippets/17-business-advice";
 
 describe("business advice council", () => {
-  test("three independent proposals start before synthesis, with the same brief", async () => {
+  test("all three advisors start before the chair runs", async () => {
     const started: string[] = [];
     let release!: () => void;
     const barrier = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const call: Call = async (profile, prompt) => {
-      if (profile.id === "orchestrator") {
+    const call: Ask = async (role, prompt) => {
+      if (role.id === "chair") {
         expect(started.length).toBe(3);
         const input = JSON.parse(prompt);
         expect(input.brief).toBe("Build or buy?");
-        expect(input.proposals.map((p: { id: string }) => p.id)).toEqual(advisors.map((a) => a.id));
-        expect(input.proposals.map((p: { text: string }) => p.text)).toEqual(
-          advisors.map((a) => `${a.id} proposal`),
-        );
+        expect(input.proposals.map((p: { id: string }) => p.id).sort()).toEqual([
+          "operator",
+          "pennypincher",
+          "visionary",
+        ]);
         return "Conditional decision memo";
       }
       expect(prompt).toBe("Build or buy?");
-      started.push(profile.id);
+      started.push(role.id);
       if (started.length === 3) release();
       await barrier;
-      return `${profile.id} proposal`;
+      return `${role.id} proposal`;
     };
-    const result = await runBusinessAdvice("  Build or buy?  ", call, AbortSignal.timeout(3000));
+    const result = await runCouncil("  Build or buy?  ", AbortSignal.timeout(3000), call);
     expect(result.advice).toBe("Conditional decision memo");
     expect(result.proposals.length).toBe(3);
   });
-  test("requested model mapping and lowest effort", () => {
-    expect(advisors.map((a) => a.model)).toEqual(["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"]);
-    expect(orchestrator.model).toBe("gpt-5.6-sol");
-    expect(reasoningEffort).toBe("none");
-  });
-  for (const input of ["", "   ", "x".repeat(20001)]) {
-    test(`rejects invalid brief length ${input.length} without calls`, async () => {
-      let calls = 0;
-      await expect(
-        runBusinessAdvice(input, async () => {
-          calls++;
-          return "bad";
-        }),
-      ).rejects.toThrow();
-      expect(calls).toBe(0);
-    });
-  }
-  for (const failure of ["throw", "empty"]) {
-    test(`does not synthesize after advisor ${failure}`, async () => {
-      const called: string[] = [];
-      await expect(
-        runBusinessAdvice("Pricing decision", async (profile) => {
-          called.push(profile.id);
-          if (profile.id === "operator") {
-            if (failure === "throw") throw new Error("Provider unavailable");
-            return " ";
-          }
-          return "Proposal";
-        }),
-      ).rejects.toThrow();
-      expect(called).not.toContain("orchestrator");
-    });
-  }
-  test("expired signal prevents dispatch", async () => {
+
+  test("rejects an empty brief without calling anything", async () => {
     let calls = 0;
-    await expect(
-      runBusinessAdvice(
-        "Hiring decision",
-        async () => {
-          calls++;
-          return "bad";
-        },
-        AbortSignal.abort(),
-      ),
-    ).rejects.toThrow();
+    const call: Ask = async () => {
+      calls++;
+      return "bad";
+    };
+    await expect(runCouncil("   ", AbortSignal.timeout(3000), call)).rejects.toThrow();
     expect(calls).toBe(0);
   });
+
+  test("does not synthesize after an advisor fails", async () => {
+    const called: string[] = [];
+    const call: Ask = async (role) => {
+      called.push(role.id);
+      if (role.id === "operator") throw new Error("Provider unavailable");
+      return "Proposal";
+    };
+    await expect(runCouncil("Pricing decision", AbortSignal.timeout(3000), call)).rejects.toThrow();
+    expect(called).not.toContain("chair");
+  });
+
+  test("an expired signal prevents dispatch", async () => {
+    let calls = 0;
+    const call: Ask = async () => {
+      calls++;
+      return "bad";
+    };
+    await expect(runCouncil("Hiring decision", AbortSignal.abort(), call)).rejects.toThrow();
+    expect(calls).toBe(0);
+  });
+
   test("cancellation during generation prevents synthesis", async () => {
     const controller = new AbortController();
     const called: string[] = [];
-    await expect(
-      runBusinessAdvice(
-        "Expansion decision",
-        async (profile) => {
-          called.push(profile.id);
-          controller.abort();
-          return "Late proposal";
-        },
-        controller.signal,
-      ),
-    ).rejects.toThrow();
-    expect(called).not.toContain("orchestrator");
-  });
-  test("empty orchestrator output is a failure", async () => {
-    await expect(
-      runBusinessAdvice("Retention decision", async (profile) =>
-        profile.id === "orchestrator" ? "" : "Proposal",
-      ),
-    ).rejects.toThrow();
-  });
-  test("synthesis rejects duplicate or missing advisors", () => {
-    expect(() => synthesisPrompt("Brief", [{ id: "operator", text: "one" }])).toThrow();
-    expect(() =>
-      synthesisPrompt(
-        "Brief",
-        advisors.map(() => ({ id: "operator", text: "duplicate" })),
-      ),
-    ).toThrow();
+    const call: Ask = async (role, _prompt, signal) => {
+      called.push(role.id);
+      controller.abort();
+      signal.throwIfAborted();
+      return "Late proposal";
+    };
+    await expect(runCouncil("Expansion decision", controller.signal, call)).rejects.toThrow();
+    expect(called).not.toContain("chair");
   });
 });

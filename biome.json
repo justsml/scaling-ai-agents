@@ -12,6 +12,12 @@
     "enabled": true,
     "indentStyle": "space",
     "indentWidth": 2,
-    "lineWidth": 100
-  }
+    "lineWidth": 56
+  },
+  "overrides": [
+    {
+      "includes": ["harness/**", "**/test/**", "**/*.json", "**/*.md"],
+      "formatter": { "lineWidth": 100 }
+    }
+  ]
 }
