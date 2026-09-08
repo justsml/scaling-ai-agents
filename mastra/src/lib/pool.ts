@@ -1,11 +1,14 @@
 /**
  * Distribute: hardware, providers, regions.
  *
- * The interesting part of this file is that the filtering happens in code,
- * before any call. `region` and `dataClass` are attributes of the request, and
- * a provider that is not eligible for them is never contacted — not "asked
- * nicely not to log", not "prompted to be careful". If nothing is eligible,
- * the request fails with a reason rather than silently downgrading.
+ * The interesting part of this file is that the
+ * filtering happens in code, before any call. `region`
+ * and `dataClass` are attributes of the request, and a
+ * provider that is not eligible for them is never
+ * contacted — not "asked nicely not to log", not
+ * "prompted to be careful". If nothing is eligible, the
+ * request fails with a reason rather than silently
+ * downgrading.
  */
 import type { ModelWithRetries } from "@mastra/core/agent";
 import {
@@ -18,7 +21,10 @@ import {
 } from "./models.js";
 
 export type Region = "us" | "eu";
-export type DataClass = "public" | "internal" | "restricted";
+export type DataClass =
+  | "public"
+  | "internal"
+  | "restricted";
 
 export interface ProviderEntry {
   id: string;
@@ -43,7 +49,8 @@ export const POOL: ProviderEntry[] = [
     dataClasses: ["public", "internal"],
     kind: "cloud",
     rank: 0,
-    available: () => Boolean(process.env.OPENAI_API_KEY),
+    available: () =>
+      Boolean(process.env.OPENAI_API_KEY),
     why: "default worker: cheapest cloud model that is good enough for a patch proposal",
   },
   {
@@ -54,7 +61,8 @@ export const POOL: ProviderEntry[] = [
     dataClasses: ["public", "internal"],
     kind: "cloud",
     rank: 1,
-    available: () => Boolean(process.env.OPENAI_API_KEY),
+    available: () =>
+      Boolean(process.env.OPENAI_API_KEY),
     why: "fallback when the primary errors; more expensive, so never first",
   },
   {
@@ -65,7 +73,8 @@ export const POOL: ProviderEntry[] = [
     dataClasses: ["public", "internal"],
     kind: "cloud",
     rank: 2,
-    available: () => Boolean(process.env.OPENAI_API_KEY),
+    available: () =>
+      Boolean(process.env.OPENAI_API_KEY),
     why: "judge-tier slot; cheap enough to run on every survivor",
   },
   {
@@ -73,8 +82,9 @@ export const POOL: ProviderEntry[] = [
     model: LOCAL_MODEL_ID,
     priceKey: "local/*",
     regions: ["us", "eu"],
-    // The only entry cleared for restricted data, because the weights and the
-    // data never leave the machine.
+    // The only entry cleared for restricted data,
+    // because the weights and the data never leave the
+    // machine.
     dataClasses: ["public", "internal", "restricted"],
     kind: "local",
     rank: 3,
@@ -93,15 +103,23 @@ export interface Resolution {
   /** Every eligible entry, best first. This is the fallback chain. */
   eligible: ProviderEntry[];
   /** Every entry considered, with the reason it was kept or dropped. */
-  considered: Array<{ id: string; eligible: boolean; reason: string }>;
+  considered: Array<{
+    id: string;
+    eligible: boolean;
+    reason: string;
+  }>;
   reason: string;
 }
 
 /**
- * Filter, then rank. Never call. This function makes no network requests, which
- * is exactly why it can be trusted to enforce a data-residency rule.
+ * Filter, then rank. Never call. This function makes no
+ * network requests, which is exactly why it can be
+ * trusted to enforce a data-residency rule.
  */
-export function resolveProvider(req: Requirement, opts: { exclude?: string[] } = {}): Resolution {
+export function resolveProvider(
+  req: Requirement,
+  opts: { exclude?: string[] } = {},
+): Resolution {
   const exclude = new Set(opts.exclude ?? []);
   const considered: Resolution["considered"] = [];
   const eligible: ProviderEntry[] = [];
@@ -111,7 +129,8 @@ export function resolveProvider(req: Requirement, opts: { exclude?: string[] } =
       considered.push({
         id: p.id,
         eligible: false,
-        reason: "excluded by the caller (already tried)",
+        reason:
+          "excluded by the caller (already tried)",
       });
       continue;
     }
@@ -135,11 +154,16 @@ export function resolveProvider(req: Requirement, opts: { exclude?: string[] } =
       considered.push({
         id: p.id,
         eligible: false,
-        reason: "configured but unavailable (missing env)",
+        reason:
+          "configured but unavailable (missing env)",
       });
       continue;
     }
-    considered.push({ id: p.id, eligible: true, reason: p.why });
+    considered.push({
+      id: p.id,
+      eligible: true,
+      reason: p.why,
+    });
     eligible.push(p);
   }
 
@@ -161,21 +185,31 @@ export function resolveProvider(req: Requirement, opts: { exclude?: string[] } =
 /**
  * The fallback chain, as data.
  *
- * `@mastra/core` walks a `model` array on the Agent by itself: on a 5xx, a
- * rate limit, or a per-step timeout it moves to the next entry after that
- * entry's `maxRetries` is spent. A whole-run `timeout.totalMs` is a hard
- * deadline and does not try the next entry. So the only job left for this
- * code is to decide who is in the chain and in what order, which is the
- * residency filter above. Nothing here retries anything.
+ * `@mastra/core` walks a `model` array on the Agent by
+ * itself: on a 5xx, a rate limit, or a per-step timeout
+ * it moves to the next entry after that entry's
+ * `maxRetries` is spent. A whole-run `timeout.totalMs`
+ * is a hard deadline and does not try the next entry.
+ * So the only job left for this code is to decide who
+ * is in the chain and in what order, which is the
+ * residency filter above. Nothing here retries
+ * anything.
  */
-export function toFallbackChain(entries: ProviderEntry[]): ModelWithRetries[] {
+export function toFallbackChain(
+  entries: ProviderEntry[],
+): ModelWithRetries[] {
   return entries.map((entry) => ({
     id: entry.id,
-    // The local slot is an OpenAI-compatible endpoint, not a router id, so it
-    // is passed as a model config object rather than a "provider/model" string.
-    model: (entry.kind === "local" ? (localModelConfig() ?? entry.model) : entry.model) as never,
-    // One retry on the same provider before moving on. Transient errors are
-    // worth one more try; a second failure is a signal to change provider.
+    // The local slot is an OpenAI-compatible endpoint,
+    // not a router id, so it is passed as a model
+    // config object rather than a "provider/model"
+    // string.
+    model: (entry.kind === "local"
+      ? (localModelConfig() ?? entry.model)
+      : entry.model) as never,
+    // One retry on the same provider before moving on.
+    // Transient errors are worth one more try; a second
+    // failure is a signal to change provider.
     maxRetries: entry.kind === "local" ? 0 : 1,
   }));
 }
@@ -190,26 +224,34 @@ export function fallbackChainFor(req: Requirement): {
 }
 
 /**
- * Which pool entry served a response. Mastra reports the provider's own model
- * id on `response.modelId`; the pool keys entries by router string, so match
- * on the id after the slash as well as on the full string.
+ * Which pool entry served a response. Mastra reports
+ * the provider's own model id on `response.modelId`;
+ * the pool keys entries by router string, so match on
+ * the id after the slash as well as on the full string.
  */
 export function providerForModelId(
   modelId: string | undefined,
   candidates: ProviderEntry[] = POOL,
 ): ProviderEntry | null {
   if (!modelId) return null;
-  const bare = modelId.includes("/") ? modelId.slice(modelId.lastIndexOf("/") + 1) : modelId;
+  const bare = modelId.includes("/")
+    ? modelId.slice(modelId.lastIndexOf("/") + 1)
+    : modelId;
   return (
     candidates.find((c) => c.model === modelId) ??
-    candidates.find((c) => c.model.slice(c.model.lastIndexOf("/") + 1) === bare) ??
+    candidates.find(
+      (c) =>
+        c.model.slice(c.model.lastIndexOf("/") + 1) ===
+        bare,
+    ) ??
     null
   );
 }
 
 /**
- * A bounded worker pool. Used by 07 for tool fan-out and by 02/04 wherever the
- * number of items is larger than the number of calls we are willing to have in
+ * A bounded worker pool. Used by 07 for tool fan-out
+ * and by 02/04 wherever the number of items is larger
+ * than the number of calls we are willing to have in
  * flight at once.
  */
 export async function boundedPool<TIn, TOut>(
@@ -217,19 +259,35 @@ export async function boundedPool<TIn, TOut>(
   limit: number,
   worker: (item: TIn, index: number) => Promise<TOut>,
 ): Promise<Array<PromiseSettledResult<TOut>>> {
-  const results = new Array<PromiseSettledResult<TOut>>(items.length);
+  const results = new Array<PromiseSettledResult<TOut>>(
+    items.length,
+  );
   let cursor = 0;
-  const runners = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
-    while (true) {
-      const index = cursor++;
-      if (index >= items.length) return;
-      try {
-        results[index] = { status: "fulfilled", value: await worker(items[index]!, index) };
-      } catch (reason) {
-        results[index] = { status: "rejected", reason };
+  const runners = Array.from(
+    {
+      length: Math.max(
+        1,
+        Math.min(limit, items.length),
+      ),
+    },
+    async () => {
+      while (true) {
+        const index = cursor++;
+        if (index >= items.length) return;
+        try {
+          results[index] = {
+            status: "fulfilled",
+            value: await worker(items[index]!, index),
+          };
+        } catch (reason) {
+          results[index] = {
+            status: "rejected",
+            reason,
+          };
+        }
       }
-    }
-  });
+    },
+  );
   await Promise.all(runners);
   return results;
 }

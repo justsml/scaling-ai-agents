@@ -10,7 +10,10 @@ import {
 const rules = await loadRules();
 const cases = await loadRouterCases();
 const instructions = await loadDecisionInstructions();
-const model = langchainDecision(process.env.OPENAI_MODEL ?? "openai/gpt-5.6-luna", instructions);
+const model = langchainDecision(
+  "openai/gpt-5.6-luna",
+  instructions,
+);
 for (const c of [
   { name: "A", on: false, modelClass: "mini-policy" },
   { name: "B", on: true, modelClass: "mini-policy" },
@@ -19,8 +22,14 @@ for (const c of [
 ]) {
   let good = 0;
   for (const item of cases) {
-    const outcome = await decide(item.input, rules, model, { rulesEnabled: c.on });
-    if (score(outcome, item.groundTruth).accurate) good++;
+    const outcome = await decide(
+      item.input,
+      rules,
+      model,
+      { rulesEnabled: c.on },
+    );
+    if (score(outcome, item.groundTruth).accurate)
+      good++;
   }
   console.log(
     `${c.name}: ${good}/${cases.length} (${c.modelClass}, rules=${c.on}, model=openai/gpt-5.6-luna, reasoning=none)`,

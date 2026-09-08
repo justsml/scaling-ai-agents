@@ -1,13 +1,20 @@
 /**
- * One span per worker, with the five metadata keys the talk asks for.
+ * One span per worker, with the five metadata keys the
+ * talk asks for.
  *
- * profile / costUsd / latencyMs / outcome / whyItExisted
+ * profile / costUsd / latencyMs / outcome /
+ * whyItExisted
  *
- * The last one is the interesting field. A parallel run where every worker's
- * reason for existing is "we fanned out" is a run nobody can prune later.
+ * The last one is the interesting field. A parallel run
+ * where every worker's reason for existing is "we
+ * fanned out" is a run nobody can prune later.
  */
 import { SpanType } from "@mastra/core/observability";
-import type { AnySpan, Span, TracingContext } from "@mastra/core/observability";
+import type {
+  AnySpan,
+  Span,
+  TracingContext,
+} from "@mastra/core/observability";
 import { mastra } from "../mastra/index.js";
 
 export interface WorkerSpanMetadata {
@@ -24,7 +31,10 @@ function instance() {
 }
 
 /** Root span for a whole snippet. Every worker span hangs off this. */
-export function startSnippetSpan(name: string, input?: unknown): AnySpan | undefined {
+export function startSnippetSpan(
+  name: string,
+  input?: unknown,
+): AnySpan | undefined {
   return instance()?.startSpan({
     type: SpanType.GENERIC,
     name,
@@ -40,7 +50,11 @@ export function startWorkerSpan(
   input?: unknown,
 ): AnySpan | undefined {
   if (!parent) return undefined;
-  return parent.createChildSpan({ type: SpanType.GENERIC, name, input }) as AnySpan;
+  return parent.createChildSpan({
+    type: SpanType.GENERIC,
+    name,
+    input,
+  }) as AnySpan;
 }
 
 export function endWorkerSpan(
@@ -57,18 +71,29 @@ export function failWorkerSpan(
   metadata: WorkerSpanMetadata,
 ): void {
   span?.error({
-    error: error instanceof Error ? error : new Error(String(error)),
+    error:
+      error instanceof Error
+        ? error
+        : new Error(String(error)),
     endSpan: true,
     metadata,
   });
 }
 
 /**
- * Turn a span into the `tracingContext` an agent.generate() call accepts, so
- * the model spans nest under the worker span rather than starting a new trace.
+ * Turn a span into the `tracingContext` an
+ * agent.generate() call accepts, so the model spans
+ * nest under the worker span rather than starting a new
+ * trace.
  */
-export function contextOf(span: AnySpan | undefined): TracingContext | undefined {
-  return span ? ({ currentSpan: span as Span<SpanType.GENERIC> } as TracingContext) : undefined;
+export function contextOf(
+  span: AnySpan | undefined,
+): TracingContext | undefined {
+  return span
+    ? ({
+        currentSpan: span as Span<SpanType.GENERIC>,
+      } as TracingContext)
+    : undefined;
 }
 
 /** Flush exporters so a short-lived script does not drop its own trace. */

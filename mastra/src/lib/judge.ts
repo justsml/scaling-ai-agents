@@ -1,14 +1,18 @@
 /**
- * The judge, in two halves that must stay in that order.
+ * The judge, in two halves that must stay in that
+ * order.
  *
- * 1. Deterministic first. The Readiness challenge decides who is even eligible.
+ * 1. Deterministic first. The Readiness challenge
+ * decides who is even eligible.
  *    A candidate that fails the fixture tests never reaches the model.
- * 2. The rubric judge second, and only for survivors. The rubric text is read
+ * 2. The rubric judge second, and only for survivors.
+ * The rubric text is read
  *    verbatim from src/fixtures/rubric.md; the judge does not get to write its
  *    own criteria, which is the failure mode this whole arrangement exists to
  *    avoid.
  *
- * Tie-break order is fixed and printed: tests, then rubric, then cost.
+ * Tie-break order is fixed and printed: tests, then
+ * rubric, then cost.
  */
 import { createScorer } from "@mastra/core/evals";
 import { z } from "zod";
@@ -21,7 +25,11 @@ import type { ReadinessTestResult } from "./readiness-challenge.js";
 let cachedRubric: string | null = null;
 
 export async function readRubric(): Promise<string> {
-  if (cachedRubric === null) cachedRubric = await readFile(join(FIXTURES_DIR, "rubric.md"), "utf8");
+  if (cachedRubric === null)
+    cachedRubric = await readFile(
+      join(FIXTURES_DIR, "rubric.md"),
+      "utf8",
+    );
   return cachedRubric;
 }
 
@@ -29,12 +37,17 @@ export async function readRubric(): Promise<string> {
 const RUBRIC_TEXT = await readRubric();
 
 /**
- * The original buggy module, given to the judge as the baseline for rubric
- * item 2 ("minimal surface"). Without it a judge reading a whole-file
- * candidate cannot tell an unchanged type declaration from a changed one, and
- * disqualifies correct patches for the crime of containing the types.
+ * The original buggy module, given to the judge as the
+ * baseline for rubric item 2 ("minimal surface").
+ * Without it a judge reading a whole-file candidate
+ * cannot tell an unchanged type declaration from a
+ * changed one, and disqualifies correct patches for the
+ * crime of containing the types.
  */
-const ORIGINAL_SOURCE = await readFile(join(FIXTURES_DIR, "readiness.ts"), "utf8");
+const ORIGINAL_SOURCE = await readFile(
+  join(FIXTURES_DIR, "readiness.ts"),
+  "utf8",
+);
 
 export const rubricAnalysisSchema = z.object({
   items: z
@@ -53,11 +66,16 @@ export const rubricAnalysisSchema = z.object({
 /**
  * The rubric judge.
  *
- * `analyze` is a prompt-object step, so it makes exactly one judge call per
- * survivor. `generateScore` is a plain function: the arithmetic that turns five
- * 0-2 marks into a 0-10 score is not something a model should be doing.
+ * `analyze` is a prompt-object step, so it makes
+ * exactly one judge call per survivor. `generateScore`
+ * is a plain function: the arithmetic that turns five
+ * 0-2 marks into a 0-10 score is not something a model
+ * should be doing.
  */
-export const rubricJudgeScorer = createScorer<{ patch: string }, { patch: string }>({
+export const rubricJudgeScorer = createScorer<
+  { patch: string },
+  { patch: string }
+>({
   id: "rubric-judge",
   name: "Rubric judge (fixtures/rubric.md)",
   description:
@@ -71,10 +89,13 @@ export const rubricJudgeScorer = createScorer<{ patch: string }, { patch: string
   },
 })
   .analyze({
-    description: "Score each of the five rubric items 0, 1 or 2 and flag disqualifiers.",
+    description:
+      "Score each of the five rubric items 0, 1 or 2 and flag disqualifiers.",
     outputSchema: rubricAnalysisSchema,
     createPrompt: ({ run }) => {
-      const patch = (run.output as { patch?: string } | undefined)?.patch ?? "";
+      const patch =
+        (run.output as { patch?: string } | undefined)
+          ?.patch ?? "";
       return `The rubric, verbatim. These are the only criteria you may apply:
 
 ---
@@ -108,15 +129,21 @@ Set disqualified to true only if a listed disqualifier clearly applies.`;
     },
   })
   .generateScore(({ results }) => {
-    const analysis = results.analyzeStepResult as z.infer<typeof rubricAnalysisSchema> | undefined;
+    const analysis = results.analyzeStepResult as
+      | z.infer<typeof rubricAnalysisSchema>
+      | undefined;
     if (!analysis) return 0;
     if (analysis.disqualified) return 0;
-    return analysis.items.reduce((sum, i) => sum + i.score, 0);
+    return analysis.items.reduce(
+      (sum, i) => sum + i.score,
+      0,
+    );
   });
 
 /**
- * Deterministic scorer used as a gate in 05. It reads a sandbox result off the
- * workflow output; there is no model in this path at all.
+ * Deterministic scorer used as a gate in 05. It reads a
+ * sandbox result off the workflow output; there is no
+ * model in this path at all.
  */
 export const fixtureScorer = createScorer<
   unknown,
@@ -124,9 +151,12 @@ export const fixtureScorer = createScorer<
 >({
   id: "fixture-pass",
   name: "Fixture tests pass",
-  description: "Scores 1 when every fixture test passes, 0 otherwise. Deterministic; no judge.",
+  description:
+    "Scores 1 when every fixture test passes, 0 otherwise. Deterministic; no judge.",
 }).generateScore(({ run }) => {
-  const out = run.output as { green?: boolean } | undefined;
+  const out = run.output as
+    | { green?: boolean }
+    | undefined;
   return out?.green ? 1 : 0;
 });
 
@@ -146,40 +176,60 @@ export interface Candidate {
 }
 
 /**
- * Pick a winner: tests first, rubric second, cost third.
+ * Pick a winner: tests first, rubric second, cost
+ * third.
  *
- * The order is not negotiable at runtime, and it is printed alongside the
- * table, because a tournament whose tie-break rule is implicit is a tournament
+ * The order is not negotiable at runtime, and it is
+ * printed alongside the table, because a tournament
+ * whose tie-break rule is implicit is a tournament
  * whose result cannot be argued with.
  */
 export const TIEBREAK_ORDER =
   "tests passed (desc) → rubric score (desc) → cost (asc) → latency (asc)";
 
-export function pickWinner(candidates: Candidate[]): Candidate | null {
-  const eligible = candidates.filter((c) => c.outcome === "ok" && c.sandbox && c.sandbox.pass > 0);
+export function pickWinner(
+  candidates: Candidate[],
+): Candidate | null {
+  const eligible = candidates.filter(
+    (c) =>
+      c.outcome === "ok" &&
+      c.sandbox &&
+      c.sandbox.pass > 0,
+  );
   if (eligible.length === 0) return null;
   const sorted = [...eligible].sort(compareCandidates);
   return sorted[0] ?? null;
 }
 
-export function compareCandidates(a: Candidate, b: Candidate): number {
+export function compareCandidates(
+  a: Candidate,
+  b: Candidate,
+): number {
   const aPass = a.sandbox?.pass ?? 0;
   const bPass = b.sandbox?.pass ?? 0;
   if (aPass !== bPass) return bPass - aPass;
 
-  const aFail = a.sandbox?.fail ?? Number.MAX_SAFE_INTEGER;
-  const bFail = b.sandbox?.fail ?? Number.MAX_SAFE_INTEGER;
+  const aFail =
+    a.sandbox?.fail ?? Number.MAX_SAFE_INTEGER;
+  const bFail =
+    b.sandbox?.fail ?? Number.MAX_SAFE_INTEGER;
   if (aFail !== bFail) return aFail - bFail;
 
   const aRub = a.rubricScore ?? -1;
   const bRub = b.rubricScore ?? -1;
   if (aRub !== bRub) return bRub - aRub;
 
-  if (a.costUsd !== b.costUsd) return a.costUsd - b.costUsd;
+  if (a.costUsd !== b.costUsd)
+    return a.costUsd - b.costUsd;
   return a.latencyMs - b.latencyMs;
 }
 
 /** Only green candidates are worth a judge call. Anything else is spend for nothing. */
-export function survivors(candidates: Candidate[]): Candidate[] {
-  return candidates.filter((c) => c.outcome === "ok" && c.sandbox?.green === true);
+export function survivors(
+  candidates: Candidate[],
+): Candidate[] {
+  return candidates.filter(
+    (c) =>
+      c.outcome === "ok" && c.sandbox?.green === true,
+  );
 }

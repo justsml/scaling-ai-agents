@@ -1,6 +1,9 @@
 import { createReadinessChallenge } from "./readiness-challenge.internal.js";
 
-export type ReadinessArtifactOrigin = "fixture:buggy" | "fixture:reference" | "candidate";
+export type ReadinessArtifactOrigin =
+  | "fixture:buggy"
+  | "fixture:reference"
+  | "candidate";
 
 export interface ReadinessArtifact {
   source: string;
@@ -8,12 +11,14 @@ export interface ReadinessArtifact {
   origin: ReadinessArtifactOrigin;
 }
 
-export interface ReferenceArtifact extends ReadinessArtifact {
+export interface ReferenceArtifact
+  extends ReadinessArtifact {
   origin: "fixture:reference";
   targetIdentity: string;
 }
 
-export interface CertifiedArtifact extends ReadinessArtifact {
+export interface CertifiedArtifact
+  extends ReadinessArtifact {
   certification: {
     testsPassed: 5;
     testsFailed: 0;
@@ -34,12 +39,24 @@ export interface ReadinessTestResult {
 }
 
 export type CertificationResult =
-  | { outcome: "certified"; artifact: CertifiedArtifact; result: ReadinessTestResult }
+  | {
+      outcome: "certified";
+      artifact: CertifiedArtifact;
+      result: ReadinessTestResult;
+    }
   | { outcome: "ineligible"; reason: string }
-  | { outcome: "candidate-failed"; failure: "compile" | "tests"; result: ReadinessTestResult }
+  | {
+      outcome: "candidate-failed";
+      failure: "compile" | "tests";
+      result: ReadinessTestResult;
+    }
   | { outcome: "cancelled"; reason: string }
   | { outcome: "timed-out"; reason: string }
-  | { outcome: "execution-error"; error: string; result?: ReadinessTestResult };
+  | {
+      outcome: "execution-error";
+      error: string;
+      result?: ReadinessTestResult;
+    };
 
 export interface ReadinessChallenge {
   load(kind: "buggy"): Promise<ReadinessArtifact>;
@@ -50,4 +67,5 @@ export interface ReadinessChallenge {
   ): Promise<CertificationResult>;
 }
 
-export const readinessChallenge: ReadinessChallenge = createReadinessChallenge();
+export const readinessChallenge: ReadinessChallenge =
+  createReadinessChallenge();

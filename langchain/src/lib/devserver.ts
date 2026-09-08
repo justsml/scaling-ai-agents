@@ -1,13 +1,18 @@
 /**
- * devserver.ts — start and stop `langgraphjs dev` as a child process.
+ * devserver.ts — start and stop `langgraphjs dev` as a
+ * child process.
  *
- * Snippets 02, 04 and 06 all want a second server process. Rather than ask the reader to
- * open a terminal, each of them starts one here and tears it down on exit. Every one of them
- * must degrade cleanly if the server cannot start, so this module never throws for a
- * start-up failure: it returns `{ ok: false, reason }` and the caller prints
- * `skipped: <reason>`.
+ * Snippets 02, 04 and 06 all want a second server
+ * process. Rather than ask the reader to open a
+ * terminal, each of them starts one here and tears it
+ * down on exit. Every one of them must degrade cleanly
+ * if the server cannot start, so this module never
+ * throws for a start-up failure: it returns `{ ok:
+ * false, reason }` and the caller prints `skipped:
+ * <reason>`.
  *
- * Two things learned the hard way against @langchain/langgraph-cli 1.4.5:
+ * Two things learned the hard way against
+ * @langchain/langgraph-cli 1.4.5:
  *
  *  - `--no-reload` is broken with the default `tsx` loader. `buildSpawnArgs` in
  *    @langchain/langgraph-api passes `--clear-screen=false` to the tsx CLI even when it is
@@ -34,15 +39,22 @@ export interface DevServerFailure {
   logTail: string;
 }
 
-export type DevServerResult = DevServer | DevServerFailure;
+export type DevServerResult =
+  | DevServer
+  | DevServerFailure;
 
 export function devServerPort(): number {
   return Number(process.env.LANGGRAPH_DEV_PORT ?? 2024);
 }
 
-async function isUp(baseUrl: string, timeoutMs = 1000): Promise<boolean> {
+async function isUp(
+  baseUrl: string,
+  timeoutMs = 1000,
+): Promise<boolean> {
   try {
-    const res = await fetch(`${baseUrl}/ok`, { signal: AbortSignal.timeout(timeoutMs) });
+    const res = await fetch(`${baseUrl}/ok`, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
     return res.ok;
   } catch {
     return false;
@@ -50,10 +62,11 @@ async function isUp(baseUrl: string, timeoutMs = 1000): Promise<boolean> {
 }
 
 /**
- * Start the dev server, or attach to one already listening on the port.
+ * Start the dev server, or attach to one already
+ * listening on the port.
  *
- * @param port         port to bind
- * @param readyTimeout how long to wait for `/ok` before giving up
+ * @param port port to bind @param readyTimeout how long
+ * to wait for `/ok` before giving up
  */
 export async function startDevServer(
   port = devServerPort(),
@@ -68,12 +81,18 @@ export async function startDevServer(
       port,
       proc: null as unknown as Subprocess,
       stop: async () => {},
-      logTail: () => "(attached to a server that was already running; not stopping it)",
+      logTail: () =>
+        "(attached to a server that was already running; not stopping it)",
     };
   }
 
   if (!Bun.which("node")) {
-    return { ok: false, reason: "node is not on PATH; langgraphjs dev needs it", logTail: "" };
+    return {
+      ok: false,
+      reason:
+        "node is not on PATH; langgraphjs dev needs it",
+      logTail: "",
+    };
   }
 
   let log = "";
@@ -86,13 +105,18 @@ export async function startDevServer(
         "--port",
         String(port),
         "--no-browser",
-        // NOTE: deliberately NOT --no-reload. See the header.
+        // NOTE: deliberately NOT --no-reload. See the
+        // header.
       ],
       {
         cwd: new URL("../..", import.meta.url).pathname,
         stdout: "pipe",
         stderr: "pipe",
-        env: { ...process.env, NO_COLOR: "1", BROWSER: "none" },
+        env: {
+          ...process.env,
+          NO_COLOR: "1",
+          BROWSER: "none",
+        },
       },
     );
   } catch (error) {
@@ -103,8 +127,11 @@ export async function startDevServer(
     };
   }
 
-  // Drain both pipes so the child never blocks on a full buffer.
-  const drain = async (stream: ReadableStream<Uint8Array> | undefined) => {
+  // Drain both pipes so the child never blocks on a
+  // full buffer.
+  const drain = async (
+    stream: ReadableStream<Uint8Array> | undefined,
+  ) => {
     if (!stream) return;
     const reader = stream.getReader();
     const dec = new TextDecoder();
@@ -158,13 +185,21 @@ export interface AssistantRow {
 }
 
 /** Agent Protocol: list the assistants the server registered from `langgraph.json`. */
-export async function listAssistants(baseUrl: string): Promise<AssistantRow[]> {
-  const res = await fetch(`${baseUrl}/assistants/search`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ limit: 20 }),
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!res.ok) throw new Error(`assistants/search returned ${res.status}`);
+export async function listAssistants(
+  baseUrl: string,
+): Promise<AssistantRow[]> {
+  const res = await fetch(
+    `${baseUrl}/assistants/search`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ limit: 20 }),
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
+  if (!res.ok)
+    throw new Error(
+      `assistants/search returned ${res.status}`,
+    );
   return (await res.json()) as AssistantRow[];
 }

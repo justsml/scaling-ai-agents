@@ -7,7 +7,8 @@ export const POKEDEX_TOOLS = [
   "pokedex_search",
   "pokedex_get",
 ] as const;
-export type PokedexToolName = (typeof POKEDEX_TOOLS)[number];
+export type PokedexToolName =
+  (typeof POKEDEX_TOOLS)[number];
 export const investigationRequestSchema = z.object({
   runId: z.string().min(1),
   scenarioId: z.string().min(1),
@@ -18,9 +19,18 @@ export const investigationRequestSchema = z.object({
   model: z.literal("openai/gpt-5.6-luna"),
   reasoningEffort: z.literal("none"),
 });
-export type InvestigationRequest = z.infer<typeof investigationRequestSchema>;
-const claimScalarSchema = z.union([z.string(), z.number(), z.boolean()]);
-const claimValueSchema = z.union([claimScalarSchema, z.array(claimScalarSchema)]);
+export type InvestigationRequest = z.infer<
+  typeof investigationRequestSchema
+>;
+const claimScalarSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+]);
+const claimValueSchema = z.union([
+  claimScalarSchema,
+  z.array(claimScalarSchema),
+]);
 export const answerSchema = z.object({
   summary: z.string(),
   claims: z.array(
@@ -31,7 +41,9 @@ export const answerSchema = z.object({
     }),
   ),
 });
-export type InvestigationAnswer = z.infer<typeof answerSchema>;
+export type InvestigationAnswer = z.infer<
+  typeof answerSchema
+>;
 export interface ToolCallEvidence {
   sequence: number;
   tool: PokedexToolName;
@@ -49,7 +61,11 @@ export interface InvestigationEvidence {
   stack: "langchain";
   answer: InvestigationAnswer | null;
   toolCalls: ToolCallEvidence[];
-  usage: { inputTokens: number; outputTokens: number; reasoningTokens?: number };
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    reasoningTokens?: number;
+  };
   latencyMs: number;
   stopReason: string;
   stopMetadata: {
@@ -66,22 +82,43 @@ export interface ToolDefinition {
   description: string;
   inputSchema: Record<string, unknown>;
 }
-export async function loadPokedexToolContract(): Promise<Record<PokedexToolName, ToolDefinition>> {
+export async function loadPokedexToolContract(): Promise<
+  Record<PokedexToolName, ToolDefinition>
+> {
   const raw = JSON.parse(
-    await readFile(new URL("../fixtures/pokedex-tools.schema.json", import.meta.url), "utf8"),
+    await readFile(
+      new URL(
+        "../fixtures/pokedex-tools.schema.json",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
   ) as Record<string, unknown>;
   const tools = raw.tools;
   const source = (
     Array.isArray(tools)
       ? Object.fromEntries(
-          tools.map((item) => [String((item as Record<string, unknown>).name), item]),
+          tools.map((item) => [
+            String(
+              (item as Record<string, unknown>).name,
+            ),
+            item,
+          ]),
         )
       : (tools ?? raw)
   ) as Record<string, unknown>;
-  const out = {} as Record<PokedexToolName, ToolDefinition>;
+  const out = {} as Record<
+    PokedexToolName,
+    ToolDefinition
+  >;
   for (const name of POKEDEX_TOOLS) {
-    const item = source[name] as Record<string, unknown> | undefined;
-    if (!item) throw new Error(`Pokédex contract is missing ${name}`);
+    const item = source[name] as
+      | Record<string, unknown>
+      | undefined;
+    if (!item)
+      throw new Error(
+        `Pokédex contract is missing ${name}`,
+      );
     out[name] = {
       description: String(item.description ?? name),
       inputSchema: (item.inputSchema ??
@@ -105,7 +142,10 @@ export class PokedexGatewaySession {
   constructor(readonly request: InvestigationRequest) {
     const controller = new AbortController();
     this.#timer = setTimeout(
-      () => controller.abort(new Error("investigation deadline exceeded")),
+      () =>
+        controller.abort(
+          new Error("investigation deadline exceeded"),
+        ),
       request.deadlineMs,
     );
     this.signal = controller.signal;
@@ -120,12 +160,19 @@ export class PokedexGatewaySession {
     error?: unknown;
   }): InvestigationEvidence {
     this.close();
-    const parsed = answerSchema.safeParse(result.answer);
+    const parsed = answerSchema.safeParse(
+      result.answer,
+    );
     const normalized = parsed.success
-      ? normalizeInvestigationAnswer(parsed.data, this.request.prompt, this.evidence)
+      ? normalizeInvestigationAnswer(
+          parsed.data,
+          this.request.prompt,
+          this.evidence,
+        )
       : null;
-    // Normalization can merge claims or remove invalid citations. Re-establish the
-    // answer contract here, before any caller can report normal completion.
+    // Normalization can merge claims or remove invalid
+    // citations. Re-establish the answer contract here,
+    // before any caller can report normal completion.
     const checked = answerSchema.safeParse(normalized);
     const accepted =
       checked.success &&
@@ -137,12 +184,19 @@ export class PokedexGatewaySession {
         : result.error instanceof Error
           ? result.error.message
           : String(result.error);
-    const finishReason = result.finishReason ?? "completed";
+    const finishReason =
+      result.finishReason ?? "completed";
     return {
       stack: "langchain",
-      answer: accepted && checked.success ? checked.data : null,
+      answer:
+        accepted && checked.success
+          ? checked.data
+          : null,
       toolCalls: [...this.evidence],
-      usage: result.usage ?? { inputTokens: 0, outputTokens: 0 },
+      usage: result.usage ?? {
+        inputTokens: 0,
+        outputTokens: 0,
+      },
       latencyMs: Date.now() - this.#startedAt,
       stopReason: this.signal.aborted
         ? "deadline"
@@ -154,7 +208,9 @@ export class PokedexGatewaySession {
               ? finishReason
               : "invalid-evidence",
       stopMetadata: {
-        ...(error !== undefined ? { error } : { finishReason }),
+        ...(error !== undefined
+          ? { error }
+          : { finishReason }),
         ...(!accepted && result.answer !== undefined
           ? {
               evidenceError:
@@ -169,8 +225,14 @@ export class PokedexGatewaySession {
     };
   }
 
-  async call(tool: PokedexToolName, args: unknown): Promise<unknown> {
-    args = this.#normalizePaginationArguments(tool, args);
+  async call(
+    tool: PokedexToolName,
+    args: unknown,
+  ): Promise<unknown> {
+    args = this.#normalizePaginationArguments(
+      tool,
+      args,
+    );
     const started = Date.now();
     const sequence = ++this.#calls;
     if (sequence > this.request.maxToolCalls) {
@@ -195,7 +257,13 @@ export class PokedexGatewaySession {
         disposition: "blocked",
         error,
       });
-      return { ...error, remainingToolCalls: Math.max(0, this.request.maxToolCalls - this.#calls) };
+      return {
+        ...error,
+        remainingToolCalls: Math.max(
+          0,
+          this.request.maxToolCalls - this.#calls,
+        ),
+      };
     }
     try {
       const response = await fetch(
@@ -206,21 +274,34 @@ export class PokedexGatewaySession {
           headers: {
             "content-type": "application/json",
             "x-pokedex-run-id": this.request.runId,
-            "x-pokedex-scenario-id": this.request.scenarioId,
+            "x-pokedex-scenario-id":
+              this.request.scenarioId,
             "x-pokedex-stack": "langchain",
           },
           body: JSON.stringify(args ?? {}),
         },
       );
-      const body = (await response.json()) as Record<string, unknown>;
+      const body = (await response.json()) as Record<
+        string,
+        unknown
+      >;
       const requestId = String(
         body.requestId ??
-          (body.error as Record<string, unknown> | undefined)?.requestId ??
+          (
+            body.error as
+              | Record<string, unknown>
+              | undefined
+          )?.requestId ??
           response.headers.get("x-request-id") ??
           `missing-${sequence}`,
       );
       const ok = response.ok && body.ok !== false;
-      if (ok) this.#rememberPaginationCursor(tool, args, body);
+      if (ok)
+        this.#rememberPaginationCursor(
+          tool,
+          args,
+          body,
+        );
       const endedAt = Date.now();
       this.#record({
         sequence,
@@ -232,16 +313,28 @@ export class PokedexGatewaySession {
         endedAt,
         latencyMs: endedAt - started,
         disposition: "gateway",
-        ...(ok ? { result: boundedResult(body) } : { error: body.error ?? body }),
+        ...(ok
+          ? { result: boundedResult(body) }
+          : { error: body.error ?? body }),
       });
-      return { ...body, remainingToolCalls: Math.max(0, this.request.maxToolCalls - this.#calls) };
+      return {
+        ...body,
+        remainingToolCalls: Math.max(
+          0,
+          this.request.maxToolCalls - this.#calls,
+        ),
+      };
     } catch (cause) {
       return this.#failure(
         sequence,
         tool,
         args,
-        this.signal.aborted ? "DEADLINE" : "GATEWAY_UNAVAILABLE",
-        cause instanceof Error ? cause.message : String(cause),
+        this.signal.aborted
+          ? "DEADLINE"
+          : "GATEWAY_UNAVAILABLE",
+        cause instanceof Error
+          ? cause.message
+          : String(cause),
         !this.signal.aborted,
         started,
       );
@@ -280,19 +373,32 @@ export class PokedexGatewaySession {
   }
   #record(call: ToolCallEvidence): void {
     this.evidence.push(call);
-    this.evidence.sort((a, b) => a.sequence - b.sequence);
+    this.evidence.sort(
+      (a, b) => a.sequence - b.sequence,
+    );
   }
-  #normalizePaginationArguments(tool: PokedexToolName, value: unknown): unknown {
+  #normalizePaginationArguments(
+    tool: PokedexToolName,
+    value: unknown,
+  ): unknown {
     if (
-      (tool !== "pokedex_list" && tool !== "pokedex_search") ||
+      (tool !== "pokedex_list" &&
+        tool !== "pokedex_search") ||
       value === null ||
       typeof value !== "object" ||
       Array.isArray(value)
     )
       return value;
-    const args = { ...(value as Record<string, unknown>) };
-    const issued = this.#paginationCursors.get(paginationKey(tool, args));
-    if (typeof args.cursor === "string" && args.cursor !== issued) {
+    const args = {
+      ...(value as Record<string, unknown>),
+    };
+    const issued = this.#paginationCursors.get(
+      paginationKey(tool, args),
+    );
+    if (
+      typeof args.cursor === "string" &&
+      args.cursor !== issued
+    ) {
       if (issued === undefined) delete args.cursor;
       else args.cursor = issued;
     }
@@ -304,7 +410,8 @@ export class PokedexGatewaySession {
     body: Record<string, unknown>,
   ): void {
     if (
-      (tool !== "pokedex_list" && tool !== "pokedex_search") ||
+      (tool !== "pokedex_list" &&
+        tool !== "pokedex_search") ||
       value === null ||
       typeof value !== "object" ||
       Array.isArray(value)
@@ -312,7 +419,10 @@ export class PokedexGatewaySession {
       return;
     if (typeof body.nextCursor === "string")
       this.#paginationCursors.set(
-        paginationKey(tool, value as Record<string, unknown>),
+        paginationKey(
+          tool,
+          value as Record<string, unknown>,
+        ),
         body.nextCursor,
       );
   }
@@ -323,7 +433,9 @@ function normalizeInvestigationAnswer(
   calls: ToolCallEvidence[] = [],
 ): InvestigationAnswer | null {
   if (!answer) return null;
-  const evolution = /evolution|later species/i.test(prompt);
+  const evolution = /evolution|later species/i.test(
+    prompt,
+  );
   const rawNamePaths = new Set([
     "name",
     "names",
@@ -336,40 +448,81 @@ function normalizeInvestigationAnswer(
     "pokedexes",
     "color",
   ]);
-  const grouped = new Map<string, InvestigationAnswer["claims"][number]>();
+  const grouped = new Map<
+    string,
+    InvestigationAnswer["claims"][number]
+  >();
   for (const original of answer.claims) {
     let path = original.path;
-    if (path === "name" && Array.isArray(original.value)) path = "names";
-    if (evolution && path === "names") path = "laterSpecies";
-    if (/main region/i.test(prompt) && path === "name") path = "region";
+    if (
+      path === "name" &&
+      Array.isArray(original.value)
+    )
+      path = "names";
+    if (evolution && path === "names")
+      path = "laterSpecies";
+    if (/main region/i.test(prompt) && path === "name")
+      path = "region";
     const value = rawNamePaths.has(path)
       ? Array.isArray(original.value)
-        ? original.value.map((item) => (typeof item === "string" ? item.toLowerCase() : item))
+        ? original.value.map((item) =>
+            typeof item === "string"
+              ? item.toLowerCase()
+              : item,
+          )
         : typeof original.value === "string"
           ? original.value.toLowerCase()
           : original.value
       : original.value;
     const previous = grouped.get(path);
-    if (previous && (Array.isArray(previous.value) || Array.isArray(value))) {
+    if (
+      previous &&
+      (Array.isArray(previous.value) ||
+        Array.isArray(value))
+    ) {
       const values = [
-        ...(Array.isArray(previous.value) ? previous.value : [previous.value]),
+        ...(Array.isArray(previous.value)
+          ? previous.value
+          : [previous.value]),
         ...(Array.isArray(value) ? value : [value]),
       ];
       grouped.set(path, {
         path,
         value: [...new Set(values)],
-        requestIds: [...new Set([...previous.requestIds, ...original.requestIds])],
+        requestIds: [
+          ...new Set([
+            ...previous.requestIds,
+            ...original.requestIds,
+          ]),
+        ],
       });
-    } else grouped.set(path, { path, value, requestIds: [...new Set(original.requestIds)] });
+    } else
+      grouped.set(path, {
+        path,
+        value,
+        requestIds: [...new Set(original.requestIds)],
+      });
   }
-  const successful = calls.filter((call) => call.ok && call.disposition === "gateway");
-  const validIds = new Set(successful.map((call) => call.requestId));
+  const successful = calls.filter(
+    (call) => call.ok && call.disposition === "gateway",
+  );
+  const validIds = new Set(
+    successful.map((call) => call.requestId),
+  );
   let claims = [...grouped.values()].map((claim) => {
-    if (calls.length === 0 || claim.requestIds.every((id) => validIds.has(id))) return claim;
-    const values = Array.isArray(claim.value) ? claim.value : [claim.value];
+    if (
+      calls.length === 0 ||
+      claim.requestIds.every((id) => validIds.has(id))
+    )
+      return claim;
+    const values = Array.isArray(claim.value)
+      ? claim.value
+      : [claim.value];
     const supportingIds = successful
       .filter((call) => {
-        return values.every((value) => containsValue(call.result, value));
+        return values.every((value) =>
+          containsValue(call.result, value),
+        );
       })
       .map((call) => call.requestId);
     return {
@@ -377,29 +530,46 @@ function normalizeInvestigationAnswer(
       requestIds:
         supportingIds.length > 0
           ? [...new Set(supportingIds)]
-          : claim.requestIds.filter((id) => validIds.has(id)),
+          : claim.requestIds.filter((id) =>
+              validIds.has(id),
+            ),
     };
   });
   if (/weighs more|heavier|by how much/i.test(prompt)) {
     const comparisonIds = [
       ...new Set(
         claims
-          .filter((claim) => claim.path === "heavier" || claim.path === "difference")
+          .filter(
+            (claim) =>
+              claim.path === "heavier" ||
+              claim.path === "difference",
+          )
           .flatMap((claim) => claim.requestIds),
       ),
     ];
     if (comparisonIds.length > 0)
       claims = claims.map((claim) =>
-        claim.path === "heavier" || claim.path === "difference"
+        claim.path === "heavier" ||
+        claim.path === "difference"
           ? { ...claim, requestIds: comparisonIds }
           : claim,
       );
   }
   return { summary: answer.summary, claims };
 }
-function validateCitations(answer: InvestigationAnswer | null, calls: ToolCallEvidence[]): boolean {
-  const ids = new Set(calls.filter((c) => c.ok).map((c) => c.requestId));
-  return Boolean(answer && answer.claims.every((c) => c.requestIds.every((id) => ids.has(id))));
+function validateCitations(
+  answer: InvestigationAnswer | null,
+  calls: ToolCallEvidence[],
+): boolean {
+  const ids = new Set(
+    calls.filter((c) => c.ok).map((c) => c.requestId),
+  );
+  return Boolean(
+    answer &&
+      answer.claims.every((c) =>
+        c.requestIds.every((id) => ids.has(id)),
+      ),
+  );
 }
 function loopbackUrlSchema() {
   return z
@@ -411,32 +581,52 @@ function loopbackUrlSchema() {
         url.protocol !== "http:" ||
         url.username ||
         url.password ||
-        !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+        !["localhost", "127.0.0.1", "[::1]"].includes(
+          url.hostname,
+        )
       )
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "gatewayBaseUrl must be credential-free HTTP on localhost, 127.0.0.1, or [::1]",
+          message:
+            "gatewayBaseUrl must be credential-free HTTP on localhost, 127.0.0.1, or [::1]",
         });
     });
 }
 const MAX_EVIDENCE_RESULT_BYTES = 64 * 1024;
 function boundedResult(value: unknown): unknown {
   const json = JSON.stringify(value);
-  const bytes = new TextEncoder().encode(json).byteLength;
+  const bytes = new TextEncoder().encode(
+    json,
+  ).byteLength;
   return bytes <= MAX_EVIDENCE_RESULT_BYTES
     ? value
-    : { truncated: true, originalBytes: bytes, preview: json.slice(0, 4096) };
+    : {
+        truncated: true,
+        originalBytes: bytes,
+        preview: json.slice(0, 4096),
+      };
 }
-function paginationKey(tool: PokedexToolName, args: Record<string, unknown>): string {
+function paginationKey(
+  tool: PokedexToolName,
+  args: Record<string, unknown>,
+): string {
   return `${tool}\0${String(args.resource ?? "")}\0${String(args.query ?? "")}`;
 }
 
-function containsValue(body: unknown, value: unknown): boolean {
+function containsValue(
+  body: unknown,
+  value: unknown,
+): boolean {
   if (body === value) return true;
-  if (Array.isArray(body)) return body.some((item) => containsValue(item, value));
+  if (Array.isArray(body))
+    return body.some((item) =>
+      containsValue(item, value),
+    );
   return (
     body !== null &&
     typeof body === "object" &&
-    Object.values(body).some((item) => containsValue(item, value))
+    Object.values(body).some((item) =>
+      containsValue(item, value),
+    )
   );
 }

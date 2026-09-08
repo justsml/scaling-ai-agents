@@ -4,51 +4,46 @@ Run `bun run snippet:17 -- "Your business decision and context"` from `ai-sdk/`,
 `langchain/`, or `mastra/`. Without a brief, it uses a small SaaS investment decision.
 Set `OPENAI_API_KEY` first. Each successful run makes four paid model calls.
 
-| Role | Model | Decision it can change |
-| --- | --- | --- |
-| Pennypincher | `gpt-5.6-luna` | Which spending or compute to avoid, reduce, or eliminate; how savings arise and what they sacrifice. |
-| Battle-scarred Operator | `gpt-5.6-terra` | Rollout sequence, staffing, ownership, recovery, and conditions for scaling. |
-| Product Visionary | `gpt-5.6-sol` | Customer segment, offer, experience, and demand validation. |
-| Business Advice Orchestrator | `gpt-5.6-sol` | Which complete proposal to use as the base and which compatible ideas to adopt. |
+Each framework's snippet is one self-contained file: the brief, the four role
+prompts, the model id, the agent construction and the orchestration all sit in
+`src/snippets/17-business-advice.ts`. There is no shared profiles module and no
+env-var indirection.
 
-The three advisor personas are adapted from
-[`council-of-dans`](https://github.com/justsml/ai-skillz/blob/main/skills/council-of-dans/SKILL.md).
-Each tests a different business hypothesis and produces a complete proposal independently.
-Pennypincher finds savings in the business being advised. Its model assignment does not
-define its mandate.
+| Role | Decision it can change |
+| --- | --- |
+| Pennypincher | Which spending to cut, and what the cut sacrifices. |
+| Battle-scarred Operator | Rollout sequence, owner, and rollback. |
+| Product Visionary | Who to serve, what to offer, how to test demand. |
+| Chair | Which proposal is the base, and which ideas get grafted onto it. |
 
-The fixed panel has three concurrent advisors and a single synthesis call. AI SDK uses
-`ToolLoopAgent` instances with `Promise.all`. LangGraph uses parallel worker nodes and
-an explicit join before the orchestrator. Mastra uses `Agent` instances in a
-`.parallel()` workflow followed by the orchestrator step. Every package contains its own
-profiles and implementation, with no runtime imports from sibling packages.
+All four roles run on `gpt-5.6-luna`. The three advisor personas are adapted from
+[`council-of-dans`](https://github.com/justsml/ai-skillz/blob/main/skills/council-of-dans/SKILL.md),
+shortened to a sentence or two each so the orchestration stays readable.
 
-All four roles explicitly request reasoning effort `none`, matching the existing
-model-routing examples. AI SDK and Mastra use `providerOptions.openai.reasoningEffort`;
-LangChain uses `reasoning.effort`. See the [LangChain OpenAI integration](https://docs.langchain.com/oss/javascript/integrations/chat/openai)
-and [Mastra provider option notes](https://mastra.ai/blog/changelog-2025-10-23).
-Model availability and acceptance of `none` still depend on the configured provider.
-The example does not silently substitute a model or higher reasoning setting on failure.
+The fixed panel has three concurrent advisors and a single synthesis call. AI SDK
+uses `ToolLoopAgent` instances with `Promise.all`. LangGraph uses three edges out
+of `START` and one join edge into the chair. Mastra uses `.parallel()` followed by
+a `.map()` join and the chair step. Every package contains its own copy, with no
+runtime imports from sibling packages.
 
-The command prints all proposals, the decision memo, and total elapsed milliseconds.
-Each call allows at most 1,800 output tokens, disables SDK retries, and receives the same
-90-second run deadline. These limits bound calls and output, not the provider invoice.
-Cancellation does not prove a provider stopped processing or charging. If any advisor
-fails, returns empty text, or exceeds the deadline, synthesis fails rather than presenting
-a partial panel as complete. An empty final memo also fails.
+The command prints all proposals and the decision memo. Each call disables SDK
+retries and receives the same 90-second run deadline. These limits bound calls,
+not the provider invoice. Cancellation does not prove a provider stopped
+processing or charging. If any advisor fails, returns empty text, or exceeds the
+deadline, synthesis fails rather than presenting a partial panel as complete.
 
 ## Evaluation contract
 
-Given a business brief of 1 to 20,000 characters, return three independent proposals and
-one memo that compares them against customer value, economics, execution feasibility,
-evidence quality, and reversibility. Recommendations must distinguish supplied facts,
-assumptions, and proposed targets. The council has no browsing or business-action tools.
+Given a business brief, return three independent proposals and one memo that
+compares them. Recommendations must distinguish supplied facts, assumptions, and
+proposed targets. The council has no browsing or business-action tools.
 
-`bun test test/business-advice.test.ts` runs offline through each framework's public
-`runBusinessAdvice` function using injected responses. It checks concurrency, the
-synthesis barrier, complete proposal transfer, model assignments, input validation,
-empty responses, provider failures, and cancellation. It does not establish advice quality
-or confirm live provider compatibility.
+`bun test test/business-advice.test.ts` runs offline through each framework's
+`runCouncil` with `ask` injected. It checks concurrency, the synthesis barrier,
+complete proposal transfer, empty-brief rejection, provider failures, and
+cancellation. It does not establish advice quality or confirm live provider
+compatibility. The empty-response guard lives inside the real `ask`, so it is not
+covered offline.
 
 For live prompt evaluation, use these authored cases as a starter set. They are synthetic
 test prompts, not observed customer data or a measured baseline.

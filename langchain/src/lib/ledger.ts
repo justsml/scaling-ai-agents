@@ -1,15 +1,18 @@
 /**
- * ledger.ts — the span record every worker writes, plus reserve/reconcile accounting.
+ * ledger.ts — the span record every worker writes, plus
+ * reserve/reconcile accounting.
  *
  * Two ideas live here.
  *
- * 1. **The span.** Every attempt, worker or judge call in this package produces exactly one
+ * 1. **The span.** Every attempt, worker or judge call
+ * in this package produces exactly one
  *    `Span` carrying the five standard keys the talk asks for:
  *      profile, costUsd, latencyMs, outcome, whyItExisted.
  *    The same object is attached to LangChain runs as `metadata` (see `lib/trace.ts`), so the
  *    printed table and the trace tree agree.
  *
- * 2. **Reserve then reconcile.** Before a fan-out, each worker reserves an estimated cost.
+ * 2. **Reserve then reconcile.** Before a fan-out, each
+ * worker reserves an estimated cost.
  *    Reservations are subtracted from the budget up front so a fan-out cannot collectively
  *    overspend while every individual worker still looks affordable. After the worker
  *    returns, the reservation is released and the real cost is charged. The difference
@@ -18,7 +21,13 @@
 
 import { usd } from "./prices.ts";
 
-export type Outcome = "ok" | "failed" | "skipped" | "cancelled" | "denied" | "cached";
+export type Outcome =
+  | "ok"
+  | "failed"
+  | "skipped"
+  | "cancelled"
+  | "denied"
+  | "cached";
 
 /** The five standard metadata keys, plus whatever a snippet wants to add. */
 export interface Span {
@@ -41,7 +50,9 @@ export class BudgetExhausted extends Error {
     readonly attempted: number,
     readonly remaining: number,
   ) {
-    super(`BudgetExhausted: needed ${usd(attempted)} but only ${usd(remaining)} remains`);
+    super(
+      `BudgetExhausted: needed ${usd(attempted)} but only ${usd(remaining)} remains`,
+    );
     this.name = "BudgetExhausted";
   }
 }
@@ -77,16 +88,28 @@ export class Ledger {
 
   /** Budget minus what is charged *and* what is currently held by open reservations. */
   get availableUsd(): number {
-    return this.budgetUsd - this.chargedUsd - this.reservedUsd;
+    return (
+      this.budgetUsd -
+      this.chargedUsd -
+      this.reservedUsd
+    );
   }
 
   /**
-   * Take money out of the budget before dispatching a worker. Throws `BudgetExhausted`
-   * rather than silently letting a fan-out run past the cap.
+   * Take money out of the budget before dispatching a
+   * worker. Throws `BudgetExhausted` rather than
+   * silently letting a fan-out run past the cap.
    */
-  reserve(id: string, profile: string, amountUsd: number): Reservation {
+  reserve(
+    id: string,
+    profile: string,
+    amountUsd: number,
+  ): Reservation {
     if (amountUsd > this.availableUsd) {
-      throw new BudgetExhausted(amountUsd, this.availableUsd);
+      throw new BudgetExhausted(
+        amountUsd,
+        this.availableUsd,
+      );
     }
     this.reservedUsd += amountUsd;
     let settled = false;
@@ -109,7 +132,11 @@ export class Ledger {
   }
 
   /** `tryReserve` for callers that would rather branch than catch. */
-  tryReserve(id: string, profile: string, amountUsd: number): Reservation | null {
+  tryReserve(
+    id: string,
+    profile: string,
+    amountUsd: number,
+  ): Reservation | null {
     try {
       return this.reserve(id, profile, amountUsd);
     } catch (error) {
@@ -124,9 +151,11 @@ export class Ledger {
   }
 
   /**
-   * Work that the provider billed but whose result we discarded — cancelled in flight, or
-   * arrived after the deadline. This is money spent with nothing to show for it, and it is
-   * printed separately so nobody can pretend a deadline is free.
+   * Work that the provider billed but whose result we
+   * discarded — cancelled in flight, or arrived after
+   * the deadline. This is money spent with nothing to
+   * show for it, and it is printed separately so nobody
+   * can pretend a deadline is free.
    */
   chargeBilledAnyway(amountUsd: number): void {
     this.chargedUsd += amountUsd;
@@ -143,18 +172,25 @@ export class Ledger {
   }
 
   byOutcome(outcome: Outcome): Span[] {
-    return this.spans.filter((s) => s.outcome === outcome);
+    return this.spans.filter(
+      (s) => s.outcome === outcome,
+    );
   }
 
   totalLatencyMs(): number {
-    return this.spans.reduce((a, s) => a + s.latencyMs, 0);
+    return this.spans.reduce(
+      (a, s) => a + s.latencyMs,
+      0,
+    );
   }
 
   /** Wall-clock span of the parallel section: max end minus min start. */
   wallClockMs(): number {
     if (this.spans.length === 0) return 0;
     const starts = this.spans.map((s) => s.startedAt);
-    const ends = this.spans.map((s) => s.startedAt + s.latencyMs);
+    const ends = this.spans.map(
+      (s) => s.startedAt + s.latencyMs,
+    );
     return Math.max(...ends) - Math.min(...starts);
   }
 }
@@ -169,14 +205,25 @@ export interface SpanDraft {
 }
 
 /**
- * Run one unit of work and always produce a span, success or not. This is the only place
- * spans are constructed, so the five keys can never drift apart between snippets.
+ * Run one unit of work and always produce a span,
+ * success or not. This is the only place spans are
+ * constructed, so the five keys can never drift apart
+ * between snippets.
  */
 export async function runSpan<T>(
   ledger: Ledger,
   draft: SpanDraft,
-  work: () => Promise<{ value: T; costUsd: number; outcome?: Outcome; note?: string }>,
-): Promise<{ span: Span; value: T | null; error: Error | null }> {
+  work: () => Promise<{
+    value: T;
+    costUsd: number;
+    outcome?: Outcome;
+    note?: string;
+  }>,
+): Promise<{
+  span: Span;
+  value: T | null;
+  error: Error | null;
+}> {
   const startedAt = Date.now();
   try {
     const result = await work();
@@ -190,8 +237,13 @@ export async function runSpan<T>(
     });
     return { span, value: result.value, error: null };
   } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    const cancelled = err.name === "AbortError" || /abort|cancel/i.test(err.message);
+    const err =
+      error instanceof Error
+        ? error
+        : new Error(String(error));
+    const cancelled =
+      err.name === "AbortError" ||
+      /abort|cancel/i.test(err.message);
     const span = ledger.record({
       ...draft,
       costUsd: 0,

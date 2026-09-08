@@ -1,14 +1,17 @@
 #!/usr/bin/env bun
 // 02 Decompose
-// ------------
+// ----------------------------------------
 // Axis: Decompose -- many sub-problems, many workers.
 //
-// The "intermittent WebSocket disconnects" incident is investigated by three
-// workers split by evidence source (network.log, app.log, state.json). Each
-// worker answers one question, returns one artifact, and reads only its own
-// file -- two workers never write the same file, so there is no possibility
-// of a merge conflict between them. A fourth call (the reviewer) reads all
-// three artifacts and looks for evidence against the favored hypothesis.
+// The "intermittent WebSocket disconnects" incident is
+// investigated by three workers split by evidence
+// source (network.log, app.log, state.json). Each
+// worker answers one question, returns one artifact,
+// and reads only its own file -- two workers never
+// write the same file, so there is no possibility of a
+// merge conflict between them. A fourth call (the
+// reviewer) reads all three artifacts and looks for
+// evidence against the favored hypothesis.
 //
 // Two decomposition strategies are shown:
 //   (a) Fixed plan: three `generateText` calls in Promise.all, each bound to
@@ -20,28 +23,56 @@
 //       lets the model choose the decomposition itself. Shown for contrast,
 //       with its extra cost printed alongside (a).
 //
-// Both are scored against src/fixtures/incident/ground-truth.md with a
-// deterministic check: did the reviewer's verdict mention *both* independent
-// causes, or just the favored (network) one?
-import { generateText, Output, ToolLoopAgent, tool } from "ai";
+// Both are scored against
+// src/fixtures/incident/ground-truth.md with a
+// deterministic check: did the reviewer's verdict
+// mention *both* independent causes, or just the
+// favored (network) one?
+import {
+  generateText,
+  Output,
+  ToolLoopAgent,
+  tool,
+} from "ai";
 import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import { workerModel } from "../lib/profiles";
-import { withWorkerSpan, dumpWorkerSpans, initTelemetry } from "../lib/otel";
+import {
+  withWorkerSpan,
+  dumpWorkerSpans,
+  initTelemetry,
+} from "../lib/otel";
 import { costUsd, formatUsd } from "../lib/prices";
 import { parseCaps, deadlineSignal } from "../lib/cli";
-import { printTable, printKV, heading } from "../lib/print";
+import {
+  printTable,
+  printKV,
+  heading,
+} from "../lib/print";
 
 const EVIDENCE = {
-  network: new URL("../fixtures/incident/network.log", import.meta.url),
-  app: new URL("../fixtures/incident/app.log", import.meta.url),
-  state: new URL("../fixtures/incident/state.json", import.meta.url),
+  network: new URL(
+    "../fixtures/incident/network.log",
+    import.meta.url,
+  ),
+  app: new URL(
+    "../fixtures/incident/app.log",
+    import.meta.url,
+  ),
+  state: new URL(
+    "../fixtures/incident/state.json",
+    import.meta.url,
+  ),
 } as const;
 
 type EvidenceSource = keyof typeof EVIDENCE;
 
 const workerOutputSchema = z.object({
-  finding: z.string().describe("The single most important fact this evidence source reveals"),
+  finding: z
+    .string()
+    .describe(
+      "The single most important fact this evidence source reveals",
+    ),
   supportsNetworkTimeoutHypothesis: z.boolean(),
 });
 
@@ -58,7 +89,10 @@ async function runFixedWorker(
   source: EvidenceSource,
   signal: AbortSignal,
 ): Promise<WorkerArtifact> {
-  const content = await readFile(EVIDENCE[source], "utf8");
+  const content = await readFile(
+    EVIDENCE[source],
+    "utf8",
+  );
   return withWorkerSpan(
     {
       profile: `decompose-${source}`,
@@ -68,19 +102,28 @@ async function runFixedWorker(
       const start = Date.now();
       const result = await generateText({
         model: workerModel(),
-        output: Output.object({ schema: workerOutputSchema }),
+        output: Output.object({
+          schema: workerOutputSchema,
+        }),
         abortSignal: signal,
-        telemetry: { functionId: `decompose-${source}` },
+        telemetry: {
+          functionId: `decompose-${source}`,
+        },
         instructions: `You investigate one evidence source for a WebSocket disconnect incident. You may only see ${source}'s evidence, not the other sources.`,
         prompt: `Evidence (${source}):\n\n${content}\n\nWhat is the single most important fact this reveals about why sessions disconnect?`,
       });
       const latencyMs = Date.now() - start;
-      const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.6-luna", result.usage);
+      const spend = costUsd(
+        "openai/gpt-5.6-luna",
+        result.usage,
+      );
       return {
         result: {
           source,
           finding: result.output.finding,
-          supportsNetworkTimeoutHypothesis: result.output.supportsNetworkTimeoutHypothesis,
+          supportsNetworkTimeoutHypothesis:
+            result.output
+              .supportsNetworkTimeoutHypothesis,
           costUsd: spend,
           latencyMs,
         },
@@ -98,25 +141,43 @@ const reviewerSchema = z.object({
   verdict: z.string(),
 });
 
-async function runReviewer(artifacts: WorkerArtifact[], signal: AbortSignal) {
+async function runReviewer(
+  artifacts: WorkerArtifact[],
+  signal: AbortSignal,
+) {
   return withWorkerSpan(
-    { profile: "reviewer", whyItExisted: "look for evidence against the favored hypothesis" },
+    {
+      profile: "reviewer",
+      whyItExisted:
+        "look for evidence against the favored hypothesis",
+    },
     async () => {
       const start = Date.now();
       const result = await generateText({
         model: workerModel(),
-        output: Output.object({ schema: reviewerSchema }),
+        output: Output.object({
+          schema: reviewerSchema,
+        }),
         abortSignal: signal,
         telemetry: { functionId: "decompose-reviewer" },
         instructions:
           "You are a reviewer. Read all three worker findings. State the favored hypothesis, but explicitly check " +
           "whether a second, independent cause is also supported by the evidence -- do not stop at the first plausible explanation.",
-        prompt: artifacts.map((a) => `[${a.source}] ${a.finding}`).join("\n\n"),
+        prompt: artifacts
+          .map((a) => `[${a.source}] ${a.finding}`)
+          .join("\n\n"),
       });
       const latencyMs = Date.now() - start;
-      const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.6-luna", result.usage);
+      const spend = costUsd(
+        "openai/gpt-5.6-luna",
+        result.usage,
+      );
       return {
-        result: { ...result.output, costUsd: spend, latencyMs },
+        result: {
+          ...result.output,
+          costUsd: spend,
+          latencyMs,
+        },
         costUsd: spend,
         latencyMs,
         outcome: "reviewed",
@@ -131,7 +192,8 @@ async function runSubagentVariant(signal: AbortSignal) {
     tool({
       description: `Read the ${source} evidence file for the ws-disconnect incident.`,
       inputSchema: z.object({}),
-      execute: async () => readFile(EVIDENCE[source], "utf8"),
+      execute: async () =>
+        readFile(EVIDENCE[source], "utf8"),
     });
 
   const investigator = new ToolLoopAgent({
@@ -150,20 +212,27 @@ async function runSubagentVariant(signal: AbortSignal) {
   return withWorkerSpan(
     {
       profile: "subagent-investigator",
-      whyItExisted: "model-chosen decomposition, for cost contrast with the fixed plan",
+      whyItExisted:
+        "model-chosen decomposition, for cost contrast with the fixed plan",
     },
     async () => {
       const start = Date.now();
       const result = await investigator.generate({
-        prompt: "Investigate why WebSocket sessions for u-9 keep closing with code 1006.",
+        prompt:
+          "Investigate why WebSocket sessions for u-9 keep closing with code 1006.",
         abortSignal: signal,
       });
       const latencyMs = Date.now() - start;
-      const spend = costUsd(process.env.MODEL_WORKER ?? "openai/gpt-5.6-luna", result.usage);
+      const spend = costUsd(
+        "openai/gpt-5.6-luna",
+        result.usage,
+      );
       return {
         result: {
           text: result.text,
-          toolCalls: result.steps.flatMap((s) => s.toolCalls).length,
+          toolCalls: result.steps.flatMap(
+            (s) => s.toolCalls,
+          ).length,
           costUsd: spend,
           latencyMs,
         },
@@ -176,24 +245,36 @@ async function runSubagentVariant(signal: AbortSignal) {
 }
 
 async function main() {
-  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), {
-    budgetUsd: 0.2,
-    deadlineMs: 60_000,
-  });
+  const { budgetUsd, deadlineMs } = parseCaps(
+    process.argv.slice(2),
+    {
+      budgetUsd: 0.2,
+      deadlineMs: 60_000,
+    },
+  );
   initTelemetry();
-  heading("02 Decompose — three workers, one file each, a contrarian reviewer");
+  heading(
+    "02 Decompose — three workers, one file each, a contrarian reviewer",
+  );
   printKV("caps", { budgetUsd, deadlineMs });
 
   const signal = deadlineSignal(deadlineMs);
-  const sources: EvidenceSource[] = ["network", "app", "state"];
+  const sources: EvidenceSource[] = [
+    "network",
+    "app",
+    "state",
+  ];
 
-  const artifacts = await Promise.all(sources.map((s) => runFixedWorker(s, signal)));
+  const artifacts = await Promise.all(
+    sources.map((s) => runFixedWorker(s, signal)),
+  );
   printTable(
     "worker artifacts (fixed plan, one file each)",
     artifacts.map((a) => ({
       source: a.source,
       finding: a.finding.slice(0, 70),
-      supportsNetworkTimeout: a.supportsNetworkTimeoutHypothesis,
+      supportsNetworkTimeout:
+        a.supportsNetworkTimeoutHypothesis,
       costUsd: a.costUsd,
       latencyMs: a.latencyMs,
     })),
@@ -202,47 +283,72 @@ async function main() {
   const review = await runReviewer(artifacts, signal);
   printKV("reviewer verdict", {
     favoredHypothesis: review.favoredHypothesis,
-    mentionsSecondCause: review.mentionsIndependentSecondCause,
+    mentionsSecondCause:
+      review.mentionsIndependentSecondCause,
     verdict: review.verdict.slice(0, 200),
   });
 
-  // Deterministic check against ground truth: did the reviewer find BOTH causes?
+  // Deterministic check against ground truth: did the
+  // reviewer find BOTH causes?
   const groundTruth = await readFile(
-    new URL("../fixtures/incident/ground-truth.md", import.meta.url),
+    new URL(
+      "../fixtures/incident/ground-truth.md",
+      import.meta.url,
+    ),
     "utf8",
   );
-  const expectsTwoCauses = /Two independent causes/i.test(groundTruth);
-  const scoredCorrectly = expectsTwoCauses ? review.mentionsIndependentSecondCause : true;
+  const expectsTwoCauses =
+    /Two independent causes/i.test(groundTruth);
+  const scoredCorrectly = expectsTwoCauses
+    ? review.mentionsIndependentSecondCause
+    : true;
   printKV("deterministic score vs ground-truth.md", {
     expectsTwoCauses,
-    reviewerFoundSecondCause: review.mentionsIndependentSecondCause,
+    reviewerFoundSecondCause:
+      review.mentionsIndependentSecondCause,
     scoredCorrectly,
   });
 
-  const fixedTotalCostUsd = artifacts.reduce((s, a) => s + a.costUsd, 0) + review.costUsd;
+  const fixedTotalCostUsd =
+    artifacts.reduce((s, a) => s + a.costUsd, 0) +
+    review.costUsd;
 
-  let subagentResult: Awaited<ReturnType<typeof runSubagentVariant>> | undefined;
+  let subagentResult:
+    | Awaited<ReturnType<typeof runSubagentVariant>>
+    | undefined;
   if (fixedTotalCostUsd < budgetUsd) {
     subagentResult = await runSubagentVariant(signal);
-    printKV("subagent variant (model-chosen decomposition)", {
-      toolCalls: subagentResult.toolCalls,
-      costUsd: subagentResult.costUsd,
-      latencyMs: subagentResult.latencyMs,
-      textPreview: subagentResult.text.slice(0, 150),
-    });
+    printKV(
+      "subagent variant (model-chosen decomposition)",
+      {
+        toolCalls: subagentResult.toolCalls,
+        costUsd: subagentResult.costUsd,
+        latencyMs: subagentResult.latencyMs,
+        textPreview: subagentResult.text.slice(0, 150),
+      },
+    );
   }
 
-  const totalCostUsd = fixedTotalCostUsd + (subagentResult?.costUsd ?? 0);
+  const totalCostUsd =
+    fixedTotalCostUsd + (subagentResult?.costUsd ?? 0);
   printKV("merge record", {
     filesWritten:
       "network.log -> worker(network), app.log -> worker(app), state.json -> worker(state); no overlap",
     fixedPlanCostUsd: formatUsd(fixedTotalCostUsd),
-    subagentCostUsd: subagentResult ? formatUsd(subagentResult.costUsd) : "skipped(budget)",
+    subagentCostUsd: subagentResult
+      ? formatUsd(subagentResult.costUsd)
+      : "skipped(budget)",
     costDeltaVsFixed: subagentResult
-      ? formatUsd(subagentResult.costUsd - artifacts[0]!.costUsd)
+      ? formatUsd(
+          subagentResult.costUsd -
+            artifacts[0]!.costUsd,
+        )
       : "-",
     totalCostUsd: formatUsd(totalCostUsd),
-    stopReason: totalCostUsd >= budgetUsd ? "budget reached" : "all workers and reviewer completed",
+    stopReason:
+      totalCostUsd >= budgetUsd
+        ? "budget reached"
+        : "all workers and reviewer completed",
   });
 
   const { exporter } = initTelemetry();

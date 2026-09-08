@@ -1,11 +1,9 @@
 /**
- * models.ts — the model ids this package uses, and how they are built.
+ * Model ids, written out. Change them here, not by env.
  *
- * Model used for every hosted role:
- *   openai:gpt-5.6-luna -> gpt-5.6-luna
- *
- * `initChatModel` is exported from `langchain` (not `langchain/chat_models`) in
- * langchain@1.5.x. It takes a "provider:model" string and returns a chat model.
+ * `initChatModel` comes from `langchain` (not
+ * `langchain/chat_models`) in langchain@1.5.x. It takes
+ * a "provider:model" string and returns a chat model.
  */
 
 import { initChatModel } from "langchain";
@@ -33,14 +31,20 @@ export interface LocalSlot {
 }
 
 /**
- * The local OpenAI-compatible slot (LM Studio, Ollama, vLLM). Present only when the env var
- * is set; snippet 04 skips or stops with a reason when it is absent, rather than silently
- * routing restricted data to a hosted provider.
+ * The local OpenAI-compatible slot (LM Studio, Ollama,
+ * vLLM). Present only when the env var is set; snippet
+ * 04 skips or stops with a reason when it is absent,
+ * rather than silently routing restricted data to a
+ * hosted provider.
  */
 export function localSlot(): LocalSlot | null {
   const baseURL = process.env.LOCAL_OPENAI_BASE_URL;
   if (!baseURL) return null;
-  return { baseURL, model: process.env.LOCAL_OPENAI_MODEL ?? "local-model" };
+  return {
+    baseURL,
+    model:
+      process.env.LOCAL_OPENAI_MODEL ?? "local-model",
+  };
 }
 
 const cache = new Map<string, BaseChatModel>();
@@ -53,30 +57,45 @@ export async function model(
   const key = `${id}::${opts.temperature ?? "default"}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  // gpt-5.6-luna is a reasoning model: it rejects a non-default temperature, so it is only
-  // passed when a caller explicitly asks for one.
+  // gpt-5.6-luna is a reasoning model: it rejects a
+  // non-default temperature, so it is only passed when
+  // a caller explicitly asks for one.
   const built = (await initChatModel(id, {
-    ...(opts.temperature === undefined ? {} : { temperature: opts.temperature }),
+    ...(opts.temperature === undefined
+      ? {}
+      : { temperature: opts.temperature }),
   })) as unknown as BaseChatModel;
   cache.set(key, built);
   return built;
 }
 
 /** The local slot cannot go through `initChatModel`; it needs a custom baseURL. */
-export function localModel(slot: LocalSlot): BaseChatModel {
+export function localModel(
+  slot: LocalSlot,
+): BaseChatModel {
   return new ChatOpenAI({
     model: slot.model,
-    apiKey: process.env.LOCAL_OPENAI_API_KEY ?? "not-needed",
+    apiKey:
+      process.env.LOCAL_OPENAI_API_KEY ?? "not-needed",
     configuration: { baseURL: slot.baseURL },
   }) as unknown as BaseChatModel;
 }
 
 /** Cheap liveness probe for the local slot: one GET on /models with a short timeout. */
-export async function localSlotAlive(slot: LocalSlot, timeoutMs = 1500): Promise<boolean> {
+export async function localSlotAlive(
+  slot: LocalSlot,
+  timeoutMs = 1500,
+): Promise<boolean> {
   try {
-    const res = await fetch(new URL("models", `${slot.baseURL.replace(/\/$/, "")}/`), {
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    const res = await fetch(
+      new URL(
+        "models",
+        `${slot.baseURL.replace(/\/$/, "")}/`,
+      ),
+      {
+        signal: AbortSignal.timeout(timeoutMs),
+      },
+    );
     return res.ok;
   } catch {
     return false;

@@ -1,42 +1,27 @@
 /**
- * 03-constrain.ts — AXIS: CONSTRAIN. Caps on time and money as first-class inputs.
+ * 03 — CONSTRAIN: caps as first-class inputs
  *
- *   bun run snippet:03 -- --budget-usd 0.20 --deadline-ms 60000
+ * Money: Ledger.reserve() subtracts BEFORE fan-out, so
+ * four workers cannot each look affordable and
+ * collectively overspend. Time: the deadline is an
+ * AbortSignal passed as config.signal, so in-flight
+ * calls are cancelled rather than waited out.
  *
- * WHAT THIS PRINTS
- *   1. RUN A: the same tournament as snippet 01, but every worker RESERVES budget before it
- *      is dispatched and RECONCILES afterwards. The reserved-vs-actual gap is the table.
- *   2. RUN B: the identical tournament with `--budget-usd 0.02`. Some workers never start,
- *      and the run says which and why.
- *   3. RUN C: a 3-second deadline. Dispatch is cancelled, in-flight calls are aborted, and
- *      the ledger prints `billed anyway` — money the provider charged for work we discarded.
- *   4. The consequential path: applying the patch to main is gated by a human, and the gate
- *      does not care how much budget is left. The interrupt payload and the denial are both
- *      printed.
+ * Three runs: normal caps, a $0.02 budget that starves
+ * the fan-out, and a 3-second deadline whose ledger
+ * prints what was billed anyway. Then the human gate,
+ * which does not care how much budget is left.
  *
- * THE MECHANISM
- *   - Money: `Ledger.reserve()` subtracts from the budget BEFORE the fan-out. A reservation
- *     that cannot be taken throws `BudgetExhausted`, so four workers cannot each look
- *     affordable and collectively overspend. `releaseAndCharge()` reconciles.
- *   - Time: the deadline is an `AbortSignal` passed as `config.signal`, so LangGraph cancels
- *     in-flight model calls rather than waiting them out. `recursionLimit` is the independent
- *     backstop.
- *   - Middleware: `modelCallLimitMiddleware` and `toolCallLimitMiddleware` are the built-in
- *     caps; a custom `createMiddleware({ wrapModelCall })` posts real token usage to the
- *     ledger from inside the call.
- *   - Consequential: `humanInTheLoopMiddleware({ interruptOn: { apply_patch_to_main: {...} } })`
- *     on the agent that owns the tool. It needs a checkpointer, so the agent gets one.
+ *   bun run snippet:03 -- --budget-usd 0.20
  *
- * WHAT IT COSTS
- *   Three tournaments, but two of them stop early on purpose. Roughly $0.05-$0.08 total.
- *   The HITL section is denied before the tool runs, so it costs one small model call.
- *
- * SKIPS
- *   `skipped: OPENAI_API_KEY is not set`.
+ * Roughly $0.05-$0.08.
  */
 
 import * as z from "zod";
-import { Command, MemorySaver } from "@langchain/langgraph";
+import {
+  Command,
+  MemorySaver,
+} from "@langchain/langgraph";
 import {
   createAgent,
   createMiddleware,
@@ -47,35 +32,72 @@ import {
 } from "langchain";
 import { HumanMessage } from "@langchain/core/messages";
 import { Caps } from "../lib/caps.ts";
-import { BudgetExhausted, Ledger, type Reservation } from "../lib/ledger.ts";
-import { WORKER_MODEL, hasOpenAIKey } from "../lib/models.ts";
-import { estimateCostUsd, readUsage, usd } from "../lib/prices.ts";
-import { PROFILES, profileByName } from "../lib/profiles.ts";
+import {
+  BudgetExhausted,
+  Ledger,
+  type Reservation,
+} from "../lib/ledger.ts";
+import {
+  WORKER_MODEL,
+  hasOpenAIKey,
+} from "../lib/models.ts";
+import {
+  estimateCostUsd,
+  readUsage,
+  usd,
+} from "../lib/prices.ts";
+import {
+  PROFILES,
+  profileByName,
+} from "../lib/profiles.ts";
 import { candidateRows } from "../lib/judge.ts";
 import { startTracing } from "../lib/trace.ts";
 import type { AttemptResult } from "../graphs/compete.ts";
-import { attemptOnce, runTournament, type AttemptContext } from "./01-compete.ts";
-import { header, kv, note, recordSpend, section, skip, table } from "../lib/print.ts";
+import {
+  attemptOnce,
+  runTournament,
+  type AttemptContext,
+} from "./01-compete.ts";
+import {
+  header,
+  kv,
+  note,
+  recordSpend,
+  section,
+  skip,
+  table,
+} from "../lib/print.ts";
 
-const REQUEST = "Fix runWhenReady so all readiness tests pass.";
+const REQUEST =
+  "Fix runWhenReady so all readiness tests pass.";
 
-// ---------------------------------------------------------------------------
-// CONSTRAIN / custom middleware: usage accounting from inside the model call.
+// ----------------------------------------
+// CONSTRAIN / custom middleware: usage accounting from
+// inside the model call.
 //
-// `wrapModelCall` runs around each model call and can see the response, so this is the one
-// place where real token usage is available *at the moment it is produced* rather than
-// reconstructed afterwards. Every agent in this snippet carries it.
-// ---------------------------------------------------------------------------
+// `wrapModelCall` runs around each model call and can
+// see the response, so this is the one place where real
+// token usage is available *at the moment it is
+// produced* rather than reconstructed afterwards. Every
+// agent in this snippet carries it.
+// ----------------------------------------
 
-function ledgerMiddleware(onUsage: (costUsd: number, note: string) => void, modelId: string) {
+function ledgerMiddleware(
+  onUsage: (costUsd: number, note: string) => void,
+  modelId: string,
+) {
   return createMiddleware({
     name: "LedgerMiddleware",
     wrapModelCall: async (request, handler) => {
       const started = Date.now();
       const response = await handler(request);
-      // `response` here is the AIMessage the model produced (or the result of the inner
-      // middleware layer). usage_metadata is on it.
-      const usage = readUsage((response as { result?: unknown[] }).result?.[0] ?? response);
+      // `response` here is the AIMessage the model
+      // produced (or the result of the inner middleware
+      // layer). usage_metadata is on it.
+      const usage = readUsage(
+        (response as { result?: unknown[] })
+          .result?.[0] ?? response,
+      );
       const costUsd = estimateCostUsd(modelId, usage);
       onUsage(
         costUsd,
@@ -86,17 +108,19 @@ function ledgerMiddleware(onUsage: (costUsd: number, note: string) => void, mode
   });
 }
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------
 // CONSTRAIN / reserve then reconcile.
 //
-// This is snippet 01's `attemptOnce`, wrapped. The wrapper does three things:
+// This is snippet 01's `attemptOnce`, wrapped. The
+// wrapper does three things:
 //   1. reserves the profile's estimated cost BEFORE dispatching,
 //   2. refuses to dispatch when the reservation cannot be taken,
 //   3. reconciles the reservation against the real cost afterwards.
 //
-// Everything else about the tournament is unchanged, which is the point: constraining is a
-// property you add to a fan-out, not a different fan-out.
-// ---------------------------------------------------------------------------
+// Everything else about the tournament is unchanged,
+// which is the point: constraining is a property you
+// add to a fan-out, not a different fan-out.
+// ----------------------------------------
 
 interface ReserveRecord {
   profile: string;
@@ -109,14 +133,26 @@ interface ReserveRecord {
 function reservingAttempt(
   ctx: AttemptContext,
   records: ReserveRecord[],
-): (profileName: string, buggySource: string) => Promise<AttemptResult> {
+): (
+  profileName: string,
+  buggySource: string,
+) => Promise<AttemptResult> {
   return async (profileName, buggySource) => {
     const profile = profileByName(profileName);
-    if (!profile) return { kind: "skipped", profile: profileName, reason: "unknown profile" };
+    if (!profile)
+      return {
+        kind: "skipped",
+        profile: profileName,
+        reason: "unknown profile",
+      };
 
     let reservation: Reservation;
     try {
-      reservation = ctx.ledger.reserve(`attempt:${profileName}`, profileName, profile.estimateUsd);
+      reservation = ctx.ledger.reserve(
+        `attempt:${profileName}`,
+        profileName,
+        profile.estimateUsd,
+      );
     } catch (error) {
       const reason =
         error instanceof BudgetExhausted
@@ -129,17 +165,28 @@ function reservingAttempt(
         outcome: "refused",
         detail: reason,
       });
-      return { kind: "skipped", profile: profileName, reason };
+      return {
+        kind: "skipped",
+        profile: profileName,
+        reason,
+      };
     }
 
-    const result = await attemptOnce(profileName, buggySource, {
-      ...ctx,
-      // The wrapper settles money; `attemptOnce` must not also charge the ledger.
-      chargeLedger: false,
-    });
+    const result = await attemptOnce(
+      profileName,
+      buggySource,
+      {
+        ...ctx,
+        // The wrapper settles money; `attemptOnce` must
+        // not also charge the ledger.
+        chargeLedger: false,
+      },
+    );
 
     if (result.kind === "candidate") {
-      reservation.releaseAndCharge(result.candidate.costUsd);
+      reservation.releaseAndCharge(
+        result.candidate.costUsd,
+      );
       records.push({
         profile: profileName,
         reservedUsd: profile.estimateUsd,
@@ -151,16 +198,27 @@ function reservingAttempt(
             : `under by ${usd(profile.estimateUsd - result.candidate.costUsd)}`,
       });
     } else {
-      // The worker produced nothing. Whether the provider billed us anyway depends on how
-      // far the call got — a cancelled-in-flight call usually IS billed. Recording it as
-      // `billedAnyway` is the honest default rather than pretending it was free.
+      // The worker produced nothing. Whether the
+      // provider billed us anyway depends on how far
+      // the call got — a cancelled-in-flight call
+      // usually IS billed. Recording it as
+      // `billedAnyway` is the honest default rather
+      // than pretending it was free.
       reservation.release();
-      const cancelled = /deadline|budget|cancel|abort/i.test(result.reason);
-      if (cancelled) ctx.ledger.chargeBilledAnyway(profile.estimateUsd * 0.5);
+      const cancelled =
+        /deadline|budget|cancel|abort/i.test(
+          result.reason,
+        );
+      if (cancelled)
+        ctx.ledger.chargeBilledAnyway(
+          profile.estimateUsd * 0.5,
+        );
       records.push({
         profile: profileName,
         reservedUsd: profile.estimateUsd,
-        actualUsd: cancelled ? profile.estimateUsd * 0.5 : 0,
+        actualUsd: cancelled
+          ? profile.estimateUsd * 0.5
+          : 0,
         outcome: "released",
         detail: cancelled
           ? `cancelled in flight; charged ~half the estimate as billed-anyway (${result.reason})`
@@ -171,9 +229,9 @@ function reservingAttempt(
   };
 }
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------
 // CONSTRAIN / one constrained tournament run.
-// ---------------------------------------------------------------------------
+// ----------------------------------------
 
 interface RunOutcome {
   label: string;
@@ -191,10 +249,18 @@ async function constrainedRun(
   deadlineMs: number,
   callbacks: unknown[],
 ): Promise<RunOutcome> {
-  const caps = new Caps({ budgetUsd, deadlineMs, flags: {} });
+  const caps = new Caps({
+    budgetUsd,
+    deadlineMs,
+    flags: {},
+  });
   const ledger = new Ledger(budgetUsd);
   const records: ReserveRecord[] = [];
-  const ctx: AttemptContext = { caps, ledger, callbacks };
+  const ctx: AttemptContext = {
+    caps,
+    ledger,
+    callbacks,
+  };
 
   const result = await runTournament({
     caps,
@@ -202,20 +268,35 @@ async function constrainedRun(
     callbacks,
     request: REQUEST,
     attempt: reservingAttempt(ctx, records),
-    // Under a tight budget the rubric judge is the first thing to cut: the deterministic
-    // gate already produced a defensible answer for free.
+    // Under a tight budget the rubric judge is the
+    // first thing to cut: the deterministic gate
+    // already produced a defensible answer for free.
     rubricEnabled: budgetUsd >= 0.05,
   }).catch((error) => ({
     candidates: [],
-    skipped: [{ profile: "all", reason: error instanceof Error ? error.message : String(error) }],
+    skipped: [
+      {
+        profile: "all",
+        reason:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+    ],
     winner: null,
-    stopReason: error instanceof Error ? error.message : String(error),
+    stopReason:
+      error instanceof Error
+        ? error.message
+        : String(error),
   }));
 
-  // A cancelled fan-out resolves the graph before its in-flight workers have finished
-  // unwinding, and those workers are the ones that release reservations and record
-  // billed-anyway spend. Give them a moment to settle, otherwise the printed ledger under-
-  // reports the cost of the deadline — which is exactly the number this snippet exists to
+  // A cancelled fan-out resolves the graph before its
+  // in-flight workers have finished unwinding, and
+  // those workers are the ones that release
+  // reservations and record billed-anyway spend. Give
+  // them a moment to settle, otherwise the printed
+  // ledger under- reports the cost of the deadline —
+  // which is exactly the number this snippet exists to
   // show honestly.
   await Bun.sleep(1500);
 
@@ -225,10 +306,16 @@ async function constrainedRun(
     caps,
     ledger,
     records,
-    candidateTable: candidateRows(result.candidates, result.winner),
+    candidateTable: candidateRows(
+      result.candidates,
+      result.winner,
+    ),
     skipped: result.skipped,
     stopReason:
-      result.stopReason || (stop ? `${stop.kind}: ${stop.detail}` : "both caps respected"),
+      result.stopReason ||
+      (stop
+        ? `${stop.kind}: ${stop.detail}`
+        : "both caps respected"),
   };
   caps.dispose();
   return outcome;
@@ -237,14 +324,30 @@ async function constrainedRun(
 function printRun(run: RunOutcome) {
   section(`${run.label} — ${run.caps.describe()}`);
   if (run.candidateTable.length > 0) {
-    table(["profile", "tests", "rubric", "cost", "ms", "note"], run.candidateTable);
+    table(
+      [
+        "profile",
+        "tests",
+        "rubric",
+        "cost",
+        "ms",
+        "note",
+      ],
+      run.candidateTable,
+    );
   } else {
     console.log("  no candidate completed");
   }
 
   console.log("");
   table(
-    ["profile", "reserved", "actual", "outcome", "detail"],
+    [
+      "profile",
+      "reserved",
+      "actual",
+      "outcome",
+      "detail",
+    ],
     run.records.map((r) => [
       r.profile,
       usd(r.reservedUsd),
@@ -260,25 +363,43 @@ function printRun(run: RunOutcome) {
     [
       ["budget", usd(run.ledger.budgetUsd)],
       ["charged", usd(run.ledger.charged)],
-      ["billed anyway (discarded)", usd(run.ledger.billedAnyway)],
-      ["still reserved (leak if > 0)", usd(run.ledger.reserved)],
-      ["elapsed", `${run.caps.elapsedMs}ms of ${run.caps.deadlineMs}ms`],
+      [
+        "billed anyway (discarded)",
+        usd(run.ledger.billedAnyway),
+      ],
+      [
+        "still reserved (leak if > 0)",
+        usd(run.ledger.reserved),
+      ],
+      [
+        "elapsed",
+        `${run.caps.elapsedMs}ms of ${run.caps.deadlineMs}ms`,
+      ],
       ["stopped because", run.stopReason],
     ],
   );
 }
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------
 // CONSTRAIN / the consequential path.
 //
-// "Apply the patch to main and push" is not a cheaper or slower version of the tournament.
-// It is a different KIND of action, and it routes to a human regardless of remaining budget.
-// `humanInTheLoopMiddleware` turns the tool call into an `interrupt`, which needs a
-// checkpointer to survive the pause.
-// ---------------------------------------------------------------------------
+// "Apply the patch to main and push" is not a cheaper
+// or slower version of the tournament. It is a
+// different KIND of action, and it routes to a human
+// regardless of remaining budget.
+// `humanInTheLoopMiddleware` turns the tool call into
+// an `interrupt`, which needs a checkpointer to survive
+// the pause.
+// ----------------------------------------
 
-async function consequentialPath(caps: Caps, ledger: Ledger, callbacks: unknown[]) {
-  section("consequential action: apply the winning patch to main");
+async function consequentialPath(
+  caps: Caps,
+  ledger: Ledger,
+  callbacks: unknown[],
+) {
+  section(
+    "consequential action: apply the winning patch to main",
+  );
 
   let applied = false;
   const applyPatchToMain = tool(
@@ -288,10 +409,15 @@ async function consequentialPath(caps: Caps, ledger: Ledger, callbacks: unknown[
     },
     {
       name: "apply_patch_to_main",
-      description: "Apply the winning readiness patch to the main branch and push it.",
+      description:
+        "Apply the winning readiness patch to the main branch and push it.",
       schema: z.object({
-        branch: z.string().describe("Branch to push to"),
-        summary: z.string().describe("One-line commit summary"),
+        branch: z
+          .string()
+          .describe("Branch to push to"),
+        summary: z
+          .string()
+          .describe("One-line commit summary"),
       }),
     },
   );
@@ -302,14 +428,20 @@ async function consequentialPath(caps: Caps, ledger: Ledger, callbacks: unknown[
   const agent = createAgent({
     model: WORKER_MODEL,
     tools: [applyPatchToMain],
-    // A checkpointer is REQUIRED for human-in-the-loop: the interrupt has to survive the
-    // pause between the two invocations below.
+    // A checkpointer is REQUIRED for human-in-the-loop:
+    // the interrupt has to survive the pause between
+    // the two invocations below.
     checkpointer,
     systemPrompt:
       "You apply approved patches. When asked to apply a patch, call apply_patch_to_main once.",
     middleware: [
-      // Built-in caps. Verified names in langchain@1.5.10.
-      modelCallLimitMiddleware({ runLimit: 3, threadLimit: 6, exitBehavior: "end" }),
+      // Built-in caps. Verified names in
+      // langchain@1.5.10.
+      modelCallLimitMiddleware({
+        runLimit: 3,
+        threadLimit: 6,
+        exitBehavior: "end",
+      }),
       toolCallLimitMiddleware({
         toolName: "apply_patch_to_main",
         runLimit: 1,
@@ -320,11 +452,16 @@ async function consequentialPath(caps: Caps, ledger: Ledger, callbacks: unknown[
         ledger.charge(cost);
         caps.charge(cost);
       }, WORKER_MODEL),
-      // The gate. It fires before the tool runs, and it does not consult the budget.
+      // The gate. It fires before the tool runs, and it
+      // does not consult the budget.
       humanInTheLoopMiddleware({
         interruptOn: {
           apply_patch_to_main: {
-            allowedDecisions: ["approve", "edit", "reject"],
+            allowedDecisions: [
+              "approve",
+              "edit",
+              "reject",
+            ],
             description:
               "Applying a patch to main is irreversible from the agent's side. A human decides.",
           },
@@ -334,12 +471,15 @@ async function consequentialPath(caps: Caps, ledger: Ledger, callbacks: unknown[
   });
 
   const config = {
-    configurable: { thread_id: `consequential-${Date.now()}` },
+    configurable: {
+      thread_id: `consequential-${Date.now()}`,
+    },
     callbacks: callbacks as never,
     recursionLimit: 8,
     metadata: {
       profile: "consequential",
-      whyItExisted: "an irreversible action; a human decides regardless of remaining budget",
+      whyItExisted:
+        "an irreversible action; a human decides regardless of remaining budget",
       outcome: "pending",
       costUsd: 0,
       latencyMs: 0,
@@ -349,7 +489,9 @@ async function consequentialPath(caps: Caps, ledger: Ledger, callbacks: unknown[
 
   kv("budget remaining", usd(caps.remainingUsd));
   kv("time remaining", `${caps.remainingMs}ms`);
-  note("neither number is consulted below: consequential actions route to a human either way");
+  note(
+    "neither number is consulted below: consequential actions route to a human either way",
+  );
 
   const first = await agent.invoke(
     {
@@ -363,35 +505,55 @@ async function consequentialPath(caps: Caps, ledger: Ledger, callbacks: unknown[
     config,
   );
 
-  // -------------------------------------------------------------------------
-  // The interrupt payload. This is what a human is actually shown.
-  // -------------------------------------------------------------------------
-  const interrupts = (first as { __interrupt__?: { value: unknown }[] }).__interrupt__ ?? [];
+  // ----------------------------------------
+  // The interrupt payload. This is what a human is
+  // actually shown.
+  // ----------------------------------------
+  const interrupts =
+    (first as { __interrupt__?: { value: unknown }[] })
+      .__interrupt__ ?? [];
   if (interrupts.length === 0) {
-    console.log("  NO INTERRUPT was raised — the human gate did not fire. That is a bug.");
+    console.log(
+      "  NO INTERRUPT was raised — the human gate did not fire. That is a bug.",
+    );
     console.log(`  tool actually executed: ${applied}`);
     return;
   }
 
   console.log("");
-  console.log("  --- interrupt payload (what the human sees) ---");
+  console.log(
+    "  --- interrupt payload (what the human sees) ---",
+  );
   const payload = interrupts[0]!.value as {
-    actionRequests?: { name: string; args: Record<string, unknown>; description?: string }[];
-    reviewConfigs?: { actionName: string; allowedDecisions: string[] }[];
+    actionRequests?: {
+      name: string;
+      args: Record<string, unknown>;
+      description?: string;
+    }[];
+    reviewConfigs?: {
+      actionName: string;
+      allowedDecisions: string[];
+    }[];
   };
   for (const req of payload.actionRequests ?? []) {
     console.log(`    action: ${req.name}`);
-    console.log(`    args:   ${JSON.stringify(req.args)}`);
-    if (req.description) console.log(`    why:    ${req.description}`);
+    console.log(
+      `    args:   ${JSON.stringify(req.args)}`,
+    );
+    if (req.description)
+      console.log(`    why:    ${req.description}`);
   }
   for (const cfg of payload.reviewConfigs ?? []) {
-    console.log(`    decisions allowed: ${cfg.allowedDecisions.join(", ")}`);
+    console.log(
+      `    decisions allowed: ${cfg.allowedDecisions.join(", ")}`,
+    );
   }
 
-  // -------------------------------------------------------------------------
-  // The denial. Resume with a Command carrying a `reject` decision. The tool never
-  // runs, and the agent has to say so out loud.
-  // -------------------------------------------------------------------------
+  // ----------------------------------------
+  // The denial. Resume with a Command carrying a
+  // `reject` decision. The tool never runs, and the
+  // agent has to say so out loud.
+  // ----------------------------------------
   const resumed = await agent.invoke(
     new Command({
       resume: {
@@ -407,11 +569,16 @@ async function consequentialPath(caps: Caps, ledger: Ledger, callbacks: unknown[
     config,
   );
 
-  const last = (resumed.messages as { content: unknown }[]).at(-1);
+  const last = (
+    resumed.messages as { content: unknown }[]
+  ).at(-1);
   console.log("");
   console.log("  --- after the denial ---");
   kv("tool executed", String(applied));
-  kv("agent said", String(last?.content ?? "").slice(0, 300));
+  kv(
+    "agent said",
+    String(last?.content ?? "").slice(0, 300),
+  );
   kv("middleware-metered cost", usd(middlewareCost));
   note(
     "the deterministic fact is `tool executed = false`. The agent's sentence is commentary; " +
@@ -419,13 +586,14 @@ async function consequentialPath(caps: Caps, ledger: Ledger, callbacks: unknown[
   );
 }
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------
 // CLI
-// ---------------------------------------------------------------------------
+// ----------------------------------------
 
 async function main() {
   const caps = Caps.fromArgv();
-  if (!hasOpenAIKey()) skip("OPENAI_API_KEY is not set");
+  if (!hasOpenAIKey())
+    skip("OPENAI_API_KEY is not set");
 
   const tracing = startTracing();
   header(
@@ -444,7 +612,8 @@ async function main() {
     ]),
   );
 
-  // RUN A: enough of everything. The reserved-vs-actual gap is the interesting column.
+  // RUN A: enough of everything. The reserved-vs-actual
+  // gap is the interesting column.
   const runA = await constrainedRun(
     "RUN A: generous",
     Math.min(caps.budgetUsd, 0.2),
@@ -453,16 +622,28 @@ async function main() {
   );
   printRun(runA);
 
-  // RUN B: the budget cannot cover the whole fan-out. Workers are refused BEFORE dispatch.
-  const runB = await constrainedRun("RUN B: --budget-usd 0.02", 0.02, 90_000, tracing.callbacks);
+  // RUN B: the budget cannot cover the whole fan-out.
+  // Workers are refused BEFORE dispatch.
+  const runB = await constrainedRun(
+    "RUN B: --budget-usd 0.02",
+    0.02,
+    90_000,
+    tracing.callbacks,
+  );
   printRun(runB);
   note(
     "the refusals happened at reservation time, before any HTTP request: the budget is a " +
       "gate on dispatch, not a report written afterwards",
   );
 
-  // RUN C: not enough time. Dispatch is cancelled and in-flight calls are aborted.
-  const runC = await constrainedRun("RUN C: --deadline-ms 3000", 0.2, 3_000, tracing.callbacks);
+  // RUN C: not enough time. Dispatch is cancelled and
+  // in-flight calls are aborted.
+  const runC = await constrainedRun(
+    "RUN C: --deadline-ms 3000",
+    0.2,
+    3_000,
+    tracing.callbacks,
+  );
   printRun(runC);
   note(
     "`billed anyway` is the honest column: a model call cancelled mid-flight is usually still " +
@@ -471,11 +652,22 @@ async function main() {
 
   // The consequential path, on the outer caps.
   const outerLedger = new Ledger(caps.budgetUsd);
-  await consequentialPath(caps, outerLedger, tracing.callbacks);
+  await consequentialPath(
+    caps,
+    outerLedger,
+    tracing.callbacks,
+  );
 
   section("summary");
   table(
-    ["run", "budget", "charged", "billed anyway", "elapsed", "stopped because"],
+    [
+      "run",
+      "budget",
+      "charged",
+      "billed anyway",
+      "elapsed",
+      "stopped because",
+    ],
     [runA, runB, runC].map((r) => [
       r.label,
       usd(r.ledger.budgetUsd),
@@ -487,9 +679,13 @@ async function main() {
   );
 
   const total =
-    runA.ledger.charged + runB.ledger.charged + runC.ledger.charged + outerLedger.charged;
-  // This snippet prints its own summary instead of `ledgerTable`, so it records its spend
-  // for `bun run all` explicitly.
+    runA.ledger.charged +
+    runB.ledger.charged +
+    runC.ledger.charged +
+    outerLedger.charged;
+  // This snippet prints its own summary instead of
+  // `ledgerTable`, so it records its spend for `bun run
+  // all` explicitly.
   recordSpend(total);
   console.log("");
   console.log(

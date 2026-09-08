@@ -1,16 +1,25 @@
 /**
  * bun run all
  *
- * Runs 00 through 07 in order, each as its own child process so a snippet that
+ * Runs 00 through 07 in order, each as its own child
+ * process so a snippet that
  * dies takes only itself with it. Every snippet prints a `#SPEND_USD` marker;
- * this script sums them and prints the total at the end.
+ * this script sums them and prints the total at the
+ * end.
  *
- * The per-snippet caps below add up to the $0.25 total the plan budgets for a
- * full pass. They are deliberately not equal: the tournament snippets are
+ * The per-snippet caps below add up to the $0.25 total
+ * the plan budgets for a full pass. They are
+ * deliberately not equal: the tournament snippets are
  * where the money goes, and the router is nearly free.
  */
 import { PKG_ROOT } from "./setup.js";
-import { SPEND_MARKER, header, section, table, usd } from "./print.js";
+import {
+  SPEND_MARKER,
+  header,
+  section,
+  table,
+  usd,
+} from "./print.js";
 
 interface SnippetPlan {
   id: string;
@@ -88,7 +97,9 @@ interface Outcome {
   detail: string;
 }
 
-async function runOne(plan: SnippetPlan): Promise<Outcome> {
+async function runOne(
+  plan: SnippetPlan,
+): Promise<Outcome> {
   const started = Date.now();
   const proc = Bun.spawn(
     [
@@ -100,7 +111,12 @@ async function runOne(plan: SnippetPlan): Promise<Outcome> {
       "--deadline-ms",
       String(plan.deadlineMs),
     ],
-    { cwd: PKG_ROOT, env: process.env, stdout: "pipe", stderr: "pipe" },
+    {
+      cwd: PKG_ROOT,
+      env: process.env,
+      stdout: "pipe",
+      stderr: "pipe",
+    },
   );
 
   const [stdout, stderr, exitCode] = await Promise.all([
@@ -109,37 +125,55 @@ async function runOne(plan: SnippetPlan): Promise<Outcome> {
     proc.exited,
   ]);
 
-  // The child's own one-screen output is the point of running it; print it.
+  // The child's own one-screen output is the point of
+  // running it; print it.
   process.stdout.write(stdout);
   if (exitCode !== 0) process.stderr.write(stderr);
 
   const spent = parseSpend(stdout);
-  // Take the LAST stop banner: snippets that run several passes (03) print
-  // one per pass, and the final one is the run's verdict.
-  const stopLines = [...stdout.matchAll(/^\s*reason: (.*)$/gm)].map((m) => m[1]!.trim());
-  const stopLine = stopLines[stopLines.length - 1] ?? "";
+  // Take the LAST stop banner: snippets that run
+  // several passes (03) print one per pass, and the
+  // final one is the run's verdict.
+  const stopLines = [
+    ...stdout.matchAll(/^\s*reason: (.*)$/gm),
+  ].map((m) => m[1]!.trim());
+  const stopLine =
+    stopLines[stopLines.length - 1] ?? "";
   return {
     id: plan.id,
     status: exitCode === 0 ? "ran" : "failed",
     exitCode,
     spentUsd: spent,
     wallMs: Date.now() - started,
-    detail: exitCode === 0 ? stopLine : lastLine(stderr),
+    detail:
+      exitCode === 0 ? stopLine : lastLine(stderr),
   };
 }
 
 function parseSpend(output: string): number {
-  const m = output.match(new RegExp(`${SPEND_MARKER}\\s+\\S+\\s+([0-9.]+)`));
+  const m = output.match(
+    new RegExp(`${SPEND_MARKER}\\s+\\S+\\s+([0-9.]+)`),
+  );
   return m ? Number(m[1]) : 0;
 }
 
 function lastLine(text: string): string {
   const lines = text.trim().split("\n").filter(Boolean);
-  return (lines[lines.length - 1] ?? "no stderr").slice(0, 90);
+  return (lines[lines.length - 1] ?? "no stderr").slice(
+    0,
+    90,
+  );
 }
 
-const only = process.argv.slice(2).filter((a) => !a.startsWith("--"));
-const selected = only.length > 0 ? PLAN.filter((p) => only.some((o) => p.id.includes(o))) : PLAN;
+const only = process.argv
+  .slice(2)
+  .filter((a) => !a.startsWith("--"));
+const selected =
+  only.length > 0
+    ? PLAN.filter((p) =>
+        only.some((o) => p.id.includes(o)),
+      )
+    : PLAN;
 
 header(
   "scaling-ai-agents · Mastra · full pass",
@@ -151,7 +185,10 @@ for (const plan of selected) {
   outcomes.push(await runOne(plan));
 }
 
-header("summary", "per snippet: did it run, what did it cost, why did it stop");
+header(
+  "summary",
+  "per snippet: did it run, what did it cost, why did it stop",
+);
 table(
   outcomes.map((o) => {
     const p = selected.find((s) => s.id === o.id)!;
@@ -168,10 +205,23 @@ table(
 );
 
 section("total");
-const total = outcomes.reduce((s, o) => s + o.spentUsd, 0);
-console.log(`  spend across all snippets: ${usd(total)}`);
-console.log(`  wall time: ${(outcomes.reduce((s, o) => s + o.wallMs, 0) / 1000).toFixed(1)}s`);
-console.log(`  failures: ${outcomes.filter((o) => o.status === "failed").length}`);
-console.log("  costs are estimates from token usage against src/fixtures/prices.json, not a bill.");
+const total = outcomes.reduce(
+  (s, o) => s + o.spentUsd,
+  0,
+);
+console.log(
+  `  spend across all snippets: ${usd(total)}`,
+);
+console.log(
+  `  wall time: ${(outcomes.reduce((s, o) => s + o.wallMs, 0) / 1000).toFixed(1)}s`,
+);
+console.log(
+  `  failures: ${outcomes.filter((o) => o.status === "failed").length}`,
+);
+console.log(
+  "  costs are estimates from token usage against src/fixtures/prices.json, not a bill.",
+);
 
-process.exit(outcomes.some((o) => o.status === "failed") ? 1 : 0);
+process.exit(
+  outcomes.some((o) => o.status === "failed") ? 1 : 0,
+);

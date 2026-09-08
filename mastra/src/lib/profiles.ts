@@ -1,15 +1,18 @@
 /**
  * Compete: many solutions, one problem.
  *
- * Four competitors on the same task. Three are the same cheap model under
- * different instructions; one is a frontier model. That split is the point:
- * most of the diversity in a tournament comes from the prompt, not the price
- * tag, and the table at the end shows whether the expensive slot earned its
- * cost on this particular problem.
+ * Four competitors on the same task. Three are the same
+ * cheap model under different instructions; one is a
+ * frontier model. That split is the point: most of the
+ * diversity in a tournament comes from the prompt, not
+ * the price tag, and the table at the end shows whether
+ * the expensive slot earned its cost on this particular
+ * problem.
  *
- * Each competitor carries `whyItExisted` — a sentence explaining what this
- * worker is for that the others are not. If you cannot write that sentence,
- * the worker is a duplicate and should not be dispatched.
+ * Each competitor carries `whyItExisted` — a sentence
+ * explaining what this worker is for that the others
+ * are not. If you cannot write that sentence, the
+ * worker is a duplicate and should not be dispatched.
  */
 import { Agent } from "@mastra/core/agent";
 import { z } from "zod";
@@ -27,7 +30,11 @@ export const patchSchema = z.object({
     .describe(
       "The complete new contents of readiness.ts. Not a diff. No markdown fences, no prose.",
     ),
-  rationale: z.string().describe("One or two sentences on what you changed and why."),
+  rationale: z
+    .string()
+    .describe(
+      "One or two sentences on what you changed and why.",
+    ),
 });
 
 export type PatchProposal = z.infer<typeof patchSchema>;
@@ -137,7 +144,9 @@ Be direct and complete. Return only the file contents.`,
   };
 }
 
-export function buildTaskPrompt(buggySource: string): string {
+export function buildTaskPrompt(
+  buggySource: string,
+): string {
   return `Here is the current, buggy contents of readiness.ts:
 
 \`\`\`ts
@@ -158,15 +167,22 @@ Return the complete new file.`;
 }
 
 /** Build the Mastra Agent for one competitor. */
-export function agentFor(profile: CompetitorProfile): Agent {
-  const local = profile.kind === "local" ? localModelConfig() : null;
+export function agentFor(
+  profile: CompetitorProfile,
+): Agent {
+  const local =
+    profile.kind === "local"
+      ? localModelConfig()
+      : null;
   return new Agent({
     id: `competitor-${profile.id}`,
     name: `Competitor: ${profile.label}`,
     description: profile.whyItExisted,
     instructions: profile.instructions,
-    // The local slot is an OpenAI-compatible endpoint, not a router id, so it
-    // is passed as a model config object rather than a "provider/model" string.
+    // The local slot is an OpenAI-compatible endpoint,
+    // not a router id, so it is passed as a model
+    // config object rather than a "provider/model"
+    // string.
     model: (local ?? profile.model) as never,
   });
 }
@@ -174,7 +190,9 @@ export function agentFor(profile: CompetitorProfile): Agent {
 /** Strip markdown fences a model may have added despite the instructions. */
 export function cleanPatch(raw: string): string {
   let out = raw.trim();
-  const fence = out.match(/^```(?:ts|typescript)?\n([\s\S]*?)\n```$/);
+  const fence = out.match(
+    /^```(?:ts|typescript)?\n([\s\S]*?)\n```$/,
+  );
   if (fence && fence[1]) out = fence[1];
   return out.trim() + "\n";
 }

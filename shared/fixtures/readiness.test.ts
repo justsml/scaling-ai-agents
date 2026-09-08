@@ -1,4 +1,5 @@
-// The deterministic judge. Every candidate patch to readiness.ts must pass this file unchanged.
+// The deterministic judge. Every candidate patch to
+// readiness.ts must pass this file unchanged.
 import { describe, expect, test } from "bun:test";
 import { runWhenReady, type Probe } from "./readiness";
 
@@ -17,17 +18,24 @@ describe("runWhenReady", () => {
     const c = clock();
     let calls = 0;
     const probe: Probe = async () =>
-      calls++ < 3 ? { ok: false, code: "ECONNREFUSED" } : { ok: true };
+      calls++ < 3
+        ? { ok: false, code: "ECONNREFUSED" }
+        : { ok: true };
     let ran = 0;
-    const out = await runWhenReady(probe, async () => void ran++, {
-      deadlineMs: 5000,
-      baseDelayMs: 50,
-      ...c,
-    });
+    const out = await runWhenReady(
+      probe,
+      async () => void ran++,
+      {
+        deadlineMs: 5000,
+        baseDelayMs: 50,
+        ...c,
+      },
+    );
     expect(out.status).toBe("ran");
     expect(ran).toBe(1);
     expect(out.attempts).toBe(4);
-    // backoff: 50 + 100 + 200 = 350ms of simulated sleep, not 3 * 50
+    // backoff: 50 + 100 + 200 = 350ms of simulated
+    // sleep, not 3 * 50
     expect(c.now()).toBeGreaterThanOrEqual(350);
   });
 
@@ -58,7 +66,10 @@ describe("runWhenReady", () => {
     expect(out.status).toBe("denied");
     expect(probes).toBe(1);
     expect(ran).toBe(0);
-    if (out.status === "denied") expect(out.reason.toLowerCase()).toContain("eacces");
+    if (out.status === "denied")
+      expect(out.reason.toLowerCase()).toContain(
+        "eacces",
+      );
   });
 
   test("deadline: stops, explains, marks partial", async () => {
@@ -82,12 +93,18 @@ describe("runWhenReady", () => {
     const c = clock();
     let calls = 0;
     const probe: Probe = async () =>
-      calls++ < 1 ? { ok: false, code: "ETIMEDOUT" } : { ok: true };
-    const out = await runWhenReady(probe, async () => {}, {
-      deadlineMs: 5000,
-      baseDelayMs: 10,
-      ...c,
-    });
+      calls++ < 1
+        ? { ok: false, code: "ETIMEDOUT" }
+        : { ok: true };
+    const out = await runWhenReady(
+      probe,
+      async () => {},
+      {
+        deadlineMs: 5000,
+        baseDelayMs: 10,
+        ...c,
+      },
+    );
     expect(out.status).toBe("ran");
     expect(out.attempts).toBe(2);
   });

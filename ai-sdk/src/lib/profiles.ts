@@ -1,17 +1,20 @@
-// Model + instruction profiles shared by Compete (01), Constrain (03) and
-// Distribute (04). Three profiles of one model (minimal-diff, best-practices,
-// performance) plus one alternate frontier model compete on the same patch
-// task. Env vars override the model ids so a talk can swap models without
-// editing code.
+// Model + instruction profiles shared by Compete (01),
+// Constrain (03) and Distribute (04). Three profiles of
+// one model (minimal-diff, best-practices, performance)
+// plus a frontier slot compete on the same patch task.
+// Model ids are written out below; there is no env
+// override, so what you read is what runs.
 import { openai } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
 
-export const WORKER_MODEL_ID = process.env.MODEL_WORKER ?? "openai/gpt-5.6-luna";
-export const JUDGE_MODEL_ID = process.env.MODEL_JUDGE ?? "openai/gpt-5.6-luna";
-export const FRONTIER_MODEL_ID = process.env.MODEL_FRONTIER ?? "openai/gpt-5.6-luna";
+export const WORKER_MODEL_ID = "openai/gpt-5.6-luna";
+export const JUDGE_MODEL_ID = "openai/gpt-5.6-luna";
+export const FRONTIER_MODEL_ID = "openai/gpt-5.6-luna";
 
 function bare(id: string): string {
-  return id.includes("/") ? id.split("/").slice(1).join("/") : id;
+  return id.includes("/")
+    ? id.split("/").slice(1).join("/")
+    : id;
 }
 
 export function workerModel(): LanguageModel {

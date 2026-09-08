@@ -1,32 +1,31 @@
 /**
- * ============================================================================
  * 06 — REMOTE: the A2A worker on its own
- * ============================================================================
  *
- * 04 used a remote competitor as one entrant among several. This snippet is
- * just the remote worker, so the protocol is visible rather than incidental.
+ * 04 used a remote competitor as one entrant. Here it
+ * is alone, so the protocol is visible rather than
+ * incidental: spawn a second Mastra process, fetch its
+ * agent card, run message/stream through creation,
+ * status and artifact chunks, read the record back with
+ * tasks/get, then start a longer task and kill it with
+ * tasks/cancel.
  *
- *   1. Spawn a second Mastra instance in its own process (src/remote/).
- *   2. Fetch its agent card from the well-known URL and read what it publishes.
- *   3. `message/stream`: task creation, status transitions, artifact chunks.
- *   4. `tasks/get`: the task record after the fact.
- *   5. `tasks/cancel`: start a second, longer task and cancel it mid-flight.
- *   6. Shut the process down.
+ * Be precise about what the card hides, because the
+ * marketing answer and the observed answer differ. In
+ * @mastra/core 1.64 the card publishes the agent's
+ * INSTRUCTIONS as its description and every tool id as
+ * a skill. It genuinely hides the model, memory,
+ * storage, tool schemas and implementations. Treat the
+ * card as public and write instructions accordingly.
  *
- * What the card actually hides is worth being precise about, because the
- * marketing answer and the observed answer differ. In @mastra/core 1.64 the
- * card publishes the agent's INSTRUCTIONS as its `description` and every tool
- * id as a `skill`. What it genuinely hides is the model, the memory, the
- * storage, the tool schemas and the tool implementations. Treat the card as a
- * public document and write the agent's instructions accordingly.
- *
- * Run:
- *   bun run snippet:06 -- --budget-usd 0.02 --deadline-ms 60000
- *
- * Prints: the card, the task id, the status/artifact event table, the task
- * record, the cancellation result, the ledger and the stop reason.
+ *   bun run snippet:06 -- --budget-usd 0.02
  */
-import { parseCaps, deadlineHit, describeCaps, hasOpenAiKey, remainingMs } from "../lib/caps.js";
+import {
+  parseCaps,
+  deadlineHit,
+  describeCaps,
+  hasOpenAiKey,
+  remainingMs,
+} from "../lib/caps.js";
 import type { StopReason } from "../lib/caps.js";
 import { Ledger } from "../lib/ledger.js";
 import {
@@ -50,15 +49,25 @@ import {
   userMessage,
 } from "../lib/a2a.js";
 import { WORKER_MODEL } from "../lib/models.js";
-import { endWorkerSpan, shutdownTracing, startSnippetSpan, startWorkerSpan } from "../lib/spans.js";
+import {
+  endWorkerSpan,
+  shutdownTracing,
+  startSnippetSpan,
+  startWorkerSpan,
+} from "../lib/spans.js";
 import { mastra } from "../mastra/index.js";
 
 const SNIPPET = "06-remote-a2a";
 
 async function main(): Promise<void> {
   const caps = parseCaps();
-  const ledger = new Ledger({ budgetUsd: caps.budgetUsd, label: SNIPPET });
-  const snippetSpan = startSnippetSpan(SNIPPET, { caps: describeCaps(caps) });
+  const ledger = new Ledger({
+    budgetUsd: caps.budgetUsd,
+    label: SNIPPET,
+  });
+  const snippetSpan = startSnippetSpan(SNIPPET, {
+    caps: describeCaps(caps),
+  });
   let stopReason: StopReason = "completed";
   let stopDetail = "";
 
@@ -69,59 +78,86 @@ async function main(): Promise<void> {
 
   if (!hasOpenAiKey()) {
     section("skipped");
-    bullet("OPENAI_API_KEY is not set. The remote agent needs it to answer anything.");
+    bullet(
+      "OPENAI_API_KEY is not set. The remote agent needs it to answer anything.",
+    );
     stopBanner("no-api-key", caps);
     reportSpend(SNIPPET, 0);
     return;
   }
 
-  // -------------------------------------------------------------------------
+  // ----------------------------------------
   // 1. Bring the second process up.
   //
-  // `mastra dev` would also serve this, but the installed CLI (1.27.3) has no
+  // `mastra dev` would also serve this, but the
+  // installed CLI (1.27.3) has no
   // --port flag and bundles the project first. src/remote/server.ts mounts the
-  // Hono adapter on Bun.serve instead and is ready in milliseconds.
-  // -------------------------------------------------------------------------
+  // Hono adapter on Bun.serve instead and is ready in
+  // milliseconds.
+  // ----------------------------------------
   section("1. starting the remote process");
-  const startSpan = startWorkerSpan(snippetSpan, "remote:start", {});
+  const startSpan = startWorkerSpan(
+    snippetSpan,
+    "remote:start",
+    {},
+  );
   const t0 = Date.now();
-  const remote = await startRemoteServer({ timeoutMs: Math.min(20_000, remainingMs(caps)) });
+  const remote = await startRemoteServer({
+    timeoutMs: Math.min(20_000, remainingMs(caps)),
+  });
   if (!remote) {
-    ledger.skip("remote", "unknown", "the remote server did not answer its agent card in time");
-    bullet("the remote server did not come up. Nothing below can run.");
+    ledger.skip(
+      "remote",
+      "unknown",
+      "the remote server did not answer its agent card in time",
+    );
+    bullet(
+      "the remote server did not come up. Nothing below can run.",
+    );
     endWorkerSpan(startSpan, {
       profile: "remote:start",
       costUsd: 0,
       latencyMs: Date.now() - t0,
       outcome: "failed",
-      whyItExisted: "the whole snippet needs a second process to talk to",
+      whyItExisted:
+        "the whole snippet needs a second process to talk to",
     });
     ledgerTable(ledger);
-    stopBanner("dependency-missing", caps, "the A2A server process never became reachable");
+    stopBanner(
+      "dependency-missing",
+      caps,
+      "the A2A server process never became reachable",
+    );
     reportSpend(SNIPPET, 0);
     return;
   }
-  bullet(`up in ${Date.now() - t0}ms at ${REMOTE_BASE_URL}`);
+  bullet(
+    `up in ${Date.now() - t0}ms at ${REMOTE_BASE_URL}`,
+  );
   endWorkerSpan(startSpan, {
     profile: "remote:start",
     costUsd: 0,
     latencyMs: Date.now() - t0,
     outcome: "ready",
-    whyItExisted: "the whole snippet needs a second process to talk to",
+    whyItExisted:
+      "the whole snippet needs a second process to talk to",
   });
 
   try {
     const a2a = remote.client.getA2A(REMOTE_AGENT_ID);
 
-    // -----------------------------------------------------------------------
+    // ----------------------------------------
     // 2. Discovery.
-    // -----------------------------------------------------------------------
+    // ----------------------------------------
     section("2. the agent card");
     bullet(`well-known URL: ${REMOTE_CARD_URL}`);
     bullet(
       "note the /api prefix — it is part of the well-known path when the server uses the default apiPrefix.",
     );
-    const card = (await a2a.getAgentCard()) as Record<string, any>;
+    const card = (await a2a.getAgentCard()) as Record<
+      string,
+      any
+    >;
     json("agent card", {
       protocolVersion: card.protocolVersion,
       name: card.name,
@@ -135,12 +171,19 @@ async function main(): Promise<void> {
         description: s.description,
         tags: s.tags,
       })),
-      descriptionLength: String(card.description ?? "").length,
+      descriptionLength: String(card.description ?? "")
+        .length,
     });
 
-    section("what the card publishes, and what it does not");
+    section(
+      "what the card publishes, and what it does not",
+    );
     table([
-      { field: "name / url / version", published: "yes", note: "discovery needs these" },
+      {
+        field: "name / url / version",
+        published: "yes",
+        note: "discovery needs these",
+      },
       {
         field: "capabilities",
         published: "yes",
@@ -161,7 +204,11 @@ async function main(): Promise<void> {
         published: "no",
         note: "the caller cannot tell what is behind the endpoint",
       },
-      { field: "tool input/output schemas", published: "no", note: "only the ids appear" },
+      {
+        field: "tool input/output schemas",
+        published: "no",
+        note: "only the ids appear",
+      },
       {
         field: "memory / storage / threads",
         published: "no",
@@ -174,15 +221,30 @@ async function main(): Promise<void> {
       },
     ]);
 
-    // -----------------------------------------------------------------------
+    // ----------------------------------------
     // 3. message/stream.
-    // -----------------------------------------------------------------------
-    section("3. message/stream — task and artifact events");
-    const streamSpan = startWorkerSpan(snippetSpan, "remote:stream", {});
+    // ----------------------------------------
+    section(
+      "3. message/stream — task and artifact events",
+    );
+    const streamSpan = startWorkerSpan(
+      snippetSpan,
+      "remote:stream",
+      {},
+    );
     const t1 = Date.now();
-    ledger.reserve("remote:stream", WORKER_MODEL, 0.002);
+    ledger.reserve(
+      "remote:stream",
+      WORKER_MODEL,
+      0.002,
+    );
 
-    const events: Array<{ kind: string; state?: string; taskId?: string; append?: boolean }> = [];
+    const events: Array<{
+      kind: string;
+      state?: string;
+      taskId?: string;
+      append?: boolean;
+    }> = [];
     const assembler = new ArtifactAssembler();
     let taskId: string | undefined;
 
@@ -192,12 +254,18 @@ async function main(): Promise<void> {
       ),
     })) {
       const e = normalizeEvent(raw);
-      events.push({ kind: e.kind, state: e.state, taskId: e.taskId, append: e.append });
+      events.push({
+        kind: e.kind,
+        state: e.state,
+        taskId: e.taskId,
+        append: e.append,
+      });
       if (e.taskId && !taskId) taskId = e.taskId;
       assembler.push(e);
       if (deadlineHit(caps)) {
         stopReason = "deadline-hit";
-        stopDetail = "the deadline fired while the first task was still streaming";
+        stopDetail =
+          "the deadline fired while the first task was still streaming";
         break;
       }
     }
@@ -207,7 +275,14 @@ async function main(): Promise<void> {
     section("event shape (first and last few)");
     const shown = [
       ...events.slice(0, 3),
-      ...(events.length > 6 ? [{ kind: "…", state: `+${events.length - 6} more` }] : []),
+      ...(events.length > 6
+        ? [
+            {
+              kind: "…",
+              state: `+${events.length - 6} more`,
+            },
+          ]
+        : []),
       ...events.slice(-3),
     ];
     table(
@@ -219,14 +294,21 @@ async function main(): Promise<void> {
         taskId: (e as any).taskId ?? "-",
       })),
     );
-    bullet(`task id: ${taskId ?? "(none)"} · ${events.length} events · ${streamMs}ms`);
+    bullet(
+      `task id: ${taskId ?? "(none)"} · ${events.length} events · ${streamMs}ms`,
+    );
     bullet(
       "artifact-update chunks either REPLACE or APPEND. Concatenating blindly corrupts the artifact.",
     );
-    bullet(`remote said: ${answer.trim().slice(0, 220)}`);
+    bullet(
+      `remote said: ${answer.trim().slice(0, 220)}`,
+    );
 
     ledger.reconcile("remote:stream", {
-      usage: { inputTokens: 120, outputTokens: Math.ceil(answer.length / 4) },
+      usage: {
+        inputTokens: 120,
+        outputTokens: Math.ceil(answer.length / 4),
+      },
       latencyMs: streamMs,
       outcome: "ok",
       note: "usage estimated locally; the remote process owns the real numbers",
@@ -241,22 +323,26 @@ async function main(): Promise<void> {
       taskId: taskId ?? null,
     });
 
-    // -----------------------------------------------------------------------
+    // ----------------------------------------
     // 4. tasks/get — the record after the fact.
-    // -----------------------------------------------------------------------
+    // ----------------------------------------
     if (taskId) {
       section("4. tasks/get — the task record");
       try {
-        const record = (await a2a.getTask({ id: taskId })) as Record<string, any>;
+        const record = (await a2a.getTask({
+          id: taskId,
+        })) as Record<string, any>;
         const task = record?.result ?? record;
         json("task record", {
           id: task?.id,
           contextId: task?.contextId,
           state: task?.status?.state,
-          artifacts: (task?.artifacts ?? []).map((a: any) => ({
-            name: a.name,
-            parts: a.parts?.length,
-          })),
+          artifacts: (task?.artifacts ?? []).map(
+            (a: any) => ({
+              name: a.name,
+              parts: a.parts?.length,
+            }),
+          ),
           historyLength: (task?.history ?? []).length,
         });
       } catch (err) {
@@ -264,16 +350,29 @@ async function main(): Promise<void> {
       }
     }
 
-    // -----------------------------------------------------------------------
-    // 5. tasks/cancel — start something long, then stop it.
-    // -----------------------------------------------------------------------
-    section("5. tasks/cancel — a second, longer task, cancelled mid-flight");
+    // ----------------------------------------
+    // 5. tasks/cancel — start something long, then stop
+    // it.
+    // ----------------------------------------
+    section(
+      "5. tasks/cancel — a second, longer task, cancelled mid-flight",
+    );
     if (deadlineHit(caps)) {
-      bullet("skipped: the deadline had already fired.");
+      bullet(
+        "skipped: the deadline had already fired.",
+      );
     } else {
-      const cancelSpan = startWorkerSpan(snippetSpan, "remote:cancel", {});
+      const cancelSpan = startWorkerSpan(
+        snippetSpan,
+        "remote:cancel",
+        {},
+      );
       const t2 = Date.now();
-      ledger.reserve("remote:cancel", WORKER_MODEL, 0.002);
+      ledger.reserve(
+        "remote:cancel",
+        WORKER_MODEL,
+        0.002,
+      );
       let longTaskId: string | undefined;
       let eventsBeforeCancel = 0;
       let cancelResult: unknown = null;
@@ -289,27 +388,40 @@ async function main(): Promise<void> {
         for await (const raw of longStream) {
           const e = normalizeEvent(raw);
           eventsBeforeCancel++;
-          if (e.taskId && !longTaskId) longTaskId = e.taskId;
-          // Cancel once the task exists and is visibly producing output.
-          if (longTaskId && eventsBeforeCancel >= 8) break;
+          if (e.taskId && !longTaskId)
+            longTaskId = e.taskId;
+          // Cancel once the task exists and is visibly
+          // producing output.
+          if (longTaskId && eventsBeforeCancel >= 8)
+            break;
         }
 
         if (longTaskId) {
-          bullet(`cancelling task ${longTaskId} after ${eventsBeforeCancel} events`);
-          cancelResult = await a2a.cancelTask({ id: longTaskId });
-          const t = (cancelResult as any)?.result ?? cancelResult;
+          bullet(
+            `cancelling task ${longTaskId} after ${eventsBeforeCancel} events`,
+          );
+          cancelResult = await a2a.cancelTask({
+            id: longTaskId,
+          });
+          const t =
+            (cancelResult as any)?.result ??
+            cancelResult;
           json("tasks/cancel result", {
             id: t?.id,
             state: t?.status?.state,
             timestamp: t?.status?.timestamp,
           });
           bullet(
-            String((t as any)?.status?.state).includes("cancel")
+            String((t as any)?.status?.state).includes(
+              "cancel",
+            )
               ? "the task is cancelled. The remote stopped work; this process stopped listening."
               : `the task reported state "${(t as any)?.status?.state}" — it may have finished before the cancel landed.`,
           );
         } else {
-          bullet("no task id was surfaced before the cancel point; nothing to cancel.");
+          bullet(
+            "no task id was surfaced before the cancel point; nothing to cancel.",
+          );
         }
         ledger.reconcile("remote:cancel", {
           usage: { inputTokens: 60, outputTokens: 200 },
@@ -319,10 +431,14 @@ async function main(): Promise<void> {
         });
         endWorkerSpan(cancelSpan, {
           profile: "remote:cancel",
-          costUsd: ledger.get("remote:cancel")!.actualUsd,
+          costUsd: ledger.get("remote:cancel")!
+            .actualUsd,
           latencyMs: Date.now() - t2,
-          outcome: longTaskId ? "cancelled" : "no task id",
-          whyItExisted: "cancellation is the only way a caller can bound work it does not run",
+          outcome: longTaskId
+            ? "cancelled"
+            : "no task id",
+          whyItExisted:
+            "cancellation is the only way a caller can bound work it does not run",
           taskId: longTaskId ?? null,
         });
       } catch (err) {
@@ -331,13 +447,16 @@ async function main(): Promise<void> {
           outcome: "failed",
           note: short(err),
         });
-        bullet(`cancellation path failed: ${short(err)}`);
+        bullet(
+          `cancellation path failed: ${short(err)}`,
+        );
         endWorkerSpan(cancelSpan, {
           profile: "remote:cancel",
           costUsd: 0,
           latencyMs: Date.now() - t2,
           outcome: "failed",
-          whyItExisted: "cancellation is the only way a caller can bound work it does not run",
+          whyItExisted:
+            "cancellation is the only way a caller can bound work it does not run",
         });
       }
     }
@@ -346,10 +465,14 @@ async function main(): Promise<void> {
     bullet(
       "push notifications: the card advertises pushNotifications, but a callback URL needs a public endpoint.",
     );
-    bullet("A2A task records live in memory, so a restart of the remote loses every paused task.");
-    bullet("the v1.0 wire protocol (getA2AV1, tasks/list) exists; this snippet stays on 0.3.");
+    bullet(
+      "A2A task records live in memory, so a restart of the remote loses every paused task.",
+    );
+    bullet(
+      "the v1.0 wire protocol (getA2AV1, tasks/list) exists; this snippet stays on 0.3.",
+    );
   } finally {
-    // -----------------------------------------------------------------------
+    // ----------------------------------------
     section("6. shutting the remote process down");
     await remote.stop();
     bullet("SIGTERM sent, process exited.");
@@ -362,14 +485,17 @@ async function main(): Promise<void> {
     costUsd: ledger.spentUsd,
     latencyMs: Date.now() - caps.startedAt,
     outcome: stopReason,
-    whyItExisted: "a worker you do not run, cannot inspect, and can still cancel",
+    whyItExisted:
+      "a worker you do not run, cannot inspect, and can still cancel",
   });
   reportSpend(SNIPPET, ledger.spentUsd);
   await shutdownTracing();
 }
 
 function short(err: unknown): string {
-  return (err instanceof Error ? err.message : String(err)).slice(0, 100);
+  return (
+    err instanceof Error ? err.message : String(err)
+  ).slice(0, 100);
 }
 
 await main();

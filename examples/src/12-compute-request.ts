@@ -1,5 +1,7 @@
-// Resolve generated compute requests against server-owned policy. No cloud API calls.
-// Resolution is a quote; the scheduler must atomically reserve it before provisioning.
+// Resolve generated compute requests against
+// server-owned policy. No cloud API calls. Resolution
+// is a quote; the scheduler must atomically reserve it
+// before provisioning.
 export interface ComputeRequest {
   shape: string;
   class: string;
@@ -22,21 +24,32 @@ const catalog = {
     shape: "provider-wait",
     regions: ["us-east"],
     maxDurationSeconds: 360,
-    egress: ["provider.example", "storage.example", "callbacks.example"],
+    egress: [
+      "provider.example",
+      "storage.example",
+      "callbacks.example",
+    ],
     centsPerWorkerMinute: 2,
   },
 } as const;
 
-export function resolveCompute(request: ComputeRequest, policy: ComputePolicy, now: number) {
-  if (!Object.hasOwn(catalog, request.class)) throw new Error("unknown-compute-class");
-  const entry = catalog[request.class as keyof typeof catalog];
+export function resolveCompute(
+  request: ComputeRequest,
+  policy: ComputePolicy,
+  now: number,
+) {
+  if (!Object.hasOwn(catalog, request.class))
+    throw new Error("unknown-compute-class");
+  const entry =
+    catalog[request.class as keyof typeof catalog];
   if (
     !Number.isSafeInteger(request.count) ||
     request.count < 1 ||
     request.count > policy.maxCount ||
     !Number.isSafeInteger(request.durationSeconds) ||
     request.durationSeconds < 1 ||
-    request.durationSeconds > entry.maxDurationSeconds ||
+    request.durationSeconds >
+      entry.maxDurationSeconds ||
     !Number.isSafeInteger(request.costCapCents) ||
     request.costCapCents < 0
   )
@@ -49,14 +62,29 @@ export function resolveCompute(request: ComputeRequest, policy: ComputePolicy, n
     throw new Error("shape-or-residency-denied");
   if (
     !Array.isArray(request.egress) ||
-    request.egress.some((host) => !(entry.egress as readonly string[]).includes(host))
+    request.egress.some(
+      (host) =>
+        !(entry.egress as readonly string[]).includes(
+          host,
+        ),
+    )
   )
     throw new Error("egress-denied");
-  const expiresAt = now + request.durationSeconds * 1000;
-  if (!Number.isSafeInteger(now) || expiresAt > policy.deadline) throw new Error("job-deadline");
+  const expiresAt =
+    now + request.durationSeconds * 1000;
+  if (
+    !Number.isSafeInteger(now) ||
+    expiresAt > policy.deadline
+  )
+    throw new Error("job-deadline");
   const reserveCents =
-    request.count * Math.ceil(request.durationSeconds / 60) * entry.centsPerWorkerMinute;
-  if (reserveCents > request.costCapCents || reserveCents > policy.availableCents)
+    request.count *
+    Math.ceil(request.durationSeconds / 60) *
+    entry.centsPerWorkerMinute;
+  if (
+    reserveCents > request.costCapCents ||
+    reserveCents > policy.availableCents
+  )
     throw new Error("compute-budget");
   return {
     job: policy.job,

@@ -1,17 +1,25 @@
 /**
  * profiles.ts — COMPETE: many solutions, one problem.
  *
- * A "profile" is a differently-instructed competitor. Three of them are the same model with
- * different system prompts; the fourth is a frontier model, present so the tournament has a
- * price/quality spread to reason about rather than four near-identical answers.
+ * A "profile" is a differently-instructed competitor.
+ * Three of them are the same model with different
+ * system prompts; the fourth is a frontier model,
+ * present so the tournament has a price/quality spread
+ * to reason about rather than four near-identical
+ * answers.
  *
- * `whyItExisted` is not decoration. It is the sentence you say out loud when someone asks
- * why you paid for four attempts instead of one.
+ * `whyItExisted` is not decoration. It is the sentence
+ * you say out loud when someone asks why you paid for
+ * four attempts instead of one.
  */
 
 import * as z from "zod";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { FRONTIER_MODEL, WORKER_MODEL, model } from "./models.ts";
+import {
+  FRONTIER_MODEL,
+  WORKER_MODEL,
+  model,
+} from "./models.ts";
 
 export interface Profile {
   name: string;
@@ -44,7 +52,8 @@ export const PROFILES: Profile[] = [
   {
     name: "minimal-diff",
     modelId: WORKER_MODEL,
-    whyItExisted: "smallest change that turns the suite green; the safe merge",
+    whyItExisted:
+      "smallest change that turns the suite green; the safe merge",
     estimateUsd: 0.004,
     systemPrompt: `${SHARED_RULES}
 
@@ -55,7 +64,8 @@ should be able to see the original function underneath your patch.`,
   {
     name: "best-practices",
     modelId: WORKER_MODEL,
-    whyItExisted: "the version a reviewer would ask for; readable and defensive",
+    whyItExisted:
+      "the version a reviewer would ask for; readable and defensive",
     estimateUsd: 0.005,
     systemPrompt: `${SHARED_RULES}
 
@@ -67,7 +77,8 @@ Small well-named helpers are welcome.`,
   {
     name: "performance",
     modelId: WORKER_MODEL,
-    whyItExisted: "least wasted waiting; caps backoff against the remaining deadline",
+    whyItExisted:
+      "least wasted waiting; caps backoff against the remaining deadline",
     estimateUsd: 0.005,
     systemPrompt: `${SHARED_RULES}
 
@@ -78,7 +89,8 @@ one enormous final sleep. Probe as few times as the contract allows.`,
   {
     name: "frontier",
     modelId: FRONTIER_MODEL,
-    whyItExisted: "one expensive competitor so the tournament has a price/quality spread",
+    whyItExisted:
+      "one expensive competitor so the tournament has a price/quality spread",
     estimateUsd: 0.03,
     systemPrompt: `${SHARED_RULES}
 
@@ -89,23 +101,37 @@ could act on.`,
   },
 ];
 
-export function profileByName(name: string): Profile | undefined {
+export function profileByName(
+  name: string,
+): Profile | undefined {
   return PROFILES.find((p) => p.name === name);
 }
 
 /** Structured output shape. Asking for a rationale alongside the patch is cheap and useful. */
 export const PatchSchema = z.object({
-  patch: z.string().describe("The complete new contents of readiness.ts. No markdown fences."),
-  rationale: z.string().describe("One sentence: what you changed and why."),
+  patch: z
+    .string()
+    .describe(
+      "The complete new contents of readiness.ts. No markdown fences.",
+    ),
+  rationale: z
+    .string()
+    .describe(
+      "One sentence: what you changed and why.",
+    ),
 });
 export type Patch = z.infer<typeof PatchSchema>;
 
-export async function modelForProfile(profile: Profile): Promise<BaseChatModel> {
+export async function modelForProfile(
+  profile: Profile,
+): Promise<BaseChatModel> {
   return model(profile.modelId);
 }
 
 /** Models sometimes fence code anyway. Strip it rather than fail the candidate. */
 export function stripFences(text: string): string {
-  const fenced = text.match(/```(?:typescript|ts)?\n([\s\S]*?)```/);
+  const fenced = text.match(
+    /```(?:typescript|ts)?\n([\s\S]*?)```/,
+  );
   return (fenced ? fenced[1]! : text).trim();
 }

@@ -1,15 +1,18 @@
 /**
  * Talking to the remote worker.
  *
- * Spawning the server, waiting for it, reading the card and streaming a task
- * are all mechanical; the snippets should be about what the events mean, not
- * about process management. So the plumbing lives here.
+ * Spawning the server, waiting for it, reading the card
+ * and streaming a task are all mechanical; the snippets
+ * should be about what the events mean, not about
+ * process management. So the plumbing lives here.
  */
 import type { Subprocess } from "bun";
 import { MastraClient } from "@mastra/client-js";
 import { PKG_ROOT } from "./setup.js";
 
-export const REMOTE_PORT = Number(process.env.REMOTE_PORT ?? 4112);
+export const REMOTE_PORT = Number(
+  process.env.REMOTE_PORT ?? 4112,
+);
 export const REMOTE_BASE_URL = `http://127.0.0.1:${REMOTE_PORT}`;
 export const REMOTE_AGENT_ID = "competitor-remote";
 /** Note the /api prefix: Mastra's default apiPrefix is part of the well-known path. */
@@ -23,25 +26,35 @@ export interface RemoteHandle {
 }
 
 /**
- * Start the remote server as a child process and wait until its agent card
- * answers. Returns null if it never comes up, so callers can skip honestly
- * instead of hanging.
+ * Start the remote server as a child process and wait
+ * until its agent card answers. Returns null if it
+ * never comes up, so callers can skip honestly instead
+ * of hanging.
  */
 export async function startRemoteServer(
   opts: { timeoutMs?: number } = {},
 ): Promise<RemoteHandle | null> {
   const timeoutMs = opts.timeoutMs ?? 20_000;
-  const proc = Bun.spawn(["bun", "run", "src/remote/server.ts"], {
-    cwd: PKG_ROOT,
-    env: { ...process.env, REMOTE_PORT: String(REMOTE_PORT) },
-    stdout: "pipe",
-    stderr: "pipe",
-  });
+  const proc = Bun.spawn(
+    ["bun", "run", "src/remote/server.ts"],
+    {
+      cwd: PKG_ROOT,
+      env: {
+        ...process.env,
+        REMOTE_PORT: String(REMOTE_PORT),
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  );
 
   const stop = async () => {
     try {
       proc.kill("SIGTERM");
-      await Promise.race([proc.exited, new Promise((r) => setTimeout(r, 3000))]);
+      await Promise.race([
+        proc.exited,
+        new Promise((r) => setTimeout(r, 3000)),
+      ]);
     } catch {
       /* nothing to do */
     }
@@ -53,7 +66,9 @@ export async function startRemoteServer(
       return {
         proc,
         baseUrl: REMOTE_BASE_URL,
-        client: new MastraClient({ baseUrl: REMOTE_BASE_URL }),
+        client: new MastraClient({
+          baseUrl: REMOTE_BASE_URL,
+        }),
         stop,
       };
     }
@@ -67,7 +82,9 @@ export async function startRemoteServer(
 
 export async function cardReachable(): Promise<boolean> {
   try {
-    const res = await fetch(REMOTE_CARD_URL, { signal: AbortSignal.timeout(1500) });
+    const res = await fetch(REMOTE_CARD_URL, {
+      signal: AbortSignal.timeout(1500),
+    });
     return res.ok;
   } catch {
     return false;
@@ -85,16 +102,27 @@ export interface A2AEvent {
 }
 
 /**
- * Normalise the A2A SSE stream into flat events. The protocol nests state
- * inside status-update payloads and text inside part arrays; the snippets only
- * ever want "what state is it in" and "what did it say".
+ * Normalise the A2A SSE stream into flat events. The
+ * protocol nests state inside status-update payloads
+ * and text inside part arrays; the snippets only ever
+ * want "what state is it in" and "what did it say".
  */
 export function normalizeEvent(event: any): A2AEvent {
-  const kind = String(event?.kind ?? event?.type ?? "unknown");
-  const parts = event?.status?.message?.parts ?? event?.artifact?.parts ?? event?.parts ?? [];
+  const kind = String(
+    event?.kind ?? event?.type ?? "unknown",
+  );
+  const parts =
+    event?.status?.message?.parts ??
+    event?.artifact?.parts ??
+    event?.parts ??
+    [];
   const text = Array.isArray(parts)
     ? parts
-        .filter((p: any) => p?.kind === "text" || typeof p?.text === "string")
+        .filter(
+          (p: any) =>
+            p?.kind === "text" ||
+            typeof p?.text === "string",
+        )
         .map((p: any) => p.text)
         .join("")
     : undefined;
@@ -102,7 +130,10 @@ export function normalizeEvent(event: any): A2AEvent {
     kind,
     state: event?.status?.state ?? event?.state,
     text: text && text.length > 0 ? text : undefined,
-    taskId: event?.taskId ?? event?.id ?? event?.status?.taskId,
+    taskId:
+      event?.taskId ??
+      event?.id ??
+      event?.status?.taskId,
     append: event?.append === true,
     raw: event,
   };
@@ -111,17 +142,25 @@ export function normalizeEvent(event: any): A2AEvent {
 /**
  * Reassemble an artifact from its update chunks.
  *
- * A2A artifact-update events either replace the artifact (`append` absent or
- * false) or extend it (`append: true`). Concatenating everything blindly
- * duplicates whatever the server chose to resend, which is how a perfectly
- * good remote patch arrives as a file that does not parse.
+ * A2A artifact-update events either replace the
+ * artifact (`append` absent or false) or extend it
+ * (`append: true`). Concatenating everything blindly
+ * duplicates whatever the server chose to resend, which
+ * is how a perfectly good remote patch arrives as a
+ * file that does not parse.
  */
 export class ArtifactAssembler {
   private text = "";
 
   push(event: A2AEvent): void {
-    if (event.kind !== "artifact-update" || event.text === undefined) return;
-    this.text = event.append ? this.text + event.text : event.text;
+    if (
+      event.kind !== "artifact-update" ||
+      event.text === undefined
+    )
+      return;
+    this.text = event.append
+      ? this.text + event.text
+      : event.text;
   }
 
   get value(): string {

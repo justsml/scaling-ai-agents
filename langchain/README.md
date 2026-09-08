@@ -226,16 +226,16 @@ See [the fan-out contract](../docs/fanout-node.md). The generator is a determini
 
 ## Business advice council
 
-`bun run snippet:17` runs three independent advisors, then a business advice
-orchestrator. It requires `OPENAI_API_KEY` and makes four paid model calls.
-Pass a quoted business brief to replace the built-in SaaS example:
+`bun run snippet:17` runs three advisors in parallel, then a chair that picks one
+proposal as its base and grafts compatible ideas from the others. It requires
+`OPENAI_API_KEY` and makes four paid model calls. Everything — the brief, the
+role prompts, the model id and the orchestration — lives in the one snippet file.
+Pass a quoted brief to replace the built-in SaaS example:
 
 ```sh
 bun run snippet:17 -- "Should our two-person SaaS team build an enterprise integration or improve onboarding?"
 bun test test/business-advice.test.ts
 ```
 
-Pennypincher uses `gpt-5.6-luna`, Battle-scarred Operator uses
-`gpt-5.6-terra`, and Product Visionary uses `gpt-5.6-sol`. The orchestrator
-uses Sol. Every agent explicitly requests reasoning effort `none`.
+All four roles run on `gpt-5.6-luna`.
 See the [business advice contract and evaluation cases](../docs/business-advice.md).

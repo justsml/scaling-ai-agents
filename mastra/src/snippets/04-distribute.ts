@@ -1,38 +1,25 @@
 /**
- * ============================================================================
  * 04 — DISTRIBUTE: hardware, providers, regions
- * ============================================================================
  *
- * The same tournament, but the question is no longer "which answer is best".
- * It is "which machine is even allowed to see this request".
+ * The question is no longer which answer is best. It is
+ * which machine is allowed to see the request.
  *
- * Four things happen here:
+ *   1. Every pool entry carries region and dataClass.
+ *      Filtering happens in lib/pool.ts, in ordinary
+ *      code, BEFORE any call. An eu+restricted request
+ *      resolves to the on-premise slot or fails with a
+ *      reason. It is never quietly downgraded to a
+ *      cloud provider with a stern prompt attached.
+ *   2. Per-competitor routing lives in the agent
+ *      definition, as model: ({ requestContext }) =>.
+ *   3. Fallback is data: the agent's model is Mastra's
+ *      native [{ model, maxRetries }] array built from
+ *      the eligible pool. Nothing here retries by
+ *      hand; response.modelId says who served it.
+ *   4. One competitor is not in this process at all.
+ *      It runs on a second Mastra server over A2A.
  *
- *   1. A provider pool with `region` and `dataClass` on every entry. Filtering
- *      happens in src/lib/pool.ts, in ordinary code, BEFORE any call. A
- *      restricted+eu request either resolves to the on-premise slot or fails
- *      with a reason. It is never quietly downgraded to a cloud provider with
- *      a stern prompt attached.
- *
- *   2. Per-competitor model selection through `model: ({ requestContext }) =>`
- *      on the Agent, so the routing decision is visible in the agent
- *      definition rather than buried in the call site.
- *
- *   3. Fallback as data. The Agent's `model` is Mastra's native
- *      `[{ model, maxRetries }, ...]` array, built from the eligible pool for
- *      the request. Mastra walks it on 5xx, rate limit, or per-step timeout;
- *      nothing in this file retries. `response.modelId` says who served it.
- *
- *   4. One competitor that is not in this process at all: it runs on a second
- *      Mastra server over A2A, reached through MastraClient.getA2A(). Its task
- *      id and status events stream into the same span tree.
- *
- * Run:
- *   bun run snippet:04 -- --budget-usd 0.05 --deadline-ms 90000
- *
- * Prints: the pool with eligibility per request, which provider served each
- * worker and why, the remote worker's task id and status events, the ledger
- * and the stop reason.
+ *   bun run snippet:04 -- --budget-usd 0.05
  */
 import { Agent } from "@mastra/core/agent";
 import { RequestContext } from "@mastra/core/request-context";
@@ -53,9 +40,18 @@ import {
   parseCaps,
   remainingMs,
 } from "../lib/caps.js";
-import { estimateWorkerCost, Ledger, usdFromUsage } from "../lib/ledger.js";
+import {
+  estimateWorkerCost,
+  Ledger,
+  usdFromUsage,
+} from "../lib/ledger.js";
 import { localSlotAvailable } from "../lib/models.js";
-import { fallbackChainFor, POOL, providerForModelId, resolveProvider } from "../lib/pool.js";
+import {
+  fallbackChainFor,
+  POOL,
+  providerForModelId,
+  resolveProvider,
+} from "../lib/pool.js";
 import {
   bullet,
   header,
@@ -67,7 +63,11 @@ import {
   table,
   usd,
 } from "../lib/print.js";
-import { buildTaskPrompt, cleanPatch, patchSchema } from "../lib/profiles.js";
+import {
+  buildTaskPrompt,
+  cleanPatch,
+  patchSchema,
+} from "../lib/profiles.js";
 import { readinessChallenge } from "../lib/readiness-challenge.js";
 import { loadRequests } from "../lib/router.js";
 import {
@@ -96,22 +96,33 @@ interface ServedWorker {
 }
 
 /**
- * Mastra raises a MastraError with this id when the model returned something
- * that does not validate against `structuredOutput.schema`. It is a contract
- * failure, not a provider failure, so the native fallback chain is (correctly)
- * not walked. Labelled separately for the same reason the router labels it.
+ * Mastra raises a MastraError with this id when the
+ * model returned something that does not validate
+ * against `structuredOutput.schema`. It is a contract
+ * failure, not a provider failure, so the native
+ * fallback chain is (correctly) not walked. Labelled
+ * separately for the same reason the router labels it.
  */
 function isContractFailure(message: string): boolean {
   return (
-    message.includes("STRUCTURED_OUTPUT_SCHEMA_VALIDATION_FAILED") ||
-    message.includes("Structured output validation failed")
+    message.includes(
+      "STRUCTURED_OUTPUT_SCHEMA_VALIDATION_FAILED",
+    ) ||
+    message.includes(
+      "Structured output validation failed",
+    )
   );
 }
 
 async function main(): Promise<void> {
   const caps = parseCaps();
-  const ledger = new Ledger({ budgetUsd: caps.budgetUsd, label: SNIPPET });
-  const snippetSpan = startSnippetSpan(SNIPPET, { caps: describeCaps(caps) });
+  const ledger = new Ledger({
+    budgetUsd: caps.budgetUsd,
+    label: SNIPPET,
+  });
+  const snippetSpan = startSnippetSpan(SNIPPET, {
+    caps: describeCaps(caps),
+  });
   let stopReason: StopReason = "completed";
   let stopDetail = "";
 
@@ -120,10 +131,11 @@ async function main(): Promise<void> {
     `${describeCaps(caps)} · eligibility decided in code, before any call`,
   );
 
-  // -------------------------------------------------------------------------
-  // The pool. Printed first, because the interesting decisions have already
-  // been made by the time anything is dispatched.
-  // -------------------------------------------------------------------------
+  // ----------------------------------------
+  // The pool. Printed first, because the interesting
+  // decisions have already been made by the time
+  // anything is dispatched.
+  // ----------------------------------------
   section("the provider pool");
   table(
     POOL.map((p) => ({
@@ -132,7 +144,9 @@ async function main(): Promise<void> {
       kind: p.kind,
       regions: p.regions.join("/"),
       dataClasses: p.dataClasses.join("/"),
-      available: p.available() ? "yes" : "no (missing env)",
+      available: p.available()
+        ? "yes"
+        : "no (missing env)",
       why: p.why,
     })),
   );
@@ -142,15 +156,21 @@ async function main(): Promise<void> {
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Eligibility per fixture request. This is the whole "distribute" argument
-  // in one table: two requests, identical text, different residency, different
+  // ----------------------------------------
+  // Eligibility per fixture request. This is the whole
+  // "distribute" argument in one table: two requests,
+  // identical text, different residency, different
   // answer about who may run them.
-  // -------------------------------------------------------------------------
+  // ----------------------------------------
   const requests = await loadRequests();
-  section("eligibility per request (filtering happens here, not in a prompt)");
+  section(
+    "eligibility per request (filtering happens here, not in a prompt)",
+  );
   const eligibility = requests.map((r) => {
-    const res = resolveProvider({ region: r.region, dataClass: r.dataClass });
+    const res = resolveProvider({
+      region: r.region,
+      dataClass: r.dataClass,
+    });
     return {
       request: r.id,
       region: r.region,
@@ -162,12 +182,17 @@ async function main(): Promise<void> {
   table(eligibility);
 
   const r6 = requests.find((x) => x.id === "r6")!;
-  const r6res = resolveProvider({ region: r6.region, dataClass: r6.dataClass });
+  const r6res = resolveProvider({
+    region: r6.region,
+    dataClass: r6.dataClass,
+  });
   section("the restricted case, spelled out");
   json("r6 — same text as r4, but eu + restricted", {
     request: r6.text,
     considered: r6res.considered,
-    outcome: r6res.provider ? `served by ${r6res.provider.id}` : "refused",
+    outcome: r6res.provider
+      ? `served by ${r6res.provider.id}`
+      : "refused",
     reason: r6res.reason,
   });
   bullet(
@@ -183,16 +208,18 @@ async function main(): Promise<void> {
     return;
   }
 
-  const buggy = (await readinessChallenge.load("buggy")).source;
+  const buggy = (await readinessChallenge.load("buggy"))
+    .source;
   const prompt = buildTaskPrompt(buggy);
   const signal = deadlineSignal(caps);
   const served: ServedWorker[] = [];
 
-  // -------------------------------------------------------------------------
-  // Two local competitors, each resolving its own provider through the pool.
-  // The model is chosen inside the Agent from requestContext, so an agent
+  // ----------------------------------------
+  // Two local competitors, each resolving its own
+  // provider through the pool. The model is chosen
+  // inside the Agent from requestContext, so an agent
   // definition carries its own routing rule.
-  // -------------------------------------------------------------------------
+  // ----------------------------------------
   const localWorkers = [
     {
       id: "w-us-internal",
@@ -208,18 +235,28 @@ async function main(): Promise<void> {
     },
   ];
 
-  section("dispatching two workers with different residency requirements");
+  section(
+    "dispatching two workers with different residency requirements",
+  );
   for (const w of localWorkers) {
-    const span = startWorkerSpan(snippetSpan, `worker:${w.id}`, {
+    const span = startWorkerSpan(
+      snippetSpan,
+      `worker:${w.id}`,
+      {
+        region: w.region,
+        dataClass: w.dataClass,
+      },
+    );
+    const started = Date.now();
+    const resolution = resolveProvider({
       region: w.region,
       dataClass: w.dataClass,
     });
-    const started = Date.now();
-    const resolution = resolveProvider({ region: w.region, dataClass: w.dataClass });
 
     if (!resolution.provider) {
-      // Refusing is a result. It goes on the table with a reason, not into a
-      // catch block that quietly retries somewhere cheaper.
+      // Refusing is a result. It goes on the table with
+      // a reason, not into a catch block that quietly
+      // retries somewhere cheaper.
       ledger.skip(w.id, "none", resolution.reason);
       served.push({
         worker: w.id,
@@ -245,9 +282,23 @@ async function main(): Promise<void> {
       continue;
     }
 
-    const estimate = estimateWorkerCost(resolution.provider.priceKey, prompt.length, 1400);
-    if (!ledger.tryReserve(w.id, resolution.provider.priceKey, estimate)) {
-      ledger.skip(`${w.id}:skipped`, resolution.provider.priceKey, "over budget");
+    const estimate = estimateWorkerCost(
+      resolution.provider.priceKey,
+      prompt.length,
+      1400,
+    );
+    if (
+      !ledger.tryReserve(
+        w.id,
+        resolution.provider.priceKey,
+        estimate,
+      )
+    ) {
+      ledger.skip(
+        `${w.id}:skipped`,
+        resolution.provider.priceKey,
+        "over budget",
+      );
       stopReason = "budget-exhausted";
       continue;
     }
@@ -258,24 +309,37 @@ async function main(): Promise<void> {
     rc.set("dataClass", w.dataClass);
     rc.set("requestId", "r4");
 
-    // The fallback chain is data on the Agent. Every eligible provider for
-    // this request, ranked, becomes an entry in Mastra's `model` array. The
-    // whole-run timeout below is a hard deadline: it does not try the next
-    // entry, which is exactly what the ledger wants.
-    const chainEntries = fallbackChainFor({ region: w.region, dataClass: w.dataClass }).entries;
-    const first = chainEntries[0] ?? resolution.provider;
-    bullet(`${w.id}: chain ${chainEntries.map((e) => e.id).join(" → ")}`);
+    // The fallback chain is data on the Agent. Every
+    // eligible provider for this request, ranked,
+    // becomes an entry in Mastra's `model` array. The
+    // whole-run timeout below is a hard deadline: it
+    // does not try the next entry, which is exactly
+    // what the ledger wants.
+    const chainEntries = fallbackChainFor({
+      region: w.region,
+      dataClass: w.dataClass,
+    }).entries;
+    const first =
+      chainEntries[0] ?? resolution.provider;
+    bullet(
+      `${w.id}: chain ${chainEntries.map((e) => e.id).join(" → ")}`,
+    );
 
     const agent = new Agent({
       id: `distributed-${w.id}`,
       name: `Distributed worker ${w.id}`,
       instructions:
         "Rewrite readiness.ts so the contract holds. Return the complete file. No imports, no markdown fences.",
-      // Routing rule, in the agent definition. The request context decides
-      // who is eligible; the array order decides who is tried first.
+      // Routing rule, in the agent definition. The
+      // request context decides who is eligible; the
+      // array order decides who is tried first.
       model: ({ requestContext }) => {
-        const region = requestContext.get("region" as never) as "us" | "eu" | undefined;
-        const dataClass = requestContext.get("dataClass" as never) as
+        const region = requestContext.get(
+          "region" as never,
+        ) as "us" | "eu" | undefined;
+        const dataClass = requestContext.get(
+          "dataClass" as never,
+        ) as
           | "public"
           | "internal"
           | "restricted"
@@ -296,33 +360,49 @@ async function main(): Promise<void> {
         tracingOptions: {
           metadata: {
             profile: w.id,
-            chain: chainEntries.map((e) => e.id).join(","),
+            chain: chainEntries
+              .map((e) => e.id)
+              .join(","),
             whyItExisted: w.why,
           },
-          requestContextKeys: ["profile", "region", "dataClass"],
+          requestContextKeys: [
+            "profile",
+            "region",
+            "dataClass",
+          ],
           tags: ["distribute"],
         },
         modelSettings: {
-          timeout: { totalMs: Math.max(1000, remainingMs(caps)) },
+          timeout: {
+            totalMs: Math.max(1000, remainingMs(caps)),
+          },
           maxOutputTokens: 2500,
         },
       });
-    let result: Awaited<ReturnType<typeof run>> | null = null;
+    let result: Awaited<ReturnType<typeof run>> | null =
+      null;
     let failure = "";
     try {
       result = await run();
     } catch (err) {
-      failure = err instanceof Error ? err.message : String(err);
+      failure =
+        err instanceof Error
+          ? err.message
+          : String(err);
     }
 
     const latencyMs = Date.now() - started;
     if (!result) {
-      // Two different failures end up here, and the table must not confuse
-      // them. A contract failure (the model answered, but not to the schema)
-      // does not trigger Mastra's fallback, and should not: the next provider
-      // would be asked the same question. Only a wire failure walks the chain.
+      // Two different failures end up here, and the
+      // table must not confuse them. A contract failure
+      // (the model answered, but not to the schema)
+      // does not trigger Mastra's fallback, and should
+      // not: the next provider would be asked the same
+      // question. Only a wire failure walks the chain.
       const contract = isContractFailure(failure);
-      const outcome = contract ? "contract failure, no fallback" : "all providers failed";
+      const outcome = contract
+        ? "contract failure, no fallback"
+        : "all providers failed";
       ledger.reconcile(w.id, {
         latencyMs,
         outcome: "failed",
@@ -348,36 +428,57 @@ async function main(): Promise<void> {
         profile: w.id,
         costUsd: 0,
         latencyMs,
-        outcome: contract ? "contract-failure" : "all-providers-failed",
+        outcome: contract
+          ? "contract-failure"
+          : "all-providers-failed",
         whyItExisted: w.why,
         provider: contract ? first.id : "none",
       });
       continue;
     }
 
-    // Mastra does not hand back the attempt trail on the result; the per-model
-    // attempts are on the trace. What it does report is who answered.
-    const servedBy = providerForModelId(result.response?.modelId, chainEntries) ?? first;
+    // Mastra does not hand back the attempt trail on
+    // the result; the per-model attempts are on the
+    // trace. What it does report is who answered.
+    const servedBy =
+      providerForModelId(
+        result.response?.modelId,
+        chainEntries,
+      ) ?? first;
     const fellBack = servedBy.id !== first.id;
-    const costUsd = usdFromUsage(servedBy.priceKey, result.usage);
+    const costUsd = usdFromUsage(
+      servedBy.priceKey,
+      result.usage,
+    );
     const aborted = signal.aborted;
     ledger.reconcile(w.id, {
       usage: result.usage,
       latencyMs,
       outcome: aborted ? "aborted" : "ok",
       model: servedBy.priceKey,
-      note: fellBack ? `fell back from ${first.id} to ${servedBy.id}` : undefined,
+      note: fellBack
+        ? `fell back from ${first.id} to ${servedBy.id}`
+        : undefined,
     });
 
-    const patch = cleanPatch(result.object?.patch ?? result.text ?? "");
+    const patch = cleanPatch(
+      result.object?.patch ?? result.text ?? "",
+    );
     const certification =
-      patch && !aborted ? await readinessChallenge.certify(patch, { abortSignal: signal }) : null;
+      patch && !aborted
+        ? await readinessChallenge.certify(patch, {
+            abortSignal: signal,
+          })
+        : null;
     const dq = !patch
       ? "empty response"
       : certification?.outcome === "ineligible"
         ? certification.reason
         : null;
-    const sandbox = certification && "result" in certification ? certification.result : null;
+    const sandbox =
+      certification && "result" in certification
+        ? certification.result
+        : null;
 
     served.push({
       worker: w.id,
@@ -385,49 +486,77 @@ async function main(): Promise<void> {
       requestedDataClass: w.dataClass,
       provider: servedBy.id,
       model: servedBy.model,
-      why: fellBack ? `${servedBy.why} (after ${first.id} failed)` : servedBy.why,
-      tests: sandbox ? `${sandbox.pass}/${sandbox.pass + sandbox.fail}` : (dq ?? "aborted"),
+      why: fellBack
+        ? `${servedBy.why} (after ${first.id} failed)`
+        : servedBy.why,
+      tests: sandbox
+        ? `${sandbox.pass}/${sandbox.pass + sandbox.fail}`
+        : (dq ?? "aborted"),
       costUsd,
       latencyMs,
-      outcome: aborted ? "aborted" : sandbox?.green ? "green" : "not green",
+      outcome: aborted
+        ? "aborted"
+        : sandbox?.green
+          ? "green"
+          : "not green",
     });
     endWorkerSpan(span, {
       profile: w.id,
       costUsd,
       latencyMs,
-      outcome: aborted ? "aborted" : sandbox?.green ? "green" : "not green",
+      outcome: aborted
+        ? "aborted"
+        : sandbox?.green
+          ? "green"
+          : "not green",
       whyItExisted: w.why,
       provider: servedBy.id,
       fellBack,
     });
-    bullet(`${w.id}: served by ${servedBy.id} (${servedBy.model}) — ${servedBy.why}`);
+    bullet(
+      `${w.id}: served by ${servedBy.id} (${servedBy.model}) — ${servedBy.why}`,
+    );
   }
 
-  // -------------------------------------------------------------------------
+  // ----------------------------------------
   // The competitor that is not in this process.
-  // -------------------------------------------------------------------------
-  section("remote competitor over A2A (a second Mastra server, own process)");
-  const remoteSpan = startWorkerSpan(snippetSpan, "worker:remote-a2a", {});
+  // ----------------------------------------
+  section(
+    "remote competitor over A2A (a second Mastra server, own process)",
+  );
+  const remoteSpan = startWorkerSpan(
+    snippetSpan,
+    "worker:remote-a2a",
+    {},
+  );
   const remoteStarted = Date.now();
   const remote = deadlineHit(caps)
     ? null
-    : await startRemoteServer({ timeoutMs: Math.min(20_000, remainingMs(caps)) });
+    : await startRemoteServer({
+        timeoutMs: Math.min(20_000, remainingMs(caps)),
+      });
 
   if (!remote) {
-    ledger.skip("remote-a2a", "unknown", "the remote server did not come up inside the deadline");
+    ledger.skip(
+      "remote-a2a",
+      "unknown",
+      "the remote server did not come up inside the deadline",
+    );
     bullet(
       "skipped: the remote A2A server did not start. See snippet 06 for the standalone version.",
     );
     if (stopReason === "completed") {
       stopReason = "dependency-missing";
-      stopDetail = "the A2A worker process was unavailable";
+      stopDetail =
+        "the A2A worker process was unavailable";
     }
     endWorkerSpan(remoteSpan, {
       profile: "remote-a2a",
       costUsd: 0,
       latencyMs: Date.now() - remoteStarted,
       outcome: "skipped",
-      whyItExisted: "runs on infrastructure this process does not own",
+      whyItExisted:
+        "runs on infrastructure this process does not own",
     });
   } else {
     try {
@@ -439,14 +568,25 @@ async function main(): Promise<void> {
         url: card.url,
         protocolVersion: (card as any).protocolVersion,
         capabilities: card.capabilities,
-        skills: (card.skills ?? []).map((s: any) => s.id),
+        skills: (card.skills ?? []).map(
+          (s: any) => s.id,
+        ),
       });
 
-      // The remote model call is billed on the remote side. We record it here
-      // as an estimate because this process cannot see the remote's usage.
-      ledger.reserve("remote-a2a", "openai/gpt-5.6-luna", 0.004);
+      // The remote model call is billed on the remote
+      // side. We record it here as an estimate because
+      // this process cannot see the remote's usage.
+      ledger.reserve(
+        "remote-a2a",
+        "openai/gpt-5.6-luna",
+        0.004,
+      );
 
-      const events: Array<{ kind: string; state?: string; taskId?: string }> = [];
+      const events: Array<{
+        kind: string;
+        state?: string;
+        taskId?: string;
+      }> = [];
       let taskId: string | undefined;
       const assembler = new ArtifactAssembler();
 
@@ -458,7 +598,11 @@ async function main(): Promise<void> {
 
       for await (const raw of stream as AsyncIterable<unknown>) {
         const e = normalizeEvent(raw);
-        events.push({ kind: e.kind, state: e.state, taskId: e.taskId });
+        events.push({
+          kind: e.kind,
+          state: e.state,
+          taskId: e.taskId,
+        });
         if (e.taskId && !taskId) taskId = e.taskId;
         assembler.push(e);
         if (deadlineHit(caps)) break;
@@ -468,14 +612,19 @@ async function main(): Promise<void> {
       const text = assembler.value;
       const patch = cleanPatch(text);
       const certification = patch
-        ? await readinessChallenge.certify(patch, { abortSignal: signal })
+        ? await readinessChallenge.certify(patch, {
+            abortSignal: signal,
+          })
         : null;
       const dq = !patch
         ? "no text returned"
         : certification?.outcome === "ineligible"
           ? certification.reason
           : null;
-      const sandbox = certification && "result" in certification ? certification.result : null;
+      const sandbox =
+        certification && "result" in certification
+          ? certification.result
+          : null;
 
       ledger.reconcile("remote-a2a", {
         usage: {
@@ -507,7 +656,9 @@ async function main(): Promise<void> {
         provider: `a2a://${REMOTE_AGENT_ID}`,
         model: "(private to the remote)",
         why: "runs on infrastructure this process does not own; its prompt, tools and model are its own business",
-        tests: sandbox ? `${sandbox.pass}/${sandbox.pass + sandbox.fail}` : (dq ?? "-"),
+        tests: sandbox
+          ? `${sandbox.pass}/${sandbox.pass + sandbox.fail}`
+          : (dq ?? "-"),
         costUsd: ledger.get("remote-a2a")!.actualUsd,
         latencyMs,
         outcome: sandbox?.green ? "green" : "not green",
@@ -517,13 +668,20 @@ async function main(): Promise<void> {
         costUsd: ledger.get("remote-a2a")!.actualUsd,
         latencyMs,
         outcome: sandbox?.green ? "green" : "not green",
-        whyItExisted: "runs on infrastructure this process does not own",
+        whyItExisted:
+          "runs on infrastructure this process does not own",
         taskId: taskId ?? null,
       });
     } catch (err) {
       const latencyMs = Date.now() - remoteStarted;
-      if (ledger.get("remote-a2a")?.outcome === "pending") {
-        ledger.reconcile("remote-a2a", { latencyMs, outcome: "failed", note: short(err) });
+      if (
+        ledger.get("remote-a2a")?.outcome === "pending"
+      ) {
+        ledger.reconcile("remote-a2a", {
+          latencyMs,
+          outcome: "failed",
+          note: short(err),
+        });
       }
       bullet(`remote worker failed: ${short(err)}`);
       failWorkerSpan(remoteSpan, err, {
@@ -531,7 +689,8 @@ async function main(): Promise<void> {
         costUsd: 0,
         latencyMs,
         outcome: "failed",
-        whyItExisted: "runs on infrastructure this process does not own",
+        whyItExisted:
+          "runs on infrastructure this process does not own",
       });
     } finally {
       await remote.stop();
@@ -539,7 +698,7 @@ async function main(): Promise<void> {
     }
   }
 
-  // -------------------------------------------------------------------------
+  // ----------------------------------------
   section("which provider served each worker, and why");
   table(
     served.map((s) => ({
@@ -554,7 +713,8 @@ async function main(): Promise<void> {
     })),
   );
   section("the reason, in words, for each");
-  for (const s of served) bullet(`${s.worker}: ${s.why}`);
+  for (const s of served)
+    bullet(`${s.worker}: ${s.why}`);
 
   ledgerTable(ledger);
   stopBanner(stopReason, caps, stopDetail || undefined);
@@ -563,14 +723,17 @@ async function main(): Promise<void> {
     costUsd: ledger.spentUsd,
     latencyMs: Date.now() - caps.startedAt,
     outcome: stopReason,
-    whyItExisted: "decides which machine may see a request before deciding what to ask it",
+    whyItExisted:
+      "decides which machine may see a request before deciding what to ask it",
   });
   reportSpend(SNIPPET, ledger.spentUsd);
   await shutdownTracing();
 }
 
 function short(err: unknown): string {
-  return (err instanceof Error ? err.message : String(err)).slice(0, 90);
+  return (
+    err instanceof Error ? err.message : String(err)
+  ).slice(0, 90);
 }
 
 await main();

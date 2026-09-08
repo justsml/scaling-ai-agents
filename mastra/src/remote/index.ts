@@ -1,10 +1,13 @@
 /**
- * A second Mastra instance, in its own process, exposed over A2A.
+ * A second Mastra instance, in its own process, exposed
+ * over A2A.
  *
- * This is deliberately a separate file from src/mastra/index.ts. The point of
- * a remote worker is that the caller cannot see inside it: not its tools, not
- * its instructions, not its memory, not its model. The agent card publishes a
- * name, a description and a skill list, and that is all.
+ * This is deliberately a separate file from
+ * src/mastra/index.ts. The point of a remote worker is
+ * that the caller cannot see inside it: not its tools,
+ * not its instructions, not its memory, not its model.
+ * The agent card publishes a name, a description and a
+ * skill list, and that is all.
  */
 import { Mastra } from "@mastra/core";
 import { Agent } from "@mastra/core/agent";
@@ -14,17 +17,22 @@ import { z } from "zod";
 import { WORKER_MODEL } from "../lib/models.js";
 
 /**
- * A private tool. It exists on the remote side only; nothing about it appears
- * on the agent card beyond the fact that the agent has *a* skill.
+ * A private tool. It exists on the remote side only;
+ * nothing about it appears on the agent card beyond the
+ * fact that the agent has *a* skill.
  */
 const backoffAdviceTool = createTool({
   id: "backoff-advice",
-  description: "Return the recommended backoff shape for a readiness loop.",
+  description:
+    "Return the recommended backoff shape for a readiness loop.",
   inputSchema: z.object({
     baseDelayMs: z.number().default(50),
     deadlineMs: z.number().default(5000),
   }),
-  outputSchema: z.object({ shape: z.string(), capNote: z.string() }),
+  outputSchema: z.object({
+    shape: z.string(),
+    capNote: z.string(),
+  }),
   execute: async ({ baseDelayMs, deadlineMs }) => ({
     shape: `exponential from ${baseDelayMs}ms, doubling, capped at 5000ms`,
     capNote: `each sleep additionally clamped to the time left of the ${deadlineMs}ms deadline`,
@@ -51,7 +59,11 @@ exponential backoff.`,
 
 export const remoteMastra = new Mastra({
   agents: { competitorRemote },
-  storage: new LibSQLStore({ id: "remote", url: process.env.REMOTE_DB_URL ?? "file:./remote.db" }),
+  storage: new LibSQLStore({
+    id: "remote",
+    url:
+      process.env.REMOTE_DB_URL ?? "file:./remote.db",
+  }),
   server: {
     port: Number(process.env.REMOTE_PORT ?? 4112),
     host: "127.0.0.1",

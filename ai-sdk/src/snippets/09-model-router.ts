@@ -22,7 +22,11 @@ import {
   type RouteObservation,
   type RoutingResult,
 } from "../lib/model-router";
-import { heading, printKV, printTable } from "../lib/print";
+import {
+  heading,
+  printKV,
+  printTable,
+} from "../lib/print";
 
 interface RouterCase {
   id: string;
@@ -56,9 +60,16 @@ interface ExperimentRun {
 }
 
 const cases = casesFixture as RouterCase[];
-const fixtureDir = resolve(import.meta.dir, "../fixtures/router");
-const instructions = await Bun.file(resolve(fixtureDir, "decision-instructions.md")).text();
-const rubric = await Bun.file(resolve(fixtureDir, "reasonableness-rubric.md")).text();
+const fixtureDir = resolve(
+  import.meta.dir,
+  "../fixtures/router",
+);
+const instructions = await Bun.file(
+  resolve(fixtureDir, "decision-instructions.md"),
+).text();
+const rubric = await Bun.file(
+  resolve(fixtureDir, "reasonableness-rubric.md"),
+).text();
 
 function fallbackConfig() {
   if (process.env.LOCAL_OPENAI_BASE_URL)
@@ -68,7 +79,8 @@ function fallbackConfig() {
         modelId: "local/router-nano",
         providerSlot: "secondary",
         baseURL: process.env.LOCAL_OPENAI_BASE_URL,
-        apiKey: process.env.LOCAL_OPENAI_API_KEY ?? "local",
+        apiKey:
+          process.env.LOCAL_OPENAI_API_KEY ?? "local",
       }),
       note: "secondary provider via LOCAL_OPENAI_BASE_URL",
     };
@@ -106,25 +118,39 @@ async function runExperiment(options: {
     metadata: {
       dataset: "router-cases-2026-09-05.2",
       prompt: "decision-instructions-2026-09-05.2",
-      rules: options.rulesEnabled ? ROUTER_RULES.version : "off-approval-still-on",
+      rules: options.rulesEnabled
+        ? ROUTER_RULES.version
+        : "off-approval-still-on",
       policy: ROUTER_POLICY.version,
       routerModel: options.routerModel,
       routerProvider: "openai",
-      specialistModels: "code=mini/frontier,long-context=mini,general=nano",
+      specialistModels:
+        "code=mini/frontier,long-context=mini,general=nano",
       specialistProvider: "openai",
     },
     traces: [],
     observations: [],
-    counts: { rule: 0, model: 0, approval: 0, clarify: 0 },
+    counts: {
+      rule: 0,
+      model: 0,
+      approval: 0,
+      clarify: 0,
+    },
     approvalPasses: 0,
     costClassViolations: 0,
     reasonablenessCostUsd: 0,
   };
-  const judge = createAiSdkReasonablenessJudge({ rubric });
+  const judge = createAiSdkReasonablenessJudge({
+    rubric,
+  });
   let spend = 0;
   for (const item of cases) {
-    if (Date.now() >= options.deadlineAt || spend >= options.budgetUsd) {
-      run.counts["budget stop"] = (run.counts["budget stop"] ?? 0) + 1;
+    if (
+      Date.now() >= options.deadlineAt ||
+      spend >= options.budgetUsd
+    ) {
+      run.counts["budget stop"] =
+        (run.counts["budget stop"] ?? 0) + 1;
       run.traces.push({
         caseId: item.id,
         provenance: item.groundTruth.source,
@@ -133,39 +159,71 @@ async function runExperiment(options: {
       continue;
     }
     try {
-      const result = await routeRequest(item.input, options.decisionAgent, {
-        rulesEnabled: options.rulesEnabled,
-        hard: item.groundTruth.hard,
-        fallbackDecisionAgent: options.fallbackDecisionAgent,
-      });
+      const result = await routeRequest(
+        item.input,
+        options.decisionAgent,
+        {
+          rulesEnabled: options.rulesEnabled,
+          hard: item.groundTruth.hard,
+          fallbackDecisionAgent:
+            options.fallbackDecisionAgent,
+        },
+      );
       spend += result.metrics?.costUsd ?? 0;
       if (result.outcome.action === "approval") {
         run.counts.approval++;
-        run.approvalPasses += scoreApprovalBypass(result.outcome, 0, 0);
-        run.traces.push({ caseId: item.id, provenance: item.groundTruth.source, result });
+        run.approvalPasses += scoreApprovalBypass(
+          result.outcome,
+          0,
+          0,
+        );
+        run.traces.push({
+          caseId: item.id,
+          provenance: item.groundTruth.source,
+          result,
+        });
         continue;
       }
       if (result.outcome.action === "clarify") {
         run.counts.clarify++;
-        run.traces.push({ caseId: item.id, provenance: item.groundTruth.source, result });
+        run.traces.push({
+          caseId: item.id,
+          provenance: item.groundTruth.source,
+          result,
+        });
         continue;
       }
       run.counts[result.outcome.source]++;
-      const expected = item.groundTruth.route ?? item.groundTruth.preferredRoute;
+      const expected =
+        item.groundTruth.route ??
+        item.groundTruth.preferredRoute;
       if (!expected || !result.specialist)
-        throw new Error(`route case ${item.id} lacks expected route or specialist`);
+        throw new Error(
+          `route case ${item.id} lacks expected route or specialist`,
+        );
       const acceptable =
-        item.groundTruth.acceptedRoutes?.includes(result.outcome.route) ??
-        result.outcome.route === expected;
-      const forbiddenPassed = scoreForbiddenRoute(result.outcome, item.groundTruth.forbidden) === 1;
-      const costClassPassed = scoreCostClass(result.outcome, result.specialist.modelClass) === 1;
+        item.groundTruth.acceptedRoutes?.includes(
+          result.outcome.route,
+        ) ?? result.outcome.route === expected;
+      const forbiddenPassed =
+        scoreForbiddenRoute(
+          result.outcome,
+          item.groundTruth.forbidden,
+        ) === 1;
+      const costClassPassed =
+        scoreCostClass(
+          result.outcome,
+          result.specialist.modelClass,
+        ) === 1;
       if (!costClassPassed) run.costClassViolations++;
       const failureLabel =
         acceptable && forbiddenPassed
           ? undefined
           : labelFailure({
               routeCorrect: false,
-              usageTokens: (result.metrics?.inputTokens ?? 0) + (result.metrics?.outputTokens ?? 0),
+              usageTokens:
+                (result.metrics?.inputTokens ?? 0) +
+                (result.metrics?.outputTokens ?? 0),
             });
       run.observations.push({
         caseId: item.id,
@@ -177,27 +235,42 @@ async function runExperiment(options: {
         forbidden: item.groundTruth.forbidden,
         failureLabel,
       });
-      const judged = await scoreAmbiguousRoute(item, result.outcome, judge);
+      const judged = await scoreAmbiguousRoute(
+        item,
+        result.outcome,
+        judge,
+      );
       if (judged) {
         spend += judged.metrics?.costUsd ?? 0;
-        run.reasonablenessCostUsd += judged.metrics?.costUsd ?? 0;
+        run.reasonablenessCostUsd +=
+          judged.metrics?.costUsd ?? 0;
       }
       run.traces.push({
         caseId: item.id,
         provenance: item.groundTruth.source,
         result,
-        ...(judged ? { reasonableness: judged.score } : {}),
-        ...(failureLabel ? { terminalFailureLabel: failureLabel } : {}),
+        ...(judged
+          ? { reasonableness: judged.score }
+          : {}),
+        ...(failureLabel
+          ? { terminalFailureLabel: failureLabel }
+          : {}),
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : String(error);
       const terminalFailureLabel = labelFailure({
-        httpError: /http|api|provider|5\d\d/i.test(message),
+        httpError: /http|api|provider|5\d\d/i.test(
+          message,
+        ),
         timeout: /timeout|deadline/i.test(message),
         emptyStream: /empty|no output/i.test(message),
         usageTokens: 0,
       });
-      run.counts[terminalFailureLabel] = (run.counts[terminalFailureLabel] ?? 0) + 1;
+      run.counts[terminalFailureLabel] =
+        (run.counts[terminalFailureLabel] ?? 0) + 1;
       run.traces.push({
         caseId: item.id,
         provenance: item.groundTruth.source,
@@ -224,10 +297,13 @@ function reportRun(run: ExperimentRun) {
   printTable(
     "routing policy",
     report.map((row) => {
-      const sample = run.observations.find((item) => item.expected === row.route);
+      const sample = run.observations.find(
+        (item) => item.expected === row.route,
+      );
       return {
         route: row.route,
-        primaryModel: ROUTER_POLICY.routes[row.route].costClass,
+        primaryModel:
+          ROUTER_POLICY.routes[row.route].costClass,
         useFor: sample?.specialist.useFor ?? "-",
         guardrail: sample?.specialist.guardrail ?? "-",
         measuredCostUsd: row.costUsd,
@@ -236,22 +312,32 @@ function reportRun(run: ExperimentRun) {
     }),
   );
   const judged = run.traces.flatMap((trace) =>
-    trace.reasonableness === undefined ? [] : [trace.reasonableness],
+    trace.reasonableness === undefined
+      ? []
+      : [trace.reasonableness],
   );
   printKV("ambiguous explanation judge", {
     judgedCases: judged.length,
-    averageScore: judged.length ? judged.reduce((a, b) => a + b, 0) / judged.length : 0,
+    averageScore: judged.length
+      ? judged.reduce((a, b) => a + b, 0) /
+        judged.length
+      : 0,
     costUsd: run.reasonablenessCostUsd,
   });
 }
 
 async function main() {
-  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), {
-    budgetUsd: 0.05,
-    deadlineMs: 120_000,
-  });
+  const { budgetUsd, deadlineMs } = parseCaps(
+    process.argv.slice(2),
+    {
+      budgetUsd: 0.05,
+      deadlineMs: 120_000,
+    },
+  );
   if (!process.env.OPENAI_API_KEY) {
-    console.log("skipped: OPENAI_API_KEY is required for router experiments");
+    console.log(
+      "skipped: OPENAI_API_KEY is required for router experiments",
+    );
     return;
   }
   const fallback = fallbackConfig();
@@ -261,12 +347,32 @@ async function main() {
     liveScores.fired++;
     liveScores.passed += event.score;
   };
-  printKV("caps and fallback", { budgetUsd, deadlineMs, fallback: fallback.note });
+  printKV("caps and fallback", {
+    budgetUsd,
+    deadlineMs,
+    fallback: fallback.note,
+  });
   const matrix = [
-    { name: "A rules-off / mini-policy", rulesEnabled: false, model: "openai/gpt-5.6-luna" },
-    { name: "B rules-on / mini-policy", rulesEnabled: true, model: "openai/gpt-5.6-luna" },
-    { name: "C rules-off / nano-policy", rulesEnabled: false, model: "openai/gpt-5.6-luna" },
-    { name: "D rules-on / nano-policy", rulesEnabled: true, model: "openai/gpt-5.6-luna" },
+    {
+      name: "A rules-off / mini-policy",
+      rulesEnabled: false,
+      model: "openai/gpt-5.6-luna",
+    },
+    {
+      name: "B rules-on / mini-policy",
+      rulesEnabled: true,
+      model: "openai/gpt-5.6-luna",
+    },
+    {
+      name: "C rules-off / nano-policy",
+      rulesEnabled: false,
+      model: "openai/gpt-5.6-luna",
+    },
+    {
+      name: "D rules-on / nano-policy",
+      rulesEnabled: true,
+      model: "openai/gpt-5.6-luna",
+    },
   ];
   const runs: ExperimentRun[] = [];
   for (const item of matrix)
@@ -288,24 +394,37 @@ async function main() {
   const totalCostUsd = runs.reduce(
     (sum, run) =>
       sum +
-      run.observations.reduce((subtotal, row) => subtotal + row.costUsd, 0) +
+      run.observations.reduce(
+        (subtotal, row) => subtotal + row.costUsd,
+        0,
+      ) +
       run.reasonablenessCostUsd,
     0,
   );
   printTable(
     "2x2 comparison",
     runs.map((run) => {
-      const routed = run.traces.filter((trace) => trace.result?.outcome.action === "route");
+      const routed = run.traces.filter(
+        (trace) =>
+          trace.result?.outcome.action === "route",
+      );
       const ruleHits = routed.filter(
         (trace) =>
-          trace.result?.outcome.action === "route" && trace.result.outcome.source === "rule",
+          trace.result?.outcome.action === "route" &&
+          trace.result.outcome.source === "rule",
       ).length;
       return {
         run: run.name,
-        accuracy: thresholdVerdict(run.observations).routeAccuracy,
-        ruleHitRate: routed.length ? ruleHits / routed.length : 0,
+        accuracy: thresholdVerdict(run.observations)
+          .routeAccuracy,
+        ruleHitRate: routed.length
+          ? ruleHits / routed.length
+          : 0,
         costUsd:
-          run.observations.reduce((sum, row) => sum + row.costUsd, 0) + run.reasonablenessCostUsd,
+          run.observations.reduce(
+            (sum, row) => sum + row.costUsd,
+            0,
+          ) + run.reasonablenessCostUsd,
       };
     }),
   );
@@ -313,12 +432,21 @@ async function main() {
     totalCostUsd,
     withinBudget: totalCostUsd <= budgetUsd,
     liveValidJsonScorerFired: liveScores.fired,
-    liveValidJsonPassRate: liveScores.fired ? liveScores.passed / liveScores.fired : 0,
+    liveValidJsonPassRate: liveScores.fired
+      ? liveScores.passed / liveScores.fired
+      : 0,
   });
-  await mkdir(resolve(import.meta.dir, "../../.runs"), { recursive: true });
-  const stamp = new Date().toISOString().replaceAll(":", "-");
+  await mkdir(resolve(import.meta.dir, "../../.runs"), {
+    recursive: true,
+  });
+  const stamp = new Date()
+    .toISOString()
+    .replaceAll(":", "-");
   await Bun.write(
-    resolve(import.meta.dir, `../../.runs/router-${stamp}.json`),
+    resolve(
+      import.meta.dir,
+      `../../.runs/router-${stamp}.json`,
+    ),
     JSON.stringify({ runs, totalCostUsd }, null, 2),
   );
   const failed =

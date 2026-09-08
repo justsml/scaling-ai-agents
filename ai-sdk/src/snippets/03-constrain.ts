@@ -1,39 +1,71 @@
 #!/usr/bin/env bun
 // 03 Constrain
-// ------------
-// Axis: Constrain -- caps on time and money as first-class inputs.
+// ----------------------------------------
+// Axis: Constrain -- caps on time and money as
+// first-class inputs.
 //
-// The Compete tournament again, but spend is reserved per worker (src/lib/
-// ledger.ts) before fan-out, and reconciled against actual token usage after
-// each worker settles. If reconciliation pushes total spend over budget, the
-// ledger flips an AbortController; remaining in-flight calls are cancelled,
-// but whatever the provider already billed stays billed ("billedAnyway").
-// The deadline is a second, independent AbortSignal, combined with the
-// ledger's via AbortSignal.any -- either one firing stops the tournament.
+// The Compete tournament again, but spend is reserved
+// per worker (src/lib/ ledger.ts) before fan-out, and
+// reconciled against actual token usage after each
+// worker settles. If reconciliation pushes total spend
+// over budget, the ledger flips an AbortController;
+// remaining in-flight calls are cancelled, but whatever
+// the provider already billed stays billed
+// ("billedAnyway"). The deadline is a second,
+// independent AbortSignal, combined with the ledger's
+// via AbortSignal.any -- either one firing stops the
+// tournament.
 //
-// `onStepEnd` feeds usage into the ledger after every step (not just at the
-// end), so a runaway loop with a low per-step cost is still cut promptly,
-// and `prepareStep` caps `maxOutputTokens` from the per-worker reservation
-// so no single step can blow through it on its own.
+// `onStepEnd` feeds usage into the ledger after every
+// step (not just at the end), so a runaway loop with a
+// low per-step cost is still cut promptly, and
+// `prepareStep` caps `maxOutputTokens` from the
+// per-worker reservation so no single step can blow
+// through it on its own.
 //
-// A fifth path -- "apply the winning patch to main" -- is consequential and
-// requires human approval via `toolApproval` regardless of remaining budget.
-// This snippet denies it automatically (no human is attached) and prints the
-// approval request that would have gone to one.
+// A fifth path -- "apply the winning patch to main" --
+// is consequential and requires human approval via
+// `toolApproval` regardless of remaining budget. This
+// snippet denies it automatically (no human is
+// attached) and prints the approval request that would
+// have gone to one.
 //
-// Run twice, as the plan specifies: once generous, once at $0.02.
-import { ToolLoopAgent, Output, isStepCount, tool, type StopCondition } from "ai";
+// Run twice, as the plan specifies: once generous, once
+// at $0.02.
+import {
+  ToolLoopAgent,
+  Output,
+  isStepCount,
+  tool,
+  type StopCondition,
+} from "ai";
 import { z } from "zod";
 import { competitorProfiles } from "../lib/profiles";
 import { Ledger } from "../lib/ledger";
-import { withWorkerSpan, dumpWorkerSpans, initTelemetry } from "../lib/otel";
-import { costUsd, formatUsd, priceFor } from "../lib/prices";
+import {
+  withWorkerSpan,
+  dumpWorkerSpans,
+  initTelemetry,
+} from "../lib/otel";
+import {
+  costUsd,
+  formatUsd,
+  priceFor,
+} from "../lib/prices";
 import { runSandbox } from "../lib/sandbox";
 import { parseCaps } from "../lib/cli";
-import { printTable, printKV, heading } from "../lib/print";
+import {
+  printTable,
+  printKV,
+  heading,
+} from "../lib/print";
 
 const patchSchema = z.object({
-  source: z.string().describe("The complete new contents of readiness.ts"),
+  source: z
+    .string()
+    .describe(
+      "The complete new contents of readiness.ts",
+    ),
   explanation: z.string(),
 });
 
@@ -58,11 +90,16 @@ function estimateReservation(modelId: string): number {
 }
 
 async function runOneConstrainedWorker(
-  profile: ReturnType<typeof competitorProfiles>[number],
+  profile: ReturnType<
+    typeof competitorProfiles
+  >[number],
   ledger: Ledger,
   combinedSignal: AbortSignal,
 ): Promise<ConstrainedResult> {
-  const reserved = ledger.reserve(profile.name, estimateReservation(profile.modelId));
+  const reserved = ledger.reserve(
+    profile.name,
+    estimateReservation(profile.modelId),
+  );
   if (!reserved) {
     return {
       profile: profile.name,
@@ -73,13 +110,24 @@ async function runOneConstrainedWorker(
     };
   }
 
-  // Cap output tokens to the dollar value just reserved, roughly, via price table.
+  // Cap output tokens to the dollar value just
+  // reserved, roughly, via price table.
   const price = priceFor(profile.modelId);
-  const reservationUsd = ledger.rows().find((r) => r.worker === profile.name)!.reservedUsd;
-  const maxOutputTokens = Math.max(200, Math.floor((reservationUsd / price.output) * 1_000_000));
+  const reservationUsd = ledger
+    .rows()
+    .find(
+      (r) => r.worker === profile.name,
+    )!.reservedUsd;
+  const maxOutputTokens = Math.max(
+    200,
+    Math.floor(
+      (reservationUsd / price.output) * 1_000_000,
+    ),
+  );
 
   let stepsSeen = 0;
-  const budgetExceeded: StopCondition<any> = () => ledger.exceeded;
+  const budgetExceeded: StopCondition<any> = () =>
+    ledger.exceeded;
 
   const agent = new ToolLoopAgent({
     model: profile.model,
@@ -87,12 +135,19 @@ async function runOneConstrainedWorker(
     output: Output.object({ schema: patchSchema }),
     maxOutputTokens,
     stopWhen: [isStepCount(2), budgetExceeded],
-    telemetry: { functionId: `constrain-${profile.name}` },
+    telemetry: {
+      functionId: `constrain-${profile.name}`,
+    },
     onStepEnd: async ({ usage }) => {
       stepsSeen++;
-      // Reconcile every step, not just at the end, so a runaway multi-step
-      // loop is cut as soon as its running total crosses the cap.
-      ledger.settle(profile.name, profile.modelId, usage);
+      // Reconcile every step, not just at the end, so a
+      // runaway multi-step loop is cut as soon as its
+      // running total crosses the cap.
+      ledger.settle(
+        profile.name,
+        profile.modelId,
+        usage,
+      );
     },
   });
 
@@ -105,17 +160,27 @@ async function runOneConstrainedWorker(
       async () => {
         const start = Date.now();
         const result = await agent.generate({
-          prompt: "Patch readiness.ts to fix the three bugs described in your instructions.",
+          prompt:
+            "Patch readiness.ts to fix the three bugs described in your instructions.",
           abortSignal: combinedSignal,
         });
         const latencyMs = Date.now() - start;
-        const actual = ledger.settle(profile.name, profile.modelId, result.usage);
+        const actual = ledger.settle(
+          profile.name,
+          profile.modelId,
+          result.usage,
+        );
         let sandboxOk: boolean | undefined;
         let outcome = "completed";
         if (result.output?.source) {
-          const sandbox = await runSandbox(result.output.source, 6000);
+          const sandbox = await runSandbox(
+            result.output.source,
+            6000,
+          );
           sandboxOk = sandbox.ok;
-          outcome = sandbox.ok ? "completed;passed-sandbox" : "completed;failed-sandbox";
+          outcome = sandbox.ok
+            ? "completed;passed-sandbox"
+            : "completed;failed-sandbox";
         }
         return {
           result: {
@@ -147,54 +212,78 @@ async function runOneConstrainedWorker(
   }
 }
 
-async function runTournament(budgetUsd: number, deadlineMs: number) {
+async function runTournament(
+  budgetUsd: number,
+  deadlineMs: number,
+) {
   const ledger = new Ledger(budgetUsd);
   const deadline = AbortSignal.timeout(deadlineMs);
-  const combined = AbortSignal.any([deadline, ledger.signal]);
+  const combined = AbortSignal.any([
+    deadline,
+    ledger.signal,
+  ]);
 
   const profiles = competitorProfiles();
   const settled = await Promise.allSettled(
-    profiles.map((p) => runOneConstrainedWorker(p, ledger, combined)),
+    profiles.map((p) =>
+      runOneConstrainedWorker(p, ledger, combined),
+    ),
   );
-  const results: ConstrainedResult[] = settled.map((s, i) =>
-    s.status === "fulfilled"
-      ? s.value
-      : {
-          profile: profiles[i]!.name,
-          reserved: false,
-          ranSteps: 0,
-          costUsd: 0,
-          outcome: "rejected",
-        },
+  const results: ConstrainedResult[] = settled.map(
+    (s, i) =>
+      s.status === "fulfilled"
+        ? s.value
+        : {
+            profile: profiles[i]!.name,
+            reserved: false,
+            ranSteps: 0,
+            costUsd: 0,
+            outcome: "rejected",
+          },
   );
 
-  return { results, ledger, deadlineHit: deadline.aborted, budgetHit: ledger.exceeded };
+  return {
+    results,
+    ledger,
+    deadlineHit: deadline.aborted,
+    budgetHit: ledger.exceeded,
+  };
 }
 
 // --- consequential path: applying the winner requires human approval ------
 const applyPatchTool = tool({
-  description: "Apply the winning patch to main and push.",
+  description:
+    "Apply the winning patch to main and push.",
   inputSchema: z.object({ patchSummary: z.string() }),
-  execute: async ({ patchSummary }) => ({ applied: true, patchSummary }),
+  execute: async ({ patchSummary }) => ({
+    applied: true,
+    patchSummary,
+  }),
 });
 
-async function runConsequentialGate(remainingBudgetUsd: number) {
+async function runConsequentialGate(
+  remainingBudgetUsd: number,
+) {
   const agent = new ToolLoopAgent({
     model: competitorProfiles()[0]!.model,
     instructions:
       "You are a release assistant. Apply the winning patch to main using the applyPatch tool.",
     tools: { applyPatch: applyPatchTool },
     toolApproval: {
-      // Consequential regardless of remaining budget -- the policy check
-      // does not even look at `remainingBudgetUsd`, which is the point.
+      // Consequential regardless of remaining budget --
+      // the policy check does not even look at
+      // `remainingBudgetUsd`, which is the point.
       applyPatch: "user-approval",
     },
     stopWhen: isStepCount(2),
   });
   const result = await agent.generate({
-    prompt: "Apply the winning readiness patch to main and push.",
+    prompt:
+      "Apply the winning readiness patch to main and push.",
   });
-  const approvalRequests = result.content.filter((p) => p.type === "tool-approval-request");
+  const approvalRequests = result.content.filter(
+    (p) => p.type === "tool-approval-request",
+  );
   return {
     approvalRequested: approvalRequests.length > 0,
     remainingBudgetUsd,
@@ -202,9 +291,16 @@ async function runConsequentialGate(remainingBudgetUsd: number) {
   };
 }
 
-async function runOnce(label: string, budgetUsd: number, deadlineMs: number) {
-  heading(`Constrain run: ${label} (budget=${formatUsd(budgetUsd)}, deadline=${deadlineMs}ms)`);
-  const { results, ledger, deadlineHit, budgetHit } = await runTournament(budgetUsd, deadlineMs);
+async function runOnce(
+  label: string,
+  budgetUsd: number,
+  deadlineMs: number,
+) {
+  heading(
+    `Constrain run: ${label} (budget=${formatUsd(budgetUsd)}, deadline=${deadlineMs}ms)`,
+  );
+  const { results, ledger, deadlineHit, budgetHit } =
+    await runTournament(budgetUsd, deadlineMs);
 
   printTable(
     "workers",
@@ -234,21 +330,39 @@ async function runOnce(label: string, budgetUsd: number, deadlineMs: number) {
       : "all workers finished under both caps";
   printKV("stop reason", { reason: stopReason });
 
-  const gate = await runConsequentialGate(Math.max(0, budgetUsd - summary.spentUsd));
-  printKV("consequential path (apply patch to main)", gate);
+  const gate = await runConsequentialGate(
+    Math.max(0, budgetUsd - summary.spentUsd),
+  );
+  printKV(
+    "consequential path (apply patch to main)",
+    gate,
+  );
 
   return summary.spentUsd;
 }
 
 async function main() {
-  const argCaps = parseCaps(process.argv.slice(2), { budgetUsd: 0.05, deadlineMs: 20_000 });
+  const argCaps = parseCaps(process.argv.slice(2), {
+    budgetUsd: 0.05,
+    deadlineMs: 20_000,
+  });
   initTelemetry();
 
   let totalSpentUsd = 0;
-  totalSpentUsd += await runOnce("generous", Math.max(argCaps.budgetUsd, 0.15), 45_000);
-  totalSpentUsd += await runOnce("tight (plan default)", 0.02, 20_000);
+  totalSpentUsd += await runOnce(
+    "generous",
+    Math.max(argCaps.budgetUsd, 0.15),
+    45_000,
+  );
+  totalSpentUsd += await runOnce(
+    "tight (plan default)",
+    0.02,
+    20_000,
+  );
 
-  printKV("grand total", { totalSpentUsd: formatUsd(totalSpentUsd) });
+  printKV("grand total", {
+    totalSpentUsd: formatUsd(totalSpentUsd),
+  });
 
   const { exporter } = initTelemetry();
   printTable("worker spans", dumpWorkerSpans(exporter));

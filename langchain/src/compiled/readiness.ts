@@ -1,13 +1,26 @@
-// Shipped reference implementation. No tournament provenance is claimed.
+// Shipped reference implementation. No tournament
+// provenance is claimed.
 export type ProbeResult =
   | { ok: true }
-  | { ok: false; code: "ECONNREFUSED" | "EACCES" | "ETIMEDOUT" };
+  | {
+      ok: false;
+      code: "ECONNREFUSED" | "EACCES" | "ETIMEDOUT";
+    };
 export type Probe = () => Promise<ProbeResult>;
 
 export type ReadinessOutcome =
   | { status: "ran"; attempts: number }
-  | { status: "denied"; attempts: number; reason: string }
-  | { status: "deadline"; attempts: number; reason: string; partial: true };
+  | {
+      status: "denied";
+      attempts: number;
+      reason: string;
+    }
+  | {
+      status: "deadline";
+      attempts: number;
+      reason: string;
+      partial: true;
+    };
 
 export interface ReadinessOptions {
   deadlineMs: number;
@@ -25,7 +38,11 @@ export async function runWhenReady(
 ): Promise<ReadinessOutcome> {
   const now = options.now ?? Date.now;
   const sleep =
-    options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+    options.sleep ??
+    ((ms: number) =>
+      new Promise<void>((resolve) =>
+        setTimeout(resolve, ms),
+      ));
   const base = options.baseDelayMs ?? 50;
   const startedAt = now();
   const elapsed = () => now() - startedAt;
@@ -41,14 +58,18 @@ export async function runWhenReady(
     reason: `deadline after ${attempts} attempt(s); last error ${lastCode}`,
   });
   for (;;) {
-    if (elapsed() >= options.deadlineMs) return expired();
+    if (elapsed() >= options.deadlineMs)
+      return expired();
     attempts++;
 
     let result: ProbeResult;
     try {
       result = await probe();
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : String(error);
       return {
         status: "denied",
         attempts,
@@ -57,7 +78,8 @@ export async function runWhenReady(
     }
 
     if (result.ok) {
-      if (elapsed() >= options.deadlineMs) return expired();
+      if (elapsed() >= options.deadlineMs)
+        return expired();
       await run();
       return { status: "ran", attempts };
     }
@@ -81,7 +103,9 @@ export async function runWhenReady(
       };
     }
 
-    await sleep(Math.min(delay, MAX_DELAY_MS, remaining));
+    await sleep(
+      Math.min(delay, MAX_DELAY_MS, remaining),
+    );
     delay = delay * 2;
   }
 }

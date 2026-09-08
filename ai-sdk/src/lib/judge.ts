@@ -1,13 +1,17 @@
-// The judge never writes its own rubric: deterministic checks run first
-// (the sandbox test suite), and only survivors go to an LLM rubric judge
-// whose text lives in src/fixtures/rubric.md.
+// The judge never writes its own rubric: deterministic
+// checks run first (the sandbox test suite), and only
+// survivors go to an LLM rubric judge whose text lives
+// in src/fixtures/rubric.md.
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import { costUsd } from "./prices";
 import { judgeModel, judgeModelId } from "./profiles";
 
-const RUBRIC_PATH = new URL("../fixtures/rubric.md", import.meta.url);
+const RUBRIC_PATH = new URL(
+  "../fixtures/rubric.md",
+  import.meta.url,
+);
 
 const rubricSchema = z.object({
   scores: z.object({
@@ -18,10 +22,11 @@ const rubricSchema = z.object({
     readability: z.number().min(0).max(2),
   }),
   disqualified: z.boolean(),
-  // OpenAI structured outputs require every property in `required`; there is
-  // no optional-field support, so an absent reason is an empty string
-  // rather than `undefined` (a real deviation from the naive zod schema
-  // PLAN.md implied).
+  // OpenAI structured outputs require every property in
+  // `required`; there is no optional-field support, so
+  // an absent reason is an empty string rather than
+  // `undefined` (a real deviation from the naive zod
+  // schema PLAN.md implied).
   disqualifiedReason: z.string(),
   total: z.number().min(0).max(10),
   summary: z.string(),
@@ -30,13 +35,18 @@ const rubricSchema = z.object({
 export type RubricScore = z.infer<typeof rubricSchema>;
 
 /** Model arithmetic is not evidence. Derive ranking totals from the rubric items. */
-export function normalizeRubricScore(value: unknown): RubricScore {
+export function normalizeRubricScore(
+  value: unknown,
+): RubricScore {
   const score = rubricSchema.parse(value);
   return {
     ...score,
     total: score.disqualified
       ? 0
-      : Object.values(score.scores).reduce((sum, item) => sum + item, 0),
+      : Object.values(score.scores).reduce(
+          (sum, item) => sum + item,
+          0,
+        ),
   };
 }
 
@@ -49,7 +59,8 @@ export interface RubricJudgeResult {
 
 let rubricCache: string | undefined;
 async function loadRubric(): Promise<string> {
-  if (!rubricCache) rubricCache = await readFile(RUBRIC_PATH, "utf8");
+  if (!rubricCache)
+    rubricCache = await readFile(RUBRIC_PATH, "utf8");
   return rubricCache;
 }
 

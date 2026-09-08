@@ -1,5 +1,9 @@
-// Offline compile path using a native tool step. Never clears or rewrites the registry.
-import { createStep, createWorkflow } from "@mastra/core/workflows";
+// Offline compile path using a native tool step. Never
+// clears or rewrites the registry.
+import {
+  createStep,
+  createWorkflow,
+} from "@mastra/core/workflows";
 import { z } from "zod";
 import { compiledReadinessTool } from "../mastra/tools.js";
 import { readinessChallenge } from "../lib/readiness-challenge.js";
@@ -15,13 +19,24 @@ export const compiledWorkflow = createWorkflow({
 if (import.meta.main) {
   const buggy = await readinessChallenge.load("buggy");
   for (const [label, source] of [
-    ["registered winner or shipped reference", buggy.source],
+    [
+      "registered winner or shipped reference",
+      buggy.source,
+    ],
     ["repeat with fresh certification", buggy.source],
-    ["different source", buggy.source + "\n// different module"],
+    [
+      "different source",
+      buggy.source + "\n// different module",
+    ],
   ]) {
     const run = await compiledWorkflow.createRun();
-    const result = await run.start({ inputData: { source } });
-    if (result.status !== "success") throw new Error(`compiled workflow ${result.status}`);
+    const result = await run.start({
+      inputData: { source },
+    });
+    if (result.status !== "success")
+      throw new Error(
+        `compiled workflow ${result.status}`,
+      );
     console.log({
       label,
       matched: result.result.matched,

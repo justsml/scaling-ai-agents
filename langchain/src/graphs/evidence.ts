@@ -1,28 +1,47 @@
 /**
- * evidence.ts — DECOMPOSE: many sub-problems, many workers.
+ * evidence.ts — DECOMPOSE: many sub-problems, many
+ * workers.
  *
- * Three workers investigate the same incident from three evidence sources. Each is its own
- * compiled subgraph, added to the parent graph as a node, with parallel edges from `START`
- * so all three run in one superstep.
+ * Three workers investigate the same incident from
+ * three evidence sources. Each is its own compiled
+ * subgraph, added to the parent graph as a node, with
+ * parallel edges from `START` so all three run in one
+ * superstep.
  *
- * The rule that matters is "two workers must never write the same file". Here that rule is a
+ * The rule that matters is "two workers must never
+ * write the same file". Here that rule is a
  * **reducer that throws**. `artifacts` is keyed by evidence source; if two workers ever
  * return the same key, `mergeArtifacts` raises `ArtifactCollision` rather than silently
- * letting the later write win. `test/collision.test.ts` proves it throws — a rule that is
- * only a convention is not a rule.
+ * letting the later write win. `test/collision.test.ts`
+ * proves it throws — a rule that is only a convention
+ * is not a rule.
  */
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as z from "zod";
-import { END, ReducedValue, START, StateGraph, StateSchema } from "@langchain/langgraph";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import {
+  END,
+  ReducedValue,
+  START,
+  StateGraph,
+  StateSchema,
+} from "@langchain/langgraph";
+import {
+  HumanMessage,
+  SystemMessage,
+} from "@langchain/core/messages";
 import { tool } from "langchain";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { estimateCostUsd, readUsage } from "../lib/prices.ts";
+import {
+  estimateCostUsd,
+  readUsage,
+} from "../lib/prices.ts";
 
-const FIXTURES = fileURLToPath(new URL("../fixtures/", import.meta.url));
+const FIXTURES = fileURLToPath(
+  new URL("../fixtures/", import.meta.url),
+);
 
 export class ArtifactCollision extends Error {
   constructor(readonly key: string) {
@@ -49,9 +68,10 @@ export interface Artifact {
 }
 
 /**
- * The collision reducer. Exported and tested directly, because the whole point of writing it
- * as a reducer instead of a convention is that it is a function you can hand two colliding
- * inputs and watch fail.
+ * The collision reducer. Exported and tested directly,
+ * because the whole point of writing it as a reducer
+ * instead of a convention is that it is a function you
+ * can hand two colliding inputs and watch fail.
  */
 export function mergeArtifacts(
   left: Record<string, Artifact>,
@@ -65,7 +85,10 @@ export function mergeArtifacts(
   return merged;
 }
 
-export type EvidenceSource = "network" | "app" | "state";
+export type EvidenceSource =
+  | "network"
+  | "app"
+  | "state";
 
 export interface WorkerSpec {
   source: EvidenceSource;
@@ -84,41 +107,53 @@ export const WORKERS: WorkerSpec[] = [
     file: "incident/network.log",
     question:
       "What does the proxy do to these connections, and on what timer? Quote the exact lines.",
-    exitCondition: "the proxy's close reason and its threshold are quoted, or absent from the log",
-    whyItExisted: "owns the network boundary; nothing else can see the proxy's own decisions",
+    exitCondition:
+      "the proxy's close reason and its threshold are quoted, or absent from the log",
+    whyItExisted:
+      "owns the network boundary; nothing else can see the proxy's own decisions",
   },
   {
     source: "app",
     file: "incident/app.log",
     question:
       "What does the application do on connect, on close, and on reconnect? Quote any configured intervals.",
-    exitCondition: "the heartbeat interval and the reconnect outcome are quoted, or absent",
-    whyItExisted: "owns the application's view; the only place configuration defaults show up",
+    exitCondition:
+      "the heartbeat interval and the reconnect outcome are quoted, or absent",
+    whyItExisted:
+      "owns the application's view; the only place configuration defaults show up",
   },
   {
     source: "state",
     file: "incident/state.json",
     question:
       "What is the session's subscription state after reconnect, and does it match what is expected?",
-    exitCondition: "expected vs restored subscriptions are compared, or the file does not say",
-    whyItExisted: "owns durable state; a log can show a reconnect succeeded and still hide this",
+    exitCondition:
+      "expected vs restored subscriptions are compared, or the file does not say",
+    whyItExisted:
+      "owns durable state; a log can show a reconnect succeeded and still hide this",
   },
 ];
 
 export const DecomposeState = new StateSchema({
   incident: z.string(),
   /**
-   * Keyed by evidence source. Three parallel workers write it in the same superstep, so it
-   * needs a reducer — and the reducer is where the "one writer per artifact" rule lives.
+   * Keyed by evidence source. Three parallel workers
+   * write it in the same superstep, so it needs a
+   * reducer — and the reducer is where the "one writer
+   * per artifact" rule lives.
    */
   artifacts: new ReducedValue(
-    z.record(z.string(), z.custom<Artifact>()).default(() => ({})),
+    z
+      .record(z.string(), z.custom<Artifact>())
+      .default(() => ({})),
     {
       reducer: mergeArtifacts,
     },
   ),
   verdict: z.string().default(""),
-  contraryEvidence: z.array(z.string()).default(() => []),
+  contraryEvidence: z
+    .array(z.string())
+    .default(() => []),
   causesFound: z.array(z.string()).default(() => []),
   reviewCostUsd: z.number().default(0),
 });
@@ -126,18 +161,24 @@ export const DecomposeState = new StateSchema({
 /**
  * State of one worker's own two-node subgraph.
  *
- * The explicit `input`/`output` schemas matter. A subgraph added as a node returns its whole
- * state to the parent by default, so three workers echoing `incident` back in the same
- * superstep collide on a LastValue channel:
+ * The explicit `input`/`output` schemas matter. A
+ * subgraph added as a node returns its whole state to
+ * the parent by default, so three workers echoing
+ * `incident` back in the same superstep collide on a
+ * LastValue channel:
  *   InvalidUpdateError: Invalid update for channel "incident" ... LastValue can only receive
  *   one value per step.
- * Narrowing the output to `artifacts` — the one channel that HAS a reducer — is the fix, and
- * it is also the honest statement of what a worker owns: one artifact, nothing else.
+ * Narrowing the output to `artifacts` — the one channel
+ * that HAS a reducer — is the fix, and it is also the
+ * honest statement of what a worker owns: one artifact,
+ * nothing else.
  */
 const WorkerState = new StateSchema({
   incident: z.string(),
   artifacts: new ReducedValue(
-    z.record(z.string(), z.custom<Artifact>()).default(() => ({})),
+    z
+      .record(z.string(), z.custom<Artifact>())
+      .default(() => ({})),
     {
       reducer: mergeArtifacts,
     },
@@ -145,11 +186,15 @@ const WorkerState = new StateSchema({
   raw: z.string().default(""),
 });
 
-const WorkerInput = new StateSchema({ incident: z.string() });
+const WorkerInput = new StateSchema({
+  incident: z.string(),
+});
 
 const WorkerOutput = new StateSchema({
   artifacts: new ReducedValue(
-    z.record(z.string(), z.custom<Artifact>()).default(() => ({})),
+    z
+      .record(z.string(), z.custom<Artifact>())
+      .default(() => ({})),
     {
       reducer: mergeArtifacts,
     },
@@ -165,28 +210,47 @@ export interface EvidenceDeps {
 }
 
 /**
- * One worker = one compiled subgraph with exactly two nodes:
+ * One worker = one compiled subgraph with exactly two
+ * nodes:
  *
  *   read  -> the ONE allowed file, through a bound tool whose schema cannot name another file
  *   answer -> the ONE question, with the ONE exit condition in the system prompt
  *
- * Compiling each worker separately (rather than inlining three near-identical nodes) is what
- * makes "this worker cannot reach that evidence" a property of the graph instead of a hope.
+ * Compiling each worker separately (rather than
+ * inlining three near-identical nodes) is what makes
+ * "this worker cannot reach that evidence" a property
+ * of the graph instead of a hope.
  */
-export function buildWorkerSubgraph(spec: WorkerSpec, deps: EvidenceDeps) {
-  // The tool takes no arguments at all. There is no parameter through which a worker could
-  // ask for a different file: the allow-list is the closure, not the schema.
-  const readMyEvidence = tool(async () => readFile(join(FIXTURES, spec.file), "utf8"), {
-    name: `read_${spec.source}_evidence`,
-    description: `Read ${spec.file}. This is the only file this worker may read.`,
-    schema: z.object({}),
-  });
+export function buildWorkerSubgraph(
+  spec: WorkerSpec,
+  deps: EvidenceDeps,
+) {
+  // The tool takes no arguments at all. There is no
+  // parameter through which a worker could ask for a
+  // different file: the allow-list is the closure, not
+  // the schema.
+  const readMyEvidence = tool(
+    async () =>
+      readFile(join(FIXTURES, spec.file), "utf8"),
+    {
+      name: `read_${spec.source}_evidence`,
+      description: `Read ${spec.file}. This is the only file this worker may read.`,
+      schema: z.object({}),
+    },
+  );
 
-  return new StateGraph({ state: WorkerState, input: WorkerInput, output: WorkerOutput })
+  return new StateGraph({
+    state: WorkerState,
+    input: WorkerInput,
+    output: WorkerOutput,
+  })
     .addNode("read", async () => {
       const raw = (await readMyEvidence.invoke(
         {},
-        { callbacks: deps.callbacks as never, runName: `read:${spec.source}` },
+        {
+          callbacks: deps.callbacks as never,
+          runName: `read:${spec.source}`,
+        },
       )) as string;
       return { raw };
     })
@@ -235,15 +299,21 @@ export function buildWorkerSubgraph(spec: WorkerSpec, deps: EvidenceDeps) {
       );
 
       const usage = readUsage(response);
-      const costUsd = estimateCostUsd(deps.modelId, usage);
+      const costUsd = estimateCostUsd(
+        deps.modelId,
+        usage,
+      );
       deps.onCost?.(costUsd);
       const finding =
-        typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+        typeof response.content === "string"
+          ? response.content
+          : JSON.stringify(response.content);
 
       return {
         artifacts: {
-          // The key IS the ownership claim. Two workers claiming it is a bug, and the
-          // reducer treats it as one.
+          // The key IS the ownership claim. Two workers
+          // claiming it is a bug, and the reducer
+          // treats it as one.
           [spec.source]: {
             source: spec.source,
             question: spec.question,
@@ -264,9 +334,18 @@ export function buildWorkerSubgraph(spec: WorkerSpec, deps: EvidenceDeps) {
 
 /** Backtick-quoted or timestamp-prefixed lines the worker claims to have read. */
 function extractCitations(text: string): string[] {
-  const backticked = [...text.matchAll(/`([^`]{12,})`/g)].map((m) => m[1]!.trim());
-  if (backticked.length > 0) return backticked.slice(0, 6);
-  return [...text.matchAll(/^\s*(20\d\d-\d\d-\d\dT[^\n]{10,})$/gm)].map((m) => m[1]!).slice(0, 6);
+  const backticked = [
+    ...text.matchAll(/`([^`]{12,})`/g),
+  ].map((m) => m[1]!.trim());
+  if (backticked.length > 0)
+    return backticked.slice(0, 6);
+  return [
+    ...text.matchAll(
+      /^\s*(20\d\d-\d\d-\d\dT[^\n]{10,})$/gm,
+    ),
+  ]
+    .map((m) => m[1]!)
+    .slice(0, 6);
 }
 
 export interface ReviewerDeps extends EvidenceDeps {
@@ -275,26 +354,49 @@ export interface ReviewerDeps extends EvidenceDeps {
 }
 
 /**
- * The reviewer's job is not to summarise. It is to look for evidence AGAINST the favored
- * hypothesis — here, "the proxy idle timeout explains everything" — because the ground truth
- * has a second, independent cause that a summariser will miss.
+ * The reviewer's job is not to summarise. It is to look
+ * for evidence AGAINST the favored hypothesis — here,
+ * "the proxy idle timeout explains everything" —
+ * because the ground truth has a second, independent
+ * cause that a summariser will miss.
  */
-export function buildDecomposeGraph(deps: ReviewerDeps) {
-  const [netSpec, appSpec, stateSpec] = WORKERS as [WorkerSpec, WorkerSpec, WorkerSpec];
+export function buildDecomposeGraph(
+  deps: ReviewerDeps,
+) {
+  const [netSpec, appSpec, stateSpec] = WORKERS as [
+    WorkerSpec,
+    WorkerSpec,
+    WorkerSpec,
+  ];
 
-  // Written out rather than looped, for two reasons. LangGraph rejects ":" in node names, so
-  // the nodes are `worker_network` etc.; and the builder is typed per `addNode` call, so a
-  // loop erases the node-name union that makes `addEdge` type-safe.
+  // Written out rather than looped, for two reasons.
+  // LangGraph rejects ":" in node names, so the nodes
+  // are `worker_network` etc.; and the builder is typed
+  // per `addNode` call, so a loop erases the node-name
+  // union that makes `addEdge` type-safe.
   return (
     new StateGraph(DecomposeState)
-      // Each worker's compiled subgraph is added as a node. It shares the `artifacts`
-      // channel with the parent, so the parent's reducer enforces the collision rule.
-      .addNode("worker_network", buildWorkerSubgraph(netSpec, deps))
-      .addNode("worker_app", buildWorkerSubgraph(appSpec, deps))
-      .addNode("worker_state", buildWorkerSubgraph(stateSpec, deps))
+      // Each worker's compiled subgraph is added as a
+      // node. It shares the `artifacts` channel with
+      // the parent, so the parent's reducer enforces
+      // the collision rule.
+      .addNode(
+        "worker_network",
+        buildWorkerSubgraph(netSpec, deps),
+      )
+      .addNode(
+        "worker_app",
+        buildWorkerSubgraph(appSpec, deps),
+      )
+      .addNode(
+        "worker_state",
+        buildWorkerSubgraph(stateSpec, deps),
+      )
       .addNode("reviewer", async (state) => {
         const started = Date.now();
-        const artifacts = Object.values(state.artifacts);
+        const artifacts = Object.values(
+          state.artifacts,
+        );
         const response = await deps.llm.invoke(
           [
             new SystemMessage(
@@ -320,9 +422,12 @@ export function buildDecomposeGraph(deps: ReviewerDeps) {
                 `Incident: ${state.incident}`,
                 ``,
                 ...artifacts.map((a) =>
-                  [`=== report: ${a.source} ===`, `question: ${a.question}`, a.finding, ``].join(
-                    "\n",
-                  ),
+                  [
+                    `=== report: ${a.source} ===`,
+                    `question: ${a.question}`,
+                    a.finding,
+                    ``,
+                  ].join("\n"),
                 ),
               ].join("\n"),
             ),
@@ -344,7 +449,10 @@ export function buildDecomposeGraph(deps: ReviewerDeps) {
         );
 
         const usage = readUsage(response);
-        const costUsd = estimateCostUsd(deps.modelId, usage);
+        const costUsd = estimateCostUsd(
+          deps.modelId,
+          usage,
+        );
         deps.onCost?.(costUsd);
         const text =
           typeof response.content === "string"
@@ -354,9 +462,13 @@ export function buildDecomposeGraph(deps: ReviewerDeps) {
         return {
           verdict: text,
           causesFound: parseList(text, "CAUSES"),
-          contraryEvidence: parseLines(text, "CONTRARY"),
+          contraryEvidence: parseLines(
+            text,
+            "CONTRARY",
+          ),
           reviewCostUsd: costUsd,
-          // latency is recorded by the caller's span; this keeps the node pure-ish
+          // latency is recorded by the caller's span;
+          // this keeps the node pure-ish
           ...(started ? {} : {}),
         };
       })
@@ -373,18 +485,30 @@ export function buildDecomposeGraph(deps: ReviewerDeps) {
   );
 }
 
-function parseList(text: string, label: string): string[] {
-  const line = text.match(new RegExp(`^${label}:\\s*(.+)$`, "mi"))?.[1] ?? "";
+function parseList(
+  text: string,
+  label: string,
+): string[] {
+  const line =
+    text.match(
+      new RegExp(`^${label}:\\s*(.+)$`, "mi"),
+    )?.[1] ?? "";
   return line
     .split(";")
     .map((s) => s.trim())
     .filter(Boolean);
 }
 
-function parseLines(text: string, label: string): string[] {
-  const start = text.search(new RegExp(`^${label}:`, "mi"));
+function parseLines(
+  text: string,
+  label: string,
+): string[] {
+  const start = text.search(
+    new RegExp(`^${label}:`, "mi"),
+  );
   if (start < 0) return [];
-  const rest = text.slice(start).split(/^VERDICT:/im)[0] ?? "";
+  const rest =
+    text.slice(start).split(/^VERDICT:/im)[0] ?? "";
   return rest
     .replace(new RegExp(`^${label}:`, "i"), "")
     .split("\n")
@@ -392,12 +516,14 @@ function parseLines(text: string, label: string): string[] {
     .filter((s) => s.length > 8);
 }
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------
 // Scoring against ground truth.
 //
-// `incident/ground-truth.md` says there are TWO independent causes. Workers must not read
-// it; only this scorer does, and only after the reviewer has committed to an answer.
-// ---------------------------------------------------------------------------
+// `incident/ground-truth.md` says there are TWO
+// independent causes. Workers must not read it; only
+// this scorer does, and only after the reviewer has
+// committed to an answer.
+// ----------------------------------------
 
 export interface GroundTruthScore {
   foundProxyTimeout: boolean;
@@ -410,21 +536,32 @@ export async function scoreAgainstGroundTruth(
   reviewerText: string,
   artifacts: Record<string, Artifact>,
 ): Promise<GroundTruthScore> {
-  // Read it so the file is genuinely part of the run, and so a reader can see it is only
-  // opened here.
-  await readFile(join(FIXTURES, "incident/ground-truth.md"), "utf8");
+  // Read it so the file is genuinely part of the run,
+  // and so a reader can see it is only opened here.
+  await readFile(
+    join(FIXTURES, "incident/ground-truth.md"),
+    "utf8",
+  );
 
-  const haystack = [reviewerText, ...Object.values(artifacts).map((a) => a.finding)]
+  const haystack = [
+    reviewerText,
+    ...Object.values(artifacts).map((a) => a.finding),
+  ]
     .join("\n")
     .toLowerCase();
 
   const foundProxyTimeout =
-    /idle[_\s-]?timeout|60s|heartbeat/.test(haystack) && /proxy|heartbeat/.test(haystack);
-  const foundSubscriptionReplay = /subscription|subscribe|restored_after_reconnect|replay/.test(
-    haystack,
-  );
+    /idle[_\s-]?timeout|60s|heartbeat/.test(haystack) &&
+    /proxy|heartbeat/.test(haystack);
+  const foundSubscriptionReplay =
+    /subscription|subscribe|restored_after_reconnect|replay/.test(
+      haystack,
+    );
 
-  const found = [foundProxyTimeout, foundSubscriptionReplay].filter(Boolean).length;
+  const found = [
+    foundProxyTimeout,
+    foundSubscriptionReplay,
+  ].filter(Boolean).length;
   return {
     foundProxyTimeout,
     foundSubscriptionReplay,

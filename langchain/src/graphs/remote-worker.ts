@@ -1,30 +1,48 @@
 /**
- * remote-worker.ts — the two graphs registered in `langgraph.json`.
+ * remote-worker.ts — the two graphs registered in
+ * `langgraph.json`.
  *
- * These are loaded by `langgraphjs dev`, which is started as a child process by snippet 06
- * and consumed by snippet 04 (`RemoteGraph`) and snippet 02 (deep-agent async subagents).
- * They must therefore stand entirely on their own: the dev server imports this file in a
- * fresh process with no access to a snippet's Caps, Ledger or tracing.
+ * These are loaded by `langgraphjs dev`, which is
+ * started as a child process by snippet 06 and consumed
+ * by snippet 04 (`RemoteGraph`) and snippet 02
+ * (deep-agent async subagents). They must therefore
+ * stand entirely on their own: the dev server imports
+ * this file in a fresh process with no access to a
+ * snippet's Caps, Ledger or tracing.
  *
- * Both graphs speak the ordinary `{ messages }` shape so they work through the Agent
- * Protocol without a custom client, and so `RemoteGraph` can be dropped into the compete
- * graph as just another node.
+ * Both graphs speak the ordinary `{ messages }` shape
+ * so they work through the Agent Protocol without a
+ * custom client, and so `RemoteGraph` can be dropped
+ * into the compete graph as just another node.
  */
 
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import * as z from "zod";
-import { END, MessagesValue, START, StateGraph, StateSchema } from "@langchain/langgraph";
-import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
+import {
+  END,
+  MessagesValue,
+  START,
+  StateGraph,
+  StateSchema,
+} from "@langchain/langgraph";
+import {
+  AIMessage,
+  HumanMessage,
+  SystemMessage,
+} from "@langchain/core/messages";
 import { initChatModel } from "langchain";
 
-const FIXTURES = fileURLToPath(new URL("../fixtures/", import.meta.url));
+const FIXTURES = fileURLToPath(
+  new URL("../fixtures/", import.meta.url),
+);
 
-// ---------------------------------------------------------------------------
-// competitor-remote: one more competitor in the COMPETE tournament, except it
-// lives in another process behind an HTTP boundary.
-// ---------------------------------------------------------------------------
+// ----------------------------------------
+// competitor-remote: one more competitor in the COMPETE
+// tournament, except it lives in another process behind
+// an HTTP boundary.
+// ----------------------------------------
 
 const CompetitorState = new StateSchema({
   messages: MessagesValue,
@@ -53,35 +71,56 @@ Return the COMPLETE file contents. No markdown fences, no commentary.
 `.trim();
 
 function stripFences(text: string): string {
-  const fenced = text.match(/```(?:typescript|ts)?\n([\s\S]*?)```/);
+  const fenced = text.match(
+    /```(?:typescript|ts)?\n([\s\S]*?)```/,
+  );
   return (fenced ? fenced[1]! : text).trim();
 }
 
-function lastHumanText(messages: { content: unknown; getType?: () => string }[]): string {
+function lastHumanText(
+  messages: {
+    content: unknown;
+    getType?: () => string;
+  }[],
+): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i]!;
     const type = m.getType?.();
     if (type === "human" || type === undefined) {
-      return typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+      return typeof m.content === "string"
+        ? m.content
+        : JSON.stringify(m.content);
     }
   }
   return "";
 }
 
-export const competitorRemote = new StateGraph(CompetitorState)
+export const competitorRemote = new StateGraph(
+  CompetitorState,
+)
   .addNode("propose", async (state) => {
-    const buggy = await readFile(join(FIXTURES, "readiness.ts"), "utf8");
-    const ask = lastHumanText(state.messages as never) || "Fix runWhenReady.";
-    const llm = await initChatModel(process.env.REMOTE_WORKER_MODEL ?? "openai:gpt-5.6-luna");
+    const buggy = await readFile(
+      join(FIXTURES, "readiness.ts"),
+      "utf8",
+    );
+    const ask =
+      lastHumanText(state.messages as never) ||
+      "Fix runWhenReady.";
+    const llm = await initChatModel(
+      "openai:gpt-5.6-luna",
+    );
     const response = await llm.invoke(
       [
         new SystemMessage(REMOTE_SYSTEM_PROMPT),
-        new HumanMessage(`${ask}\n\n=== CURRENT readiness.ts ===\n${buggy}`),
+        new HumanMessage(
+          `${ask}\n\n=== CURRENT readiness.ts ===\n${buggy}`,
+        ),
       ],
       {
         metadata: {
           profile: "remote-worker",
-          whyItExisted: "a competitor running behind an HTTP boundary, not in this process",
+          whyItExisted:
+            "a competitor running behind an HTTP boundary, not in this process",
           outcome: "pending",
           costUsd: 0,
           latencyMs: 0,
@@ -90,25 +129,34 @@ export const competitorRemote = new StateGraph(CompetitorState)
       },
     );
     const patch = stripFences(
-      typeof response.content === "string" ? response.content : JSON.stringify(response.content),
+      typeof response.content === "string"
+        ? response.content
+        : JSON.stringify(response.content),
     );
     return {
       patch,
       rationale: "remote worker patch",
-      // The full patch goes back on `messages` so an Agent Protocol client that only knows
-      // about messages still gets the answer.
-      messages: [new AIMessage({ content: patch, response_metadata: response.response_metadata })],
+      // The full patch goes back on `messages` so an
+      // Agent Protocol client that only knows about
+      // messages still gets the answer.
+      messages: [
+        new AIMessage({
+          content: patch,
+          response_metadata: response.response_metadata,
+        }),
+      ],
     };
   })
   .addEdge(START, "propose")
   .addEdge("propose", END)
   .compile();
 
-// ---------------------------------------------------------------------------
-// researcher: one evidence-source worker from DECOMPOSE, exposed remotely so the
-// deep-agent async-subagent path in snippet 02 has a real Agent Protocol server
-// to talk to.
-// ---------------------------------------------------------------------------
+// ----------------------------------------
+// researcher: one evidence-source worker from
+// DECOMPOSE, exposed remotely so the deep-agent
+// async-subagent path in snippet 02 has a real Agent
+// Protocol server to talk to.
+// ----------------------------------------
 
 const ResearcherState = new StateSchema({
   messages: MessagesValue,
@@ -122,22 +170,37 @@ const ALLOWED_SOURCES: Record<string, string> = {
   state: "incident/state.json",
 };
 
-export const researcher = new StateGraph(ResearcherState)
+export const researcher = new StateGraph(
+  ResearcherState,
+)
   .addNode("read", async (state) => {
-    // One worker, one file. The allow-list is the exit condition: a worker that is asked
-    // for evidence it does not own says so rather than reaching for another file.
+    // One worker, one file. The allow-list is the exit
+    // condition: a worker that is asked for evidence it
+    // does not own says so rather than reaching for
+    // another file.
     const ask = lastHumanText(state.messages as never);
     const source =
-      Object.keys(ALLOWED_SOURCES).find((k) => ask.toLowerCase().includes(k)) ?? state.source;
+      Object.keys(ALLOWED_SOURCES).find((k) =>
+        ask.toLowerCase().includes(k),
+      ) ?? state.source;
     const rel = ALLOWED_SOURCES[source];
     if (!rel) {
       return {
         finding: `refused: '${source}' is not one of ${Object.keys(ALLOWED_SOURCES).join(", ")}`,
-        messages: [new AIMessage(`refused: unknown evidence source '${source}'`)],
+        messages: [
+          new AIMessage(
+            `refused: unknown evidence source '${source}'`,
+          ),
+        ],
       };
     }
-    const evidence = await readFile(join(FIXTURES, rel), "utf8");
-    const llm = await initChatModel(process.env.REMOTE_WORKER_MODEL ?? "openai:gpt-5.6-luna");
+    const evidence = await readFile(
+      join(FIXTURES, rel),
+      "utf8",
+    );
+    const llm = await initChatModel(
+      "openai:gpt-5.6-luna",
+    );
     const response = await llm.invoke(
       [
         new SystemMessage(
@@ -163,8 +226,14 @@ export const researcher = new StateGraph(ResearcherState)
       },
     );
     const finding =
-      typeof response.content === "string" ? response.content : JSON.stringify(response.content);
-    return { source, finding, messages: [new AIMessage(finding)] };
+      typeof response.content === "string"
+        ? response.content
+        : JSON.stringify(response.content);
+    return {
+      source,
+      finding,
+      messages: [new AIMessage(finding)],
+    };
   })
   .addEdge(START, "read")
   .addEdge("read", END)

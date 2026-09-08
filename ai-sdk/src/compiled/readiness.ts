@@ -1,7 +1,10 @@
-// The shipped reference artifact used by the offline Compile (05) replay. This file is intentionally standalone (no imports from
-// src/fixtures) so it can be copied next to the fixture tests and run in CI
-// exactly as shipped -- see src/compiled/readiness.test.ts and
-// registry.json in this directory.
+// The shipped reference artifact used by the offline
+// Compile (05) replay. This file is intentionally
+// standalone (no imports from src/fixtures) so it can
+// be copied next to the fixture tests and run in CI
+// exactly as shipped -- see
+// src/compiled/readiness.test.ts and registry.json in
+// this directory.
 //
 // Fixes applied relative to the buggy fixture:
 //   1. EACCES stops immediately instead of retrying forever.
@@ -9,14 +12,26 @@
 //   3. Backoff is exponential (base * 2^n), capped at the remaining deadline.
 export type ProbeResult =
   | { ok: true }
-  | { ok: false; code: "ECONNREFUSED" | "EACCES" | "ETIMEDOUT" };
+  | {
+      ok: false;
+      code: "ECONNREFUSED" | "EACCES" | "ETIMEDOUT";
+    };
 
 export type Probe = () => Promise<ProbeResult>;
 
 export type ReadinessOutcome =
   | { status: "ran"; attempts: number }
-  | { status: "denied"; attempts: number; reason: string }
-  | { status: "deadline"; attempts: number; reason: string; partial: true };
+  | {
+      status: "denied";
+      attempts: number;
+      reason: string;
+    }
+  | {
+      status: "deadline";
+      attempts: number;
+      reason: string;
+      partial: true;
+    };
 
 export interface ReadinessOptions {
   deadlineMs: number;
@@ -31,7 +46,10 @@ export async function runWhenReady(
   options: ReadinessOptions,
 ): Promise<ReadinessOutcome> {
   const now = options.now ?? Date.now;
-  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const sleep =
+    options.sleep ??
+    ((ms: number) =>
+      new Promise<void>((r) => setTimeout(r, ms)));
   const baseDelayMs = options.baseDelayMs ?? 50;
   const start = now();
   let attempts = 0;
@@ -46,12 +64,14 @@ export async function runWhenReady(
   });
 
   while (true) {
-    if (now() - start >= options.deadlineMs) return deadlineOutcome();
+    if (now() - start >= options.deadlineMs)
+      return deadlineOutcome();
     attempts++;
     const result = await probe();
 
     if (result.ok) {
-      if (now() - start >= options.deadlineMs) return deadlineOutcome();
+      if (now() - start >= options.deadlineMs)
+        return deadlineOutcome();
       await run();
       return { status: "ran", attempts };
     }

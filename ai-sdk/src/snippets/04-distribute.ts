@@ -1,15 +1,18 @@
 #!/usr/bin/env bun
 // 04 Distribute
-// -------------
+// ----------------------------------------
 // Axis: Distribute -- hardware, providers, regions.
 //
-// The Compete tournament again, but each competitor is served from a
-// provider pool filtered in code by `region` and `dataClass` before any
-// call is made (src/lib/pool.ts `pickProviders`): a request tagged
-// region=eu, dataClass=restricted must never reach the OpenAI-primary slot
-// if that slot isn't cleared for it (illustrated below with a synthetic
-// policy; OpenAI itself doesn't publish region/dataClass guarantees, so
-// treat the filter as the mechanism, not real compliance advice).
+// The Compete tournament again, but each competitor is
+// served from a provider pool filtered in code by
+// `region` and `dataClass` before any call is made
+// (src/lib/pool.ts `pickProviders`): a request tagged
+// region=eu, dataClass=restricted must never reach the
+// OpenAI-primary slot if that slot isn't cleared for it
+// (illustrated below with a synthetic policy; OpenAI
+// itself doesn't publish region/dataClass guarantees,
+// so treat the filter as the mechanism, not real
+// compliance advice).
 //
 // Providers, in priority order:
 //   1. openai       -- primary, cleared for all regions/dataClasses in this demo
@@ -20,46 +23,85 @@
 //                       from this package's own 06 server (or ../mastra's on
 //                       4112 if that's already running)
 //
-// Gateway routing (`providerOptions.gateway: { order, only, models, sort }`)
-// is shown only when AI_GATEWAY_API_KEY is set; otherwise this snippet
-// implements try-next-provider fallback in plain code and says so, per
-// PLAN.md's explicit fallback note.
-import { createProviderRegistry, generateText, Output, wrapLanguageModel } from "ai";
+// Gateway routing (`providerOptions.gateway: { order,
+// only, models, sort }`) is shown only when
+// AI_GATEWAY_API_KEY is set; otherwise this snippet
+// implements try-next-provider fallback in plain code
+// and says so, per PLAN.md's explicit fallback note.
+import {
+  createProviderRegistry,
+  generateText,
+  Output,
+  wrapLanguageModel,
+} from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { z } from "zod";
-import { pickProviders, type ProviderSlot } from "../lib/pool";
-import { withWorkerSpan, dumpWorkerSpans, initTelemetry } from "../lib/otel";
+import {
+  pickProviders,
+  type ProviderSlot,
+} from "../lib/pool";
+import {
+  withWorkerSpan,
+  dumpWorkerSpans,
+  initTelemetry,
+} from "../lib/otel";
 import { costUsd, formatUsd } from "../lib/prices";
 import { runSandbox } from "../lib/sandbox";
-import { A2AClient, type A2AMessage } from "../lib/a2a-client";
+import {
+  A2AClient,
+  type A2AMessage,
+} from "../lib/a2a-client";
 import { createA2AServer } from "./06-remote-a2a";
 import { parseCaps, deadlineSignal } from "../lib/cli";
-import { printTable, printKV, heading } from "../lib/print";
+import {
+  printTable,
+  printKV,
+  heading,
+} from "../lib/print";
 import requestsFixture from "../fixtures/requests.json";
 
-const patchSchema = z.object({ source: z.string(), explanation: z.string() });
+const patchSchema = z.object({
+  source: z.string(),
+  explanation: z.string(),
+});
 
-async function probeLocalEndpoint(baseUrl: string): Promise<boolean> {
+async function probeLocalEndpoint(
+  baseUrl: string,
+): Promise<boolean> {
   try {
-    const res = await fetch(`${baseUrl}/models`, { signal: AbortSignal.timeout(1000) });
+    const res = await fetch(`${baseUrl}/models`, {
+      signal: AbortSignal.timeout(1000),
+    });
     return res.ok;
   } catch {
     return false;
   }
 }
 
-// No explicit return type here: annotating it as `ReturnType<typeof
-// createProviderRegistry>` erases the specific provider map TypeScript
-// infers from the `{ openai, local }` object literal below and collapses
-// `registry.languageModel`'s id parameter to `never`. Letting inference flow
-// through keeps the literal `"openai:gpt-5.6-luna"` / `"local:..."` ids type-checked.
+// No explicit return type here: annotating it as
+// `ReturnType<typeof createProviderRegistry>` erases
+// the specific provider map TypeScript infers from the
+// `{ openai, local }` object literal below and
+// collapses `registry.languageModel`'s id parameter to
+// `never`. Letting inference flow through keeps the
+// literal `"openai:gpt-5.6-luna"` / `"local:..."` ids
+// type-checked.
 async function buildProviderPool() {
-  const localBaseUrl = process.env.LOCAL_OPENAI_BASE_URL ?? "http://localhost:1234/v1";
-  const localAvailable = await probeLocalEndpoint(localBaseUrl);
-  const local = createOpenAICompatible({ name: "local", baseURL: localBaseUrl });
+  const localBaseUrl =
+    process.env.LOCAL_OPENAI_BASE_URL ??
+    "http://localhost:1234/v1";
+  const localAvailable =
+    await probeLocalEndpoint(localBaseUrl);
+  const local = createOpenAICompatible({
+    name: "local",
+    baseURL: localBaseUrl,
+  });
 
-  const registry = createProviderRegistry({ openai, local });
+  const registry = createProviderRegistry({
+    openai,
+    local,
+  });
 
   const pool: ProviderSlot[] = [
     {
@@ -78,8 +120,10 @@ async function buildProviderPool() {
       available: localAvailable,
       registryId: "local:local-model",
     },
-    // remote-a2a isn't a registry model -- it's handled separately via A2AClient, but still
-    // participates in the same region/dataClass filter so the pool logic covers it too.
+    // remote-a2a isn't a registry model -- it's handled
+    // separately via A2AClient, but still participates
+    // in the same region/dataClass filter so the pool
+    // logic covers it too.
     {
       id: "remote-a2a",
       kind: "remote-a2a",
@@ -105,14 +149,24 @@ interface DistributedResult {
 }
 
 async function runViaRegistryModel(
-  // Same inference note as buildProviderPool: kept loose (not
-  // `ReturnType<typeof createProviderRegistry>`) so `.languageModel(id)`
-  // still accepts the runtime-computed `slot.registryId` string below.
-  registry: { languageModel(id: string): Parameters<typeof wrapLanguageModel>[0]["model"] },
+  // Same inference note as buildProviderPool: kept
+  // loose (not `ReturnType<typeof
+  // createProviderRegistry>`) so `.languageModel(id)`
+  // still accepts the runtime-computed
+  // `slot.registryId` string below.
+  registry: {
+    languageModel(
+      id: string,
+    ): Parameters<typeof wrapLanguageModel>[0]["model"];
+  },
   slot: ProviderSlot,
   requestId: string,
   signal: AbortSignal,
-): Promise<{ costUsd: number; latencyMs: number; outcome: string }> {
+): Promise<{
+  costUsd: number;
+  latencyMs: number;
+  outcome: string;
+}> {
   return withWorkerSpan(
     {
       profile: `distribute-${slot.id}`,
@@ -128,21 +182,44 @@ async function runViaRegistryModel(
         model,
         output: Output.object({ schema: patchSchema }),
         abortSignal: signal,
-        telemetry: { functionId: `distribute-${slot.id}` },
+        telemetry: {
+          functionId: `distribute-${slot.id}`,
+        },
         instructions:
           "Patch readiness.ts: EACCES stops immediately, a deadline is enforced with capped exponential backoff, ETIMEDOUT/ECONNREFUSED keep retrying.",
-        prompt: "Patch readiness.ts to fix the three bugs.",
+        prompt:
+          "Patch readiness.ts to fix the three bugs.",
       });
       const latencyMs = Date.now() - start;
-      const spend = slot.kind === "local" ? 0 : costUsd("openai/gpt-5.6-luna", result.usage);
-      const sandbox = await runSandbox(result.output.source, 6000);
-      const outcome = sandbox.ok ? "served;passed-sandbox" : "served;failed-sandbox";
-      return { result: { costUsd: spend, latencyMs, outcome }, costUsd: spend, latencyMs, outcome };
+      const spend =
+        slot.kind === "local"
+          ? 0
+          : costUsd(
+              "openai/gpt-5.6-luna",
+              result.usage,
+            );
+      const sandbox = await runSandbox(
+        result.output.source,
+        6000,
+      );
+      const outcome = sandbox.ok
+        ? "served;passed-sandbox"
+        : "served;failed-sandbox";
+      return {
+        result: { costUsd: spend, latencyMs, outcome },
+        costUsd: spend,
+        latencyMs,
+        outcome,
+      };
     },
   );
 }
 
-async function runViaRemoteA2A(baseUrl: string, requestId: string, signal: AbortSignal) {
+async function runViaRemoteA2A(
+  baseUrl: string,
+  requestId: string,
+  signal: AbortSignal,
+) {
   return withWorkerSpan(
     {
       profile: "distribute-remote-a2a",
@@ -153,25 +230,48 @@ async function runViaRemoteA2A(baseUrl: string, requestId: string, signal: Abort
       const client = new A2AClient(baseUrl);
       const message: A2AMessage = {
         role: "user",
-        parts: [{ type: "text", text: "Patch readiness.ts to fix the three bugs." }],
+        parts: [
+          {
+            type: "text",
+            text: "Patch readiness.ts to fix the three bugs.",
+          },
+        ],
       };
-      const task = await client.sendMessage(message, undefined, signal);
+      const task = await client.sendMessage(
+        message,
+        undefined,
+        signal,
+      );
       const latencyMs = Date.now() - start;
-      const artifactText = task.artifacts[0]?.parts[0]?.text;
+      const artifactText =
+        task.artifacts[0]?.parts[0]?.text;
       let costUsdValue = 0;
       let outcome = `task-${task.status.state}`;
       if (artifactText) {
         try {
-          const parsed = JSON.parse(artifactText) as { source: string; costUsd: number };
+          const parsed = JSON.parse(artifactText) as {
+            source: string;
+            costUsd: number;
+          };
           costUsdValue = parsed.costUsd;
-          const sandbox = await runSandbox(parsed.source, 6000);
-          outcome = sandbox.ok ? "served;passed-sandbox" : "served;failed-sandbox";
+          const sandbox = await runSandbox(
+            parsed.source,
+            6000,
+          );
+          outcome = sandbox.ok
+            ? "served;passed-sandbox"
+            : "served;failed-sandbox";
         } catch {
           outcome = "served;unparseable-artifact";
         }
       }
       return {
-        result: { costUsd: costUsdValue, latencyMs, outcome, taskId: task.id },
+        result: {
+          costUsd: costUsdValue,
+          latencyMs,
+          outcome,
+          taskId: task.id,
+        },
         costUsd: costUsdValue,
         latencyMs,
         outcome,
@@ -181,15 +281,22 @@ async function runViaRemoteA2A(baseUrl: string, requestId: string, signal: Abort
 }
 
 async function main() {
-  const { budgetUsd, deadlineMs } = parseCaps(process.argv.slice(2), {
-    budgetUsd: 0.1,
-    deadlineMs: 60_000,
-  });
+  const { budgetUsd, deadlineMs } = parseCaps(
+    process.argv.slice(2),
+    {
+      budgetUsd: 0.1,
+      deadlineMs: 60_000,
+    },
+  );
   initTelemetry();
-  heading("04 Distribute — provider pool filtered by region/dataClass, one remote A2A competitor");
+  heading(
+    "04 Distribute — provider pool filtered by region/dataClass, one remote A2A competitor",
+  );
   printKV("caps", { budgetUsd, deadlineMs });
 
-  const gatewayAvailable = Boolean(process.env.AI_GATEWAY_API_KEY);
+  const gatewayAvailable = Boolean(
+    process.env.AI_GATEWAY_API_KEY,
+  );
   if (!gatewayAvailable) {
     console.log(
       "\nAI_GATEWAY_API_KEY not set: showing plain try-next-provider fallback in code instead of " +
@@ -213,11 +320,14 @@ async function main() {
     })),
   );
 
-  // Start our own A2A server for the remote-a2a slot (falls back to the
-  // Mastra server on 4112 if this package's own port isn't reachable and
-  // that one is -- but since these run in separate directories, we default
-  // to starting our own; this is the "second local server process" the plan
-  // describes, just spawned in-process here for a self-contained snippet).
+  // Start our own A2A server for the remote-a2a slot
+  // (falls back to the Mastra server on 4112 if this
+  // package's own port isn't reachable and that one is
+  // -- but since these run in separate directories, we
+  // default to starting our own; this is the "second
+  // local server process" the plan describes, just
+  // spawned in-process here for a self-contained
+  // snippet).
   const a2aServer = createA2AServer(0);
   const a2aBaseUrl = `http://localhost:${a2aServer.port}`;
 
@@ -250,24 +360,38 @@ async function main() {
       continue;
     }
 
-    const eligible = pickProviders(pool, request.region, request.dataClass);
+    const eligible = pickProviders(
+      pool,
+      request.region,
+      request.dataClass,
+    );
     let served = false;
     let servedBy = "none";
     let costUsdValue = 0;
     let latencyMs = 0;
     let outcome = "no-eligible-provider";
 
-    // Try-next-provider fallback in code (the non-gateway path): walk the
-    // eligible slots in pool order until one succeeds.
+    // Try-next-provider fallback in code (the
+    // non-gateway path): walk the eligible slots in
+    // pool order until one succeeds.
     for (const slot of eligible) {
       try {
         if (slot.kind === "remote-a2a") {
-          const r = await runViaRemoteA2A(a2aBaseUrl, request.id, signal);
+          const r = await runViaRemoteA2A(
+            a2aBaseUrl,
+            request.id,
+            signal,
+          );
           costUsdValue = r.costUsd;
           latencyMs = r.latencyMs;
           outcome = r.outcome;
         } else {
-          const r = await runViaRegistryModel(registry, slot, request.id, signal);
+          const r = await runViaRegistryModel(
+            registry,
+            slot,
+            request.id,
+            signal,
+          );
           costUsdValue = r.costUsd;
           latencyMs = r.latencyMs;
           outcome = r.outcome;
@@ -296,7 +420,10 @@ async function main() {
 
   printTable(
     "requests",
-    results.map((r) => ({ ...r, eligibleProviders: r.eligibleProviders.join(",") })),
+    results.map((r) => ({
+      ...r,
+      eligibleProviders: r.eligibleProviders.join(","),
+    })),
   );
 
   a2aServer.stop(true);
@@ -304,9 +431,16 @@ async function main() {
   printKV("result", {
     totalCostUsd: formatUsd(totalCostUsd),
     budgetUsd: formatUsd(budgetUsd),
-    localSlotUsed: results.some((r) => r.servedBy === "local-slot"),
-    remoteA2AUsed: results.some((r) => r.servedBy === "remote-a2a"),
-    stopReason: totalCostUsd >= budgetUsd ? "budget reached" : "all novel requests served",
+    localSlotUsed: results.some(
+      (r) => r.servedBy === "local-slot",
+    ),
+    remoteA2AUsed: results.some(
+      (r) => r.servedBy === "remote-a2a",
+    ),
+    stopReason:
+      totalCostUsd >= budgetUsd
+        ? "budget reached"
+        : "all novel requests served",
   });
 
   const { exporter } = initTelemetry();

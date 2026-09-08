@@ -1,13 +1,16 @@
 /**
  * pool.ts — DISTRIBUTE: hardware, providers, regions.
  *
- * The important part of this file is that `region` and `dataClass` filter the pool **in
- * code, before any call is made**. A request tagged `restricted` never gets as far as
- * building a hosted model — not "the prompt says don't", not "a middleware catches it", but
- * a filter that removes the provider from the list.
+ * The important part of this file is that `region` and
+ * `dataClass` filter the pool **in code, before any
+ * call is made**. A request tagged `restricted` never
+ * gets as far as building a hosted model — not "the
+ * prompt says don't", not "a middleware catches it",
+ * but a filter that removes the provider from the list.
  *
- * Providers are declared with the properties a router actually needs: where they run, what
- * data classes they may see, and what they cost.
+ * Providers are declared with the properties a router
+ * actually needs: where they run, what data classes
+ * they may see, and what they cost.
  */
 
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
@@ -22,7 +25,10 @@ import {
 } from "./models.ts";
 
 export type Region = "us" | "eu" | "any";
-export type DataClass = "public" | "internal" | "restricted";
+export type DataClass =
+  | "public"
+  | "internal"
+  | "restricted";
 
 export interface ProviderSpec {
   id: string;
@@ -45,7 +51,8 @@ export const PROVIDERS: ProviderSpec[] = [
     regions: ["us"],
     allows: ["public", "internal"],
     rank: 0,
-    whyItExists: "default worker: cheapest hosted model that can do the task",
+    whyItExists:
+      "default worker: cheapest hosted model that can do the task",
   },
   {
     id: "openai-frontier",
@@ -54,7 +61,8 @@ export const PROVIDERS: ProviderSpec[] = [
     regions: ["us"],
     allows: ["public", "internal"],
     rank: 2,
-    whyItExists: "fallback when the primary fails, and the frontier competitor",
+    whyItExists:
+      "fallback when the primary fails, and the frontier competitor",
   },
   {
     id: "openai-nano",
@@ -70,11 +78,13 @@ export const PROVIDERS: ProviderSpec[] = [
     modelId: "local",
     kind: "local",
     regions: ["us", "eu"],
-    // The local slot is the only provider allowed to see restricted data, because it is the
-    // only one where the bytes do not leave the machine.
+    // The local slot is the only provider allowed to
+    // see restricted data, because it is the only one
+    // where the bytes do not leave the machine.
     allows: ["public", "internal", "restricted"],
     rank: 3,
-    whyItExists: "on-device slot: the only provider cleared for restricted data",
+    whyItExists:
+      "on-device slot: the only provider cleared for restricted data",
   },
 ];
 
@@ -86,24 +96,37 @@ export interface Requirement {
 export interface PoolDecision {
   provider: ProviderSpec | null;
   /** Every provider considered, and why it was kept or dropped. */
-  considered: { id: string; kept: boolean; why: string }[];
+  considered: {
+    id: string;
+    kept: boolean;
+    why: string;
+  }[];
   reason: string;
 }
 
 /**
- * Pure function: no I/O, no model construction. This is what makes the filter auditable —
- * `test/pool.test.ts` can assert that `restricted` can only ever reach the local slot.
+ * Pure function: no I/O, no model construction. This is
+ * what makes the filter auditable — `test/pool.test.ts`
+ * can assert that `restricted` can only ever reach the
+ * local slot.
  */
 export function selectProvider(
   req: Requirement,
-  opts: { localAvailable: boolean; exclude?: string[] } = { localAvailable: false },
+  opts: {
+    localAvailable: boolean;
+    exclude?: string[];
+  } = { localAvailable: false },
 ): PoolDecision {
   const considered: PoolDecision["considered"] = [];
   const kept: ProviderSpec[] = [];
 
   for (const p of PROVIDERS) {
     if (opts.exclude?.includes(p.id)) {
-      considered.push({ id: p.id, kept: false, why: "excluded by caller (already tried)" });
+      considered.push({
+        id: p.id,
+        kept: false,
+        why: "excluded by caller (already tried)",
+      });
       continue;
     }
     if (!p.allows.includes(req.dataClass)) {
@@ -114,18 +137,35 @@ export function selectProvider(
       });
       continue;
     }
-    // `region: "any"` on the REQUEST means "anywhere is fine". A provider never claims
-    // "any" — it lists the regions it actually runs in, so the filter cannot be defeated by
-    // a wildcard on the wrong side.
-    if (req.region !== "any" && !p.regions.includes(req.region)) {
-      considered.push({ id: p.id, kept: false, why: `not available in region=${req.region}` });
+    // `region: "any"` on the REQUEST means "anywhere is
+    // fine". A provider never claims "any" — it lists
+    // the regions it actually runs in, so the filter
+    // cannot be defeated by a wildcard on the wrong
+    // side.
+    if (
+      req.region !== "any" &&
+      !p.regions.includes(req.region)
+    ) {
+      considered.push({
+        id: p.id,
+        kept: false,
+        why: `not available in region=${req.region}`,
+      });
       continue;
     }
     if (p.kind === "local" && !opts.localAvailable) {
-      considered.push({ id: p.id, kept: false, why: "local slot not running" });
+      considered.push({
+        id: p.id,
+        kept: false,
+        why: "local slot not running",
+      });
       continue;
     }
-    considered.push({ id: p.id, kept: true, why: p.whyItExists });
+    considered.push({
+      id: p.id,
+      kept: true,
+      why: p.whyItExists,
+    });
     kept.push(p);
   }
 
@@ -141,11 +181,17 @@ export function selectProvider(
 }
 
 /** The ordered chain a request may fall back through, after filtering. */
-export function fallbackChain(req: Requirement, localAvailable: boolean): ProviderSpec[] {
+export function fallbackChain(
+  req: Requirement,
+  localAvailable: boolean,
+): ProviderSpec[] {
   const chain: ProviderSpec[] = [];
   const tried: string[] = [];
   for (;;) {
-    const decision = selectProvider(req, { localAvailable, exclude: tried });
+    const decision = selectProvider(req, {
+      localAvailable,
+      exclude: tried,
+    });
     if (!decision.provider) break;
     chain.push(decision.provider);
     tried.push(decision.provider.id);
@@ -159,10 +205,15 @@ export interface ResolvedProvider {
 }
 
 /** Build the actual model for a chosen provider. Only called after the filter has run. */
-export async function buildModel(spec: ProviderSpec): Promise<ResolvedProvider> {
+export async function buildModel(
+  spec: ProviderSpec,
+): Promise<ResolvedProvider> {
   if (spec.kind === "local") {
     const slot = localSlot();
-    if (!slot) throw new Error("local slot selected but LOCAL_OPENAI_BASE_URL is unset");
+    if (!slot)
+      throw new Error(
+        "local slot selected but LOCAL_OPENAI_BASE_URL is unset",
+      );
     return { spec, llm: localModel(slot) };
   }
   return { spec, llm: await model(spec.modelId) };
@@ -179,13 +230,19 @@ export function isLocalAvailable(): Promise<boolean> {
   return localProbe;
 }
 
-export function describePool(localAvailable: boolean): (string | number)[][] {
+export function describePool(
+  localAvailable: boolean,
+): (string | number)[][] {
   return PROVIDERS.map((p) => [
     p.id,
     p.kind,
     p.regions.join("/"),
     p.allows.join("/"),
-    p.kind === "local" ? (localAvailable ? "up" : "absent") : "assumed up",
+    p.kind === "local"
+      ? localAvailable
+        ? "up"
+        : "absent"
+      : "assumed up",
     p.whyItExists,
   ]);
 }

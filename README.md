@@ -16,7 +16,7 @@ cd scaling-ai-agents/examples
 AGENT_FANOUT=3 bun run snippet:16
 ```
 
-No dependency install is needed for this demo. Three fixed drafts compete. The highest-scoring draft omits a required deadline and loses. The output compares ranking, racing, synthesis, and failure inspection, including costs that cancellation cannot erase.
+No dependency install is needed for this example. Three fixed drafts compete. The highest-scoring draft omits a required deadline and loses. The output compares ranking, racing, synthesis, and failure inspection, including costs that cancellation cannot erase.
 
 Try the single-attempt baseline:
 
@@ -69,7 +69,7 @@ The same numbered example solves the same kind of problem in each stack. Click a
 | 08 | Pokédex investigation | Discover tools, page and search records, then cite the evidence. | [Code](ai-sdk/src/snippets/08-pokedex.ts) | [Code](langchain/src/snippets/08-pokedex.ts) | [Code](mastra/src/snippets/08-pokedex.ts) |
 | 09 | Model routing | Make model selection and fallback explicit. | [Code](ai-sdk/src/snippets/09-model-router.ts) | [Code](langchain/src/snippets/09-model-router.ts) | [Code](mastra/src/snippets/09-model-router.ts) |
 | 16 | Bounded fan-out | Encapsulate parallel drafts in one workflow component. | [Code](ai-sdk/src/snippets/16-fanout-node.ts) | [Code](langchain/src/snippets/16-fanout-node.ts) | [Code](mastra/src/snippets/16-fanout-node.ts) |
-| 17 | Business advice | Three independent business advisors and an orchestrator that compares and synthesizes their proposals. | [Code](ai-sdk/src/snippets/17-business-advice.ts) | [Code](langchain/src/snippets/17-business-advice.ts) | [Code](mastra/src/snippets/17-business-advice.ts) |
+| 17 | Business advice | Three advisors answer the same brief in parallel; a chair picks one as the base and grafts compatible ideas from the others. | [Code](ai-sdk/src/snippets/17-business-advice.ts) | [Code](langchain/src/snippets/17-business-advice.ts) | [Code](mastra/src/snippets/17-business-advice.ts) |
 
 `05` and `16` run offline in all three stacks after installing their dependencies. Other snippets may call providers, require credentials or need a running remote service. Check the package guide before running them:
 
@@ -129,4 +129,4 @@ Each framework also has its own tests and type check. Its full test command may 
 - [Adaptive, agentic apps](https://danlevy.net/talks/adaptive-systems.html): scoped jobs, tool discovery, repair evidence and execution memory.
 - [Code Is Cheap. Judgment Is Expensive.](https://danlevy.net/talks/judgment.html): protect review capacity and measure time to acceptance.
 
-[Run the browser demo kit](https://danlevy.net/talks/demos/) · [Read the talk sources](https://github.com/justsml/dans-blog/tree/main/artifacts/speaking-portfolio-expanded)
+[Read the talk sources](https://github.com/justsml/dans-blog/tree/main/artifacts/speaking-portfolio-expanded)

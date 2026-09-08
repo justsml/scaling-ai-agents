@@ -1,15 +1,20 @@
 /**
  * trace.ts — a span tree without LangSmith.
  *
- * LangSmith is the intended home for these traces, but LANGSMITH_API_KEY is not available
- * in this environment, so every snippet gets the local handler instead: a
- * `BaseCallbackHandler` that reconstructs the run tree from `runId`/`parentRunId` and
- * prints it as an indented list.
+ * LangSmith is the intended home for these traces, but
+ * LANGSMITH_API_KEY is not available in this
+ * environment, so every snippet gets the local handler
+ * instead: a `BaseCallbackHandler` that reconstructs
+ * the run tree from `runId`/`parentRunId` and prints it
+ * as an indented list.
  *
- * The point is not pretty output. The point is that the five standard metadata keys
- * — profile, costUsd, latencyMs, outcome, whyItExisted — are attached to the *run*, not
- * just to our own table. Pass them as `metadata` on any `invoke`/`stream` config and they
- * show up here, and would show up identically in LangSmith.
+ * The point is not pretty output. The point is that the
+ * five standard metadata keys — profile, costUsd,
+ * latencyMs, outcome, whyItExisted — are attached to
+ * the *run*, not just to our own table. Pass them as
+ * `metadata` on any `invoke`/`stream` config and they
+ * show up here, and would show up identically in
+ * LangSmith.
  */
 
 import { BaseCallbackHandler } from "@langchain/core/callbacks/base";
@@ -71,7 +76,9 @@ export class LocalSpanTree extends BaseCallbackHandler {
       children: [],
     };
     this.nodes.set(runId, node);
-    const parent = parentRunId ? this.nodes.get(parentRunId) : undefined;
+    const parent = parentRunId
+      ? this.nodes.get(parentRunId)
+      : undefined;
     if (parent) parent.children.push(node);
     else this.roots.push(node);
   }
@@ -80,7 +87,11 @@ export class LocalSpanTree extends BaseCallbackHandler {
     const node = this.nodes.get(runId);
     if (!node) return;
     node.endedAt = Date.now();
-    if (error) node.error = error instanceof Error ? error.message : String(error);
+    if (error)
+      node.error =
+        error instanceof Error
+          ? error.message
+          : String(error);
   }
 
   override async handleChainStart(
@@ -93,14 +104,27 @@ export class LocalSpanTree extends BaseCallbackHandler {
     _runType?: string,
     runName?: string,
   ) {
-    this.open(runId, parentRunId, runName ?? chain?.id?.at(-1) ?? "chain", "chain", tags, metadata);
+    this.open(
+      runId,
+      parentRunId,
+      runName ?? chain?.id?.at(-1) ?? "chain",
+      "chain",
+      tags,
+      metadata,
+    );
   }
 
-  override async handleChainEnd(_o: unknown, runId: string) {
+  override async handleChainEnd(
+    _o: unknown,
+    runId: string,
+  ) {
     this.close(runId);
   }
 
-  override async handleChainError(err: unknown, runId: string) {
+  override async handleChainError(
+    err: unknown,
+    runId: string,
+  ) {
     this.close(runId, err);
   }
 
@@ -114,7 +138,14 @@ export class LocalSpanTree extends BaseCallbackHandler {
     metadata?: Record<string, unknown>,
     runName?: string,
   ) {
-    this.open(runId, parentRunId, runName ?? llm?.id?.at(-1) ?? "llm", "llm", tags, metadata);
+    this.open(
+      runId,
+      parentRunId,
+      runName ?? llm?.id?.at(-1) ?? "llm",
+      "llm",
+      tags,
+      metadata,
+    );
   }
 
   override async handleChatModelStart(
@@ -127,19 +158,34 @@ export class LocalSpanTree extends BaseCallbackHandler {
     metadata?: Record<string, unknown>,
     runName?: string,
   ) {
-    this.open(runId, parentRunId, runName ?? llm?.id?.at(-1) ?? "chat", "llm", tags, metadata);
+    this.open(
+      runId,
+      parentRunId,
+      runName ?? llm?.id?.at(-1) ?? "chat",
+      "llm",
+      tags,
+      metadata,
+    );
   }
 
-  override async handleLLMEnd(output: LLMResult, runId: string) {
+  override async handleLLMEnd(
+    output: LLMResult,
+    runId: string,
+  ) {
     const node = this.nodes.get(runId);
     if (node) {
       for (const gen of output.generations.flat()) {
-        const usage = readUsage((gen as { message?: unknown }).message);
+        const usage = readUsage(
+          (gen as { message?: unknown }).message,
+        );
         node.inputTokens += usage.inputTokens;
         node.outputTokens += usage.outputTokens;
       }
       const raw = output.llmOutput?.tokenUsage as
-        | { promptTokens?: number; completionTokens?: number }
+        | {
+            promptTokens?: number;
+            completionTokens?: number;
+          }
         | undefined;
       if (node.inputTokens === 0 && raw) {
         node.inputTokens += raw.promptTokens ?? 0;
@@ -149,7 +195,10 @@ export class LocalSpanTree extends BaseCallbackHandler {
     this.close(runId);
   }
 
-  override async handleLLMError(err: unknown, runId: string) {
+  override async handleLLMError(
+    err: unknown,
+    runId: string,
+  ) {
     this.close(runId, err);
   }
 
@@ -162,14 +211,27 @@ export class LocalSpanTree extends BaseCallbackHandler {
     metadata?: Record<string, unknown>,
     runName?: string,
   ) {
-    this.open(runId, parentRunId, runName ?? tool?.id?.at(-1) ?? "tool", "tool", tags, metadata);
+    this.open(
+      runId,
+      parentRunId,
+      runName ?? tool?.id?.at(-1) ?? "tool",
+      "tool",
+      tags,
+      metadata,
+    );
   }
 
-  override async handleToolEnd(_o: unknown, runId: string) {
+  override async handleToolEnd(
+    _o: unknown,
+    runId: string,
+  ) {
     this.close(runId);
   }
 
-  override async handleToolError(err: unknown, runId: string) {
+  override async handleToolError(
+    err: unknown,
+    runId: string,
+  ) {
     this.close(runId, err);
   }
 
@@ -191,12 +253,21 @@ export class LocalSpanTree extends BaseCallbackHandler {
     }
     const line = (n: TraceNode, depth: number) => {
       if (depth > maxDepth) return;
-      const ms = n.endedAt ? n.endedAt - n.startedAt : -1;
-      const tok = n.inputTokens || n.outputTokens ? ` tok=${n.inputTokens}/${n.outputTokens}` : "";
-      const labels = STANDARD_KEYS.filter((k) => n.metadata[k] !== undefined)
+      const ms = n.endedAt
+        ? n.endedAt - n.startedAt
+        : -1;
+      const tok =
+        n.inputTokens || n.outputTokens
+          ? ` tok=${n.inputTokens}/${n.outputTokens}`
+          : "";
+      const labels = STANDARD_KEYS.filter(
+        (k) => n.metadata[k] !== undefined,
+      )
         .map((k) => `${k}=${String(n.metadata[k])}`)
         .join(" ");
-      const err = n.error ? ` ERROR=${n.error.slice(0, 40)}` : "";
+      const err = n.error
+        ? ` ERROR=${n.error.slice(0, 40)}`
+        : "";
       console.log(
         `  ${"  ".repeat(depth)}${depth === 0 ? "" : "└ "}${n.name} [${n.kind}] ${ms}ms${tok}${
           labels ? ` {${labels}}` : ""
@@ -208,12 +279,19 @@ export class LocalSpanTree extends BaseCallbackHandler {
   }
 
   /** Assert (loudly, not fatally) that labelled runs carry all five keys. */
-  verifyStandardKeys(): { ok: boolean; missing: string[] } {
+  verifyStandardKeys(): {
+    ok: boolean;
+    missing: string[];
+  } {
     const missing = new Set<string>();
     for (const n of this.labelled()) {
-      for (const k of STANDARD_KEYS) if (n.metadata[k] === undefined) missing.add(k);
+      for (const k of STANDARD_KEYS)
+        if (n.metadata[k] === undefined) missing.add(k);
     }
-    return { ok: missing.size === 0, missing: [...missing] };
+    return {
+      ok: missing.size === 0,
+      missing: [...missing],
+    };
   }
 }
 
@@ -238,10 +316,13 @@ export function startTracing(): Tracing {
 }
 
 /**
- * The metadata block every worker attaches to its run. `costUsd` and `latencyMs` are not
- * known until the run finishes, so they go in as placeholders and are re-stamped on the
+ * The metadata block every worker attaches to its run.
+ * `costUsd` and `latencyMs` are not known until the run
+ * finishes, so they go in as placeholders and are
+ * re-stamped on the
  * node afterwards; that is a real limitation of run-start metadata and it is worth saying
- * out loud rather than pretending the numbers arrive early.
+ * out loud rather than pretending the numbers arrive
+ * early.
  */
 export function runMetadata(input: {
   profile: string;
@@ -263,9 +344,14 @@ export function runMetadata(input: {
 export function stampRun(
   handler: LocalSpanTree,
   profile: string,
-  patch: { costUsd: number; latencyMs: number; outcome: string },
+  patch: {
+    costUsd: number;
+    latencyMs: number;
+    outcome: string;
+  },
 ): void {
   for (const n of handler.labelled()) {
-    if (n.metadata.profile === profile) Object.assign(n.metadata, patch);
+    if (n.metadata.profile === profile)
+      Object.assign(n.metadata, patch);
   }
 }

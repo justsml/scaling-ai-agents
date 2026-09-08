@@ -1,13 +1,25 @@
 export type ProbeResult =
   | { ok: true }
-  | { ok: false; code: "ECONNREFUSED" | "EACCES" | "ETIMEDOUT" };
+  | {
+      ok: false;
+      code: "ECONNREFUSED" | "EACCES" | "ETIMEDOUT";
+    };
 
 export type Probe = () => Promise<ProbeResult>;
 
 export type ReadinessOutcome =
   | { status: "ran"; attempts: number }
-  | { status: "denied"; attempts: number; reason: string }
-  | { status: "deadline"; attempts: number; reason: string; partial: true };
+  | {
+      status: "denied";
+      attempts: number;
+      reason: string;
+    }
+  | {
+      status: "deadline";
+      attempts: number;
+      reason: string;
+      partial: true;
+    };
 
 export interface ReadinessOptions {
   deadlineMs: number;
@@ -34,7 +46,10 @@ export async function runWhenReady(
 ): Promise<ReadinessOutcome> {
   const { deadlineMs, baseDelayMs = 100 } = options;
   const now = options.now ?? (() => Date.now());
-  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const sleep =
+    options.sleep ??
+    ((ms: number) =>
+      new Promise<void>((r) => setTimeout(r, ms)));
 
   const startedAt = now();
   const deadlineAt = startedAt + deadlineMs;
@@ -48,7 +63,10 @@ export async function runWhenReady(
     try {
       result = await probe();
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message =
+        err instanceof Error
+          ? err.message
+          : String(err);
       return {
         status: "denied",
         attempts,
@@ -63,8 +81,9 @@ export async function runWhenReady(
 
     lastError = result.code;
 
-    // EACCES is a permanent answer. Retrying a permission failure only burns
-    // the deadline, so stop and say why.
+    // EACCES is a permanent answer. Retrying a
+    // permission failure only burns the deadline, so
+    // stop and say why.
     if (result.code === "EACCES") {
       return {
         status: "denied",
@@ -77,9 +96,13 @@ export async function runWhenReady(
     const remaining = deadlineAt - now();
     if (remaining <= 0) break;
 
-    // Exponential backoff, capped twice: by an absolute ceiling and by the
-    // time actually left. Never sleep past the caller's deadline.
-    const backoff = Math.min(baseDelayMs * 2 ** (attempts - 1), MAX_DELAY_MS);
+    // Exponential backoff, capped twice: by an absolute
+    // ceiling and by the time actually left. Never
+    // sleep past the caller's deadline.
+    const backoff = Math.min(
+      baseDelayMs * 2 ** (attempts - 1),
+      MAX_DELAY_MS,
+    );
     await sleep(Math.min(backoff, remaining));
   }
 
