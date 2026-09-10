@@ -9,10 +9,8 @@ cd examples
 bun install
 bun run snippet:10
 bun run snippet:11
-bun run snippet:12
 bun run snippet:13
 bun run snippet:14
-bun run snippet:15
 AGENT_FANOUT=3 bun run snippet:16
 bun run test
 bun run check
@@ -23,11 +21,9 @@ No install is needed to run the snippets themselves with Bun. The development de
 | Example | What to watch | Checks |
 | --- | --- | --- |
 | [10: scoped repair](src/10-scoped-repair.ts) | A rename proposal passes fixed semantic fixtures; email is denied; an unknown status is quarantined; promotion has a 100-record canary | Tool discovery and invocation, deadline, attempt cap, forged scores, leading zeroes, stale parent, canary exhaustion, rollback |
-| [11: durable admission](src/11-durable-admission.ts) | Four callers get one job; another request is denied while its budget is held; a lost response remains unresolved after restart | Four competing OS processes, tenant accounting, deduplication conflict, rate versus concurrency, stale workers, retry cap, outbox deduplication |
-| [12: compute request](src/12-compute-request.ts) | Eight workers for six minutes resolve to a 96-cent fixture quote; billing identity comes from server policy | Catalog, size, shape, residency, egress, deadline and budget denials |
+| [11: durable admission](src/11-durable-admission.ts) | Four callers get one job; requested compute is resolved and reserved atomically; a lost response remains unresolved after restart | Competing OS processes, tenant accounting, compute policy, idempotent leases, stale workers, unknown charges, teardown, retry cap, outbox deduplication |
 | [13: execution memory](src/13-execution-memory.ts) | A missing tenant predicate is recorded and corrected; execution and result verification remain separate | Tenant/project/version isolation, denied execution, wrong totals, unknown responses, durable intent, correction references |
-| [14: Council of Guards](src/14-council-of-guards.ts) | Three judges disagree on the maintainer; every original design still fails a gate | Missing judges, repeated model identity, score/reason disagreement, fresh synthesis evidence, cost and review-capacity limits |
-| [15: evaluator validity](src/15-evaluator-validity.ts) | An always-pass judge scores 90% agreement; an unjudged document depresses naive precision | Confusion matrix, undefined kappa, majority disagreement, IID assumption, judgment coverage, queue wait versus service time |
+| [14: council reliability](src/14-council-of-guards.ts) | Three judges disagree, every original design still fails a gate, and evaluator evidence determines whether the council is ready | Missing judges, model identity, reason disagreement, fresh evidence, calibration, IID assumptions, judgment coverage, and review queues |
 | [16: bounded fan-out](src/16-fanout-node.ts) | Generate a bounded set concurrently and select only a draft that passes the lifecycle gate | Fan-out bounds, invalid high scorer, failed-branch isolation |
 
 Example 10 accepts a tiny mapping grammar instead of executing generated code. Only `postal_code` to `postalCode` by string copy is allowed under the fixture contract. Expected outputs belong to the validator. All input records receive an accepted or quarantined disposition. The proposing job cannot promote its own artifact; the demo calls promotion separately as the trusted owner.
@@ -44,7 +40,7 @@ A provider slot represents outstanding remote work. Abandoning a local worker le
 
 Transactions use Bun's [SQLite immediate transactions](https://bun.com/docs/runtime/sqlite#transactions). The tests exercise a shared database across separate Bun processes. Production authentication and remote provider behavior are outside this example.
 
-Example 12 resolves a compute request; it does not grant a lease. The trusted scheduler still needs to reserve that quote atomically, provision the worker, and record expiry and teardown. Worker expiry does not settle remote provider charges. The fixture catalog permits only `sandbox-small` in `us-east` with named egress hosts.
+Example 11 also resolves compute against a server-owned catalog and identity. The quote and job reservation are written in one immediate transaction, so concurrent callers cannot spend the same available budget. Provisioning is restart-safe and records an explicit teardown obligation. Worker expiry still does not settle unknown provider charges; only provider-confirmed reconciliation does that. The fixture catalog permits only `sandbox-small` in `us-east` with named egress hosts.
 
 See the [architecture review](../docs/talk-architecture-review-2026-09-06.md) for source talks, integration points, evaluation criteria and the limits of these demonstrations.
 
@@ -80,7 +76,7 @@ Generation planning includes all judges and available review slots under a fixtu
 budget. It can select zero alternatives when money or review capacity is exhausted.
 This is a planning calculation, not a second durable reservation service.
 
-Example 15 ports the new talks' arithmetic into tested functions. It distinguishes
+The same example audits the measuring instrument with tested arithmetic. It distinguishes
 unjudged from judged nonrelevant documents, and shows the misleading score alongside
 judgment coverage. It keeps false approvals visible even when raw agreement is high.
 The zero-failure bound is returned only when the caller explicitly asserts representative

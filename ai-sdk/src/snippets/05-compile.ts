@@ -64,7 +64,7 @@ export async function routeCompiled(
       path: "miss",
       modelCalls: 0,
       nextAction:
-        "request independent certification via 01-compete.ts",
+        "request independent review via snippet 17 select mode",
     };
   }
   if (!certified)

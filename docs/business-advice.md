@@ -1,7 +1,8 @@
 # Business advice council
 
-Run `bun run snippet:17 -- "Your business decision and context"` from `ai-sdk/`,
-`langchain/`, or `mastra/`. Without a brief, it uses a small SaaS investment decision.
+Run `bun run snippet:17 -- --mode select "Your business decision and context"` or
+`bun run snippet:17 -- --mode synthesize "Your business decision and context"` from
+`ai-sdk/`, `langchain/`, or `mastra/`. Without a brief, it uses a small SaaS investment decision.
 Set `OPENAI_API_KEY` first. Each successful run makes four paid model calls.
 
 Each framework's snippet is one self-contained file: the brief, the four role
@@ -14,19 +15,23 @@ env-var indirection.
 | Pennypincher | Which spending to cut, and what the cut sacrifices. |
 | Battle-scarred Operator | Rollout sequence, owner, and rollback. |
 | Product Visionary | Who to serve, what to offer, how to test demand. |
-| Chair | Which proposal is the base, and which ideas get grafted onto it. |
+| Chair | Either which proposal to return unchanged, or which proposal is the base and which compatible ideas are incorporated. |
 
 All four roles run on `gpt-5.6-luna`. The three advisor personas are adapted from
 [`council-of-dans`](https://github.com/justsml/ai-skillz/blob/main/skills/council-of-dans/SKILL.md),
 shortened to a sentence or two each so the orchestration stays readable.
 
-The fixed panel has three concurrent advisors and a single synthesis call. AI SDK
+The fixed panel has three concurrent advisors and a single chair call. AI SDK
 uses `ToolLoopAgent` instances with `Promise.all`. LangGraph uses three edges out
 of `START` and one join edge into the chair. Mastra uses `.parallel()` followed by
 a `.map()` join and the chair step. Every package contains its own copy, with no
 runtime imports from sibling packages.
 
-The command prints all proposals and the decision memo. Each call disables SDK
+In `select` mode, the chair returns an advisor id and the program returns that advisor's
+proposal text byte-for-byte. In `synthesize` mode, the chair returns structured JSON;
+the program rechecks the base and source ids, uniqueness, and non-empty advice. That
+check establishes structure and provenance only—it does not certify the synthesized
+prose as correct, grounded, or safe. The command prints all proposals and the result. Each call disables SDK
 retries and receives the same 90-second run deadline. These limits bound calls,
 not the provider invoice. Cancellation does not prove a provider stopped
 processing or charging. If any advisor fails, returns empty text, or exceeds the
@@ -34,14 +39,15 @@ deadline, synthesis fails rather than presenting a partial panel as complete.
 
 ## Evaluation contract
 
-Given a business brief, return three independent proposals and one memo that
-compares them. Recommendations must distinguish supplied facts, assumptions, and
-proposed targets. The council has no browsing or business-action tools.
+Given a business brief, return three independent proposals and either one unchanged
+proposal or a structured synthesis with valid source provenance. Recommendations must
+distinguish supplied facts, assumptions, and proposed targets. The council has no
+browsing or business-action tools.
 
 `bun test test/business-advice.test.ts` runs offline through each framework's
 `runCouncil` with `ask` injected. It checks concurrency, the synthesis barrier,
-complete proposal transfer, empty-brief rejection, provider failures, and
-cancellation. It does not establish advice quality or confirm live provider
+complete proposal transfer, exact unchanged selection, invalid synthesis provenance,
+empty-brief rejection, provider failures, and cancellation. It does not establish advice quality or confirm live provider
 compatibility. The empty-response guard lives inside the real `ask`, so it is not
 covered offline.
 

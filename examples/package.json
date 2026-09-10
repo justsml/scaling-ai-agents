@@ -7,10 +7,8 @@
     "check": "tsc --noEmit",
     "snippet:10": "bun src/10-scoped-repair.ts",
     "snippet:11": "bun src/11-durable-admission.ts",
-    "snippet:12": "bun src/12-compute-request.ts",
     "snippet:13": "bun src/13-execution-memory.ts",
     "snippet:14": "bun src/14-council-of-guards.ts",
-    "snippet:15": "bun src/15-evaluator-validity.ts",
     "snippet:16": "bun src/16-fanout-node.ts"
   },
   "devDependencies": {

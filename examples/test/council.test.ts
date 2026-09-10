@@ -1,9 +1,14 @@
 import { expect, test } from "bun:test";
 import {
+  auditCouncilEvaluator,
   artifactHash,
   disagreement,
+  judgeAgreement,
   planAlternatives,
+  precisionAtK,
   review,
+  reviewQueue,
+  zeroFailureBound,
   type Evidence,
   type Vote,
 } from "../src/14-council-of-guards";
@@ -99,4 +104,73 @@ test("generation stops at the reviewer capacity even with budget left", () => {
     stop: "review-capacity",
   });
   expect(planAlternatives(1000, 20, 2, 3, 1).alternatives).toBe(1);
+});
+
+test("high agreement does not substitute for expert calibration", () => {
+  const result = judgeAgreement(
+    [...Array(90).fill(true), ...Array(10).fill(false)],
+    Array(100).fill(true),
+  );
+  expect(result).toMatchObject({
+    agreement: 0.9,
+    falsePass: 10,
+    trueFail: 0,
+  });
+  expect(result.kappa).toBeCloseTo(0);
+  expect(judgeAgreement([true], [true]).kappa).toBeNull();
+});
+
+test("retrieval coverage is council evidence, not an implicit negative", () => {
+  const judgments = new Map([
+    ["A", true],
+    ["B", true],
+  ]);
+  expect(precisionAtK(["B", "F"], judgments, 2)).toMatchObject({
+    unjudged: ["F"],
+    judgedCoverage: 0.5,
+    unjudgedAsNonrelevant: 0.5,
+    fullyJudgedPrecision: null,
+  });
+  judgments.set("F", true);
+  expect(precisionAtK(["B", "F"], judgments, 2).fullyJudgedPrecision).toBe(1);
+  expect(() => precisionAtK(["B", "B"], judgments, 2)).toThrow();
+});
+
+test("zero failures supports a bound only for representative IID samples", () => {
+  expect(zeroFailureBound(20, true)?.exactUpper95).toBeCloseTo(0.1391, 4);
+  expect(zeroFailureBound(20, false)).toBeNull();
+  expect(() => zeroFailureBound(0, true)).toThrow();
+});
+
+test("review capacity includes queue delay, not only hands-on time", () => {
+  expect(reviewQueue(0.8, 1).waitingMinutes).toBeCloseTo(4);
+  expect(reviewQueue(0.95, 1).waitingMinutes).toBeCloseTo(19);
+  expect(reviewQueue(0.95, 1).totalMinutes).toBeCloseTo(20);
+  expect(() => reviewQueue(1, 1)).toThrow();
+});
+
+test("council deployment is withheld when evaluator evidence is weak", () => {
+  expect(
+    auditCouncilEvaluator({
+      expert: [...Array(9).fill(true), false],
+      judge: Array(10).fill(true),
+      zeroFailureTrials: 20,
+      representativeIID: false,
+      maxFailureRate: 0.05,
+      ranking: ["A", "new"],
+      judgments: new Map([["A", true]]),
+      k: 2,
+      reviewUtilization: 0.95,
+      serviceMinutes: 1,
+      maxReviewMinutes: 5,
+    }),
+  ).toMatchObject({
+    decision: "not-ready",
+    issues: [
+      "judge-not-calibrated",
+      "failure-bound-insufficient",
+      "retrieval-judgments-incomplete",
+      "review-sla-at-risk",
+    ],
+  });
 });

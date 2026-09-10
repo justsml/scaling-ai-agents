@@ -1,8 +1,8 @@
 /**
- * 02 — Decompose (AI SDK)
+ * 02 — Decompose and place (AI SDK)
  *
- * Three investigators inspect separate evidence, then
- * one incident lead combines their findings.
+ * Place three evidence assignments on explicit model lanes,
+ * run them together, then synthesize their findings.
  *
  *   bun run snippet:02
  *
@@ -17,6 +17,10 @@ the first safe mitigation.`;
 
 type Assignment = {
   id: string;
+  model:
+    | "gpt-5.6-luna"
+    | "gpt-5.6-terra"
+    | "gpt-5.6-sol";
   instructions: string;
   evidence: string;
 };
@@ -24,12 +28,14 @@ type Assignment = {
 const assignments: Assignment[] = [
   {
     id: "network",
+    model: "gpt-5.6-luna",
     instructions: "Analyze only the network evidence.",
     evidence:
       "Proxy idle timeout is 60s; clients send heartbeats every 75s.",
   },
   {
     id: "application",
+    model: "gpt-5.6-terra",
     instructions:
       "Analyze only the application evidence.",
     evidence:
@@ -37,6 +43,7 @@ const assignments: Assignment[] = [
   },
   {
     id: "state",
+    model: "gpt-5.6-sol",
     instructions:
       "Analyze only the session-state evidence.",
     evidence:
@@ -47,13 +54,17 @@ const assignments: Assignment[] = [
 type Finding = { id: string; text: string };
 
 export async function ask(
-  role: { id: string; instructions: string },
+  role: {
+    id: string;
+    model: Assignment["model"];
+    instructions: string;
+  },
   prompt: string,
   signal: AbortSignal,
 ) {
   const agent = new ToolLoopAgent({
     id: role.id,
-    model: openai("gpt-5.6-luna"),
+    model: openai(role.model),
     instructions: `${role.instructions}
 State what the evidence proves, what it does not prove, and one check.`,
     stopWhen: stepCountIs(1),
@@ -84,6 +95,7 @@ export async function runInvestigation(
   );
   const lead = {
     id: "incident-lead",
+    model: "gpt-5.6-sol" as const,
     instructions: `Combine the findings. Keep independent
 causes distinct, name missing evidence, and recommend the
 first reversible mitigation.`,
@@ -93,7 +105,14 @@ first reversible mitigation.`,
     JSON.stringify({ incident, findings }),
     signal,
   );
-  return { findings, report };
+  return {
+    placement: assignments.map(({ id, model }) => ({
+      worker: id,
+      model,
+    })),
+    findings,
+    report,
+  };
 }
 
 if (import.meta.main)

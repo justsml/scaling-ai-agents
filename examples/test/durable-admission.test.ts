@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Admission } from "../src/11-durable-admission";
+import { Admission, computeRequest } from "../src/11-durable-admission";
 const cleanups: Array<() => void> = [];
 afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
@@ -150,4 +150,98 @@ test("notification retry only updates delivery state", () => {
   db.notificationDelivered(a.item);
   expect(db.snapshot("tenant")).toEqual(before);
   expect(db.notifications()).toEqual([{ item: a.item, delivered: 1 }]);
+});
+
+test("compute quote derives identity and atomically reserves shared budget", () => {
+  const s = setup(120);
+  const job = s.db.admit("tenant", "job", 1, 600_000);
+  const lease = s.db.reserveCompute("tenant", job.jobId!, "workers-1", {
+    ...computeRequest,
+    billTo: "someone-else",
+  } as typeof computeRequest);
+  expect(lease).toMatchObject({
+    job: job.jobId,
+    billedTo: "tenant",
+    state: "reserved",
+    held: 96,
+    expiresAt: 360_000,
+    teardownRequired: true,
+  });
+  expect(s.db.snapshot("tenant")).toMatchObject({
+    held: 116,
+    available: 4,
+  });
+  expect(() => s.open().reserveCompute("tenant", job.jobId!, "workers-2", computeRequest)).toThrow(
+    "compute-budget",
+  );
+  expect(() => s.db.reserveCompute("other", job.jobId!, "forged", computeRequest)).toThrow(
+    "unknown job",
+  );
+});
+
+test("compute reservation is idempotent and survives provisioning restart", () => {
+  const s = setup();
+  const jobId = s.db.admit("tenant", "job", 1, 600_000).jobId!;
+  const first = s.db.reserveCompute("tenant", jobId, "workers", computeRequest);
+  expect(s.open().reserveCompute("tenant", jobId, "workers", computeRequest).id).toBe(first.id);
+  expect(() =>
+    s.db.reserveCompute("tenant", jobId, "workers", {
+      ...computeRequest,
+      count: 7,
+    }),
+  ).toThrow("idempotency conflict");
+  s.db.provisionCompute(first.id, "provider-lease");
+  const restarted = s.open();
+  expect(restarted.computeLease(first.id)).toMatchObject({
+    state: "provisioned",
+    providerId: "provider-lease",
+    teardownRequired: true,
+  });
+  restarted.confirmComputeTeardown(first.id, 80);
+  restarted.confirmComputeTeardown(first.id, 80);
+  expect(restarted.computeLease(first.id)).toMatchObject({
+    state: "reconciled",
+    held: 0,
+    spent: 80,
+    teardownRequired: false,
+  });
+  expect(restarted.snapshot("tenant")).toMatchObject({
+    held: 20,
+    spent: 80,
+    available: 100,
+  });
+  expect(() => restarted.confirmComputeTeardown(first.id, 81)).toThrow("conflicting");
+});
+
+test.each([
+  { class: "gpu-huge" },
+  { class: "__proto__" },
+  { shape: "gpu" },
+  { region: "eu-west" },
+  { egress: ["attacker.example"] },
+  { count: 9 },
+  { count: -1 },
+  { durationSeconds: 361 },
+  { costCapCents: 95 },
+  { count: Number.NaN },
+])("compute admission rejects generated escalation %j", (change) => {
+  const { db } = setup();
+  const jobId = db.admit("tenant", "job", 1, 600_000).jobId!;
+  expect(() =>
+    db.reserveCompute("tenant", jobId, "workers", {
+      ...computeRequest,
+      ...change,
+    }),
+  ).toThrow();
+});
+
+test("job deadline constrains compute and teardown cannot exceed its hold", () => {
+  const s = setup();
+  const jobId = s.db.admit("tenant", "job", 1, 600_000).jobId!;
+  s.tick(300_000);
+  expect(() => s.db.reserveCompute("tenant", jobId, "late", computeRequest)).toThrow("deadline");
+  s.tick(0);
+  const lease = s.db.reserveCompute("tenant", jobId, "workers", computeRequest);
+  s.db.provisionCompute(lease.id, "provider-lease");
+  expect(() => s.db.confirmComputeTeardown(lease.id, 97)).toThrow("outside reservation");
 });

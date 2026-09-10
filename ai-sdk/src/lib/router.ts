@@ -1,4 +1,4 @@
-// The deterministic classifier used by 00-router.ts
+// The deterministic classifier used by the routing policy examples.
 // (and by 05-compile.ts, which reuses it to decide when
 // the compiled tool short-circuits the routine path).
 // Deliberately simple keyword rules, not a model call:

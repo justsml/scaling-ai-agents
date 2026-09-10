@@ -1,12 +1,12 @@
 /**
- * 06 — Remote agent over A2A (AI SDK)
+ * Advanced — Remote agent over A2A (AI SDK)
  *
  * Put one patch agent behind a tiny A2A JSON-RPC
  * server, then call it as a remote worker. The AI SDK
  * has no A2A server primitive, so the protocol boundary
  * is deliberately visible here.
  *
- *   bun run snippet:06
+ *   bun run advanced:remote
  *
  * Two paid calls. Needs OPENAI_API_KEY.
  */

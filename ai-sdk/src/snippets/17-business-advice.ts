@@ -1,11 +1,12 @@
 /**
- * 17 — Business advice council (AI SDK)
+ * 17 — Select or synthesize business advice (AI SDK)
  *
- * Three advisors answer the same brief at the same
- * time. A chair then picks one as the base and grafts
- * compatible ideas from the others.
+ * Three advisors answer in parallel. The chair either
+ * selects one proposal unchanged, or synthesizes a new
+ * answer whose provenance is rechecked in code.
  *
- *   bun run snippet:17 -- "your business question"
+ *   bun run snippet:17 -- --mode select "your question"
+ *   bun run snippet:17 -- --mode synthesize "your question"
  *
  * Four paid calls. Needs OPENAI_API_KEY.
  */
@@ -24,40 +25,36 @@ numbers. Name the risk and one reversible experiment.
 Under 150 words.`;
 
 type Role = { id: string; instructions: string };
+export type Proposal = { id: string; text: string };
+export type CouncilMode = "select" | "synthesize";
 
 const advisors: Role[] = [
   {
     id: "pennypincher",
-    instructions: `${rules}
-You are the Pennypincher. Find spend to cut, and say
-what the cut sacrifices.`,
+    instructions: `${rules}\nYou are the Pennypincher. Find spend to cut, and say what the cut sacrifices.`,
   },
   {
     id: "operator",
-    instructions: `${rules}
-You are the Battle-scarred Operator. Give a sequence,
-an owner, and a rollback.`,
+    instructions: `${rules}\nYou are the Battle-scarred Operator. Give a sequence, an owner, and a rollback.`,
   },
   {
     id: "visionary",
-    instructions: `${rules}
-You are the Product Visionary. Say who to serve, what
-to offer, and how to test demand.`,
+    instructions: `${rules}\nYou are the Product Visionary. Say who to serve, what to offer, and how to test demand.`,
   },
 ];
 
-const chair: Role = {
-  id: "chair",
-  instructions: `You chair the council. Pick the
-strongest proposal as your base; do not average
-incompatible strategies. Graft only compatible ideas
-and name their source. State disagreements, missing
-evidence, and next steps with owners.`,
+const chairs: Record<CouncilMode, Role> = {
+  select: {
+    id: "chair-select",
+    instructions:
+      "Choose exactly one proposal. Return only its advisor id, with no explanation.",
+  },
+  synthesize: {
+    id: "chair-synthesize",
+    instructions: `Pick one proposal as the base. Graft only compatible ideas from other proposals. Return only JSON with keys baseId, compatibleSourceIds, and advice. State disagreements, missing evidence, and next steps with owners in advice.`,
+  },
 };
 
-type Proposal = { id: string; text: string };
-
-/** One agent per role, built where it is used. */
 export async function ask(
   role: Role,
   prompt: string,
@@ -82,11 +79,78 @@ export async function ask(
 
 export type Ask = typeof ask;
 
+function proposalId(
+  output: string,
+  proposals: Proposal[],
+) {
+  const id = output.trim();
+  if (!proposals.some((proposal) => proposal.id === id))
+    throw new Error(
+      `chair selected unknown advisor: ${id}`,
+    );
+  return id;
+}
+
+export function recheckSynthesis(
+  output: string,
+  proposals: Proposal[],
+) {
+  let value: unknown;
+  try {
+    value = JSON.parse(output);
+  } catch {
+    throw new Error("chair synthesis is not JSON");
+  }
+  if (!value || typeof value !== "object")
+    throw new Error("chair synthesis is not an object");
+  const result = value as Record<string, unknown>;
+  const ids = new Set(
+    proposals.map((proposal) => proposal.id),
+  );
+  if (
+    typeof result.baseId !== "string" ||
+    !ids.has(result.baseId)
+  )
+    throw new Error(
+      "chair synthesis has an unknown baseId",
+    );
+  if (!Array.isArray(result.compatibleSourceIds))
+    throw new Error(
+      "chair synthesis has no compatibleSourceIds",
+    );
+  const sources = result.compatibleSourceIds;
+  if (
+    sources.some(
+      (id) => typeof id !== "string" || !ids.has(id),
+    ) ||
+    new Set(sources).size !== sources.length ||
+    sources.includes(result.baseId)
+  )
+    throw new Error(
+      "chair synthesis has invalid source ids",
+    );
+  if (
+    typeof result.advice !== "string" ||
+    !result.advice.trim()
+  )
+    throw new Error("chair synthesis has empty advice");
+  return {
+    baseId: result.baseId,
+    compatibleSourceIds: sources as string[],
+    advice: result.advice,
+    recheck: {
+      passed: true as const,
+      scope: "structure-and-provenance" as const,
+    },
+  };
+}
+
 /** The AI SDK fan-out is plain Promise.all. */
 export async function runCouncil(
   input = brief,
   signal = AbortSignal.timeout(90_000),
   call: Ask = ask,
+  mode: CouncilMode = "synthesize",
 ) {
   const text = input.trim();
   if (!text) throw new Error("Brief is empty");
@@ -97,20 +161,55 @@ export async function runCouncil(
       text: await call(role, text, signal),
     })),
   );
-  // The join: every advisor lands before the chair.
-  const advice = await call(
-    chair,
+  const chairOutput = await call(
+    chairs[mode],
     JSON.stringify({ brief: text, proposals }),
     signal,
   );
-  return { proposals, advice };
+  if (mode === "select") {
+    const selectedId = proposalId(
+      chairOutput,
+      proposals,
+    );
+    return {
+      mode,
+      proposals,
+      selectedId,
+      advice: proposals.find(
+        (proposal) => proposal.id === selectedId,
+      )!.text,
+    };
+  }
+  return {
+    mode,
+    proposals,
+    ...recheckSynthesis(chairOutput, proposals),
+  };
 }
 
 if (import.meta.main) {
-  const arg = process.argv
+  const args = process.argv
     .slice(2)
-    .filter((a) => a !== "--")
-    .join(" ");
-  const result = await runCouncil(arg.trim() || brief);
-  console.log(JSON.stringify(result, null, 2));
+    .filter((arg) => arg !== "--");
+  const modeIndex = args.indexOf("--mode");
+  const mode =
+    modeIndex === -1
+      ? "synthesize"
+      : args.splice(modeIndex, 2)[1];
+  if (mode !== "select" && mode !== "synthesize")
+    throw new Error(
+      "--mode must be select or synthesize",
+    );
+  console.log(
+    JSON.stringify(
+      await runCouncil(
+        args.join(" ").trim() || brief,
+        undefined,
+        undefined,
+        mode,
+      ),
+      null,
+      2,
+    ),
+  );
 }

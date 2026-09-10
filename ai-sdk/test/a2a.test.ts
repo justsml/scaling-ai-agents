@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { createA2AServer } from "../src/snippets/06-remote-a2a";
+import { createA2AServer } from "../src/advanced/remote-a2a";
 import { A2AClient, type A2AMessage } from "../src/lib/a2a-client";
 
 let server: ReturnType<typeof createA2AServer>;
@@ -14,7 +14,7 @@ afterAll(() => {
   server.stop(true);
 });
 
-describe("A2A client against the local 06 server", () => {
+describe("A2A client against the advanced local server", () => {
   test("agent card is reachable", async () => {
     const card = await client.getAgentCard();
     expect(card.name).toBe("competitor-remote");

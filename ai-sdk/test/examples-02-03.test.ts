@@ -1,8 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { runCompetition } from "../src/snippets/01-compete";
 import { runInvestigation } from "../src/snippets/02-decompose";
 import { runConstrained } from "../src/snippets/03-constrain";
-import { runDistributed } from "../src/snippets/04-distribute";
 
 function gate(expected: number) {
   const started: string[] = [];
@@ -20,37 +18,31 @@ function gate(expected: number) {
   };
 }
 
-describe("examples 01-04 outcomes", () => {
-  test("01 joins every concurrent competitor before judging", async () => {
-    const competitors = gate(3);
-    const result = await runCompetition(
-      "demo",
-      AbortSignal.timeout(5_000),
-      async (role, prompt) => {
-        if (role.id === "judge") {
-          expect(competitors.started).toHaveLength(3);
-          expect(JSON.parse(prompt).candidates).toHaveLength(3);
-          return "minimal-diff wins";
-        }
-        await competitors.arrive(role.id);
-        return role.id;
-      },
-    );
-    expect(result.candidates).toHaveLength(3);
-  });
-
-  test("02 joins every evidence owner before the lead", async () => {
+describe("examples 02-03 outcomes", () => {
+  test("02 runs every placed evidence owner before synthesis", async () => {
     const owners = gate(3);
+    const placement = new Map<string, string>();
     const result = await runInvestigation(AbortSignal.timeout(5_000), async (role, prompt) => {
       if (role.id === "incident-lead") {
         expect(owners.started).toHaveLength(3);
         expect(JSON.parse(prompt).findings).toHaveLength(3);
         return "combined report";
       }
+      placement.set(role.id, role.model);
       await owners.arrive(role.id);
       return role.id;
     });
     expect(result.findings).toHaveLength(3);
+    expect(Object.fromEntries(placement)).toEqual({
+      network: "gpt-5.6-luna",
+      application: "gpt-5.6-terra",
+      state: "gpt-5.6-sol",
+    });
+    expect(result.placement).toEqual([
+      { worker: "network", model: "gpt-5.6-luna" },
+      { worker: "application", model: "gpt-5.6-terra" },
+      { worker: "state", model: "gpt-5.6-sol" },
+    ]);
   });
 
   test("03 admits exactly the requested maximum", async () => {
@@ -62,15 +54,5 @@ describe("examples 01-04 outcomes", () => {
     expect(called).toHaveLength(2);
     expect(result.results).toHaveLength(2);
     expect(result.skipped).toEqual(["docs"]);
-  });
-
-  test("04 starts every explicit lane concurrently and preserves placement", async () => {
-    const laneGate = gate(3);
-    const result = await runDistributed(AbortSignal.timeout(5_000), async (lane) => {
-      await laneGate.arrive(lane.id);
-      return lane.id;
-    });
-    expect(result.results).toHaveLength(3);
-    expect(result.placement.map((lane) => lane.id)).toEqual(["triage", "operations", "review"]);
   });
 });

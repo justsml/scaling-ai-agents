@@ -1,5 +1,5 @@
 /**
- * 06 — Remote graph (LangGraph)
+ * Advanced — Remote graph (LangGraph)
  *
  * Start a second LangGraph process, probe its network
  * protocol, then invoke its worker through RemoteGraph
@@ -8,7 +8,7 @@
  * The local dev server exposes Agent Protocol, not A2A;
  * the probe makes that boundary visible at runtime.
  *
- *   bun run snippet:06
+ *   bun run advanced:remote
  *
  * One paid remote call. Needs OPENAI_API_KEY.
  */

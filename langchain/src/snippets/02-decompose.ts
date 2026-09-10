@@ -1,8 +1,8 @@
 /**
- * 02 — Decompose (LangGraph)
+ * 02 — Decompose and place (LangGraph)
  *
- * Three investigators inspect separate evidence, then
- * one incident lead combines their findings.
+ * Place three evidence assignments on explicit model lanes,
+ * run them together, then synthesize their findings.
  *
  *   bun run snippet:02
  *
@@ -26,6 +26,10 @@ const incident =
   "WebSocket sessions intermittently close with code 1006 after a deploy.";
 type Assignment = {
   id: string;
+  model:
+    | "gpt-5.6-luna"
+    | "gpt-5.6-terra"
+    | "gpt-5.6-sol";
   instructions: string;
   evidence: string;
 };
@@ -33,12 +37,14 @@ type Finding = { id: string; text: string };
 const assignments: Assignment[] = [
   {
     id: "network",
+    model: "gpt-5.6-luna",
     instructions: "Analyze only the network evidence.",
     evidence:
       "Proxy idle timeout is 60s; clients send heartbeats every 75s.",
   },
   {
     id: "application",
+    model: "gpt-5.6-terra",
     instructions:
       "Analyze only the application evidence.",
     evidence:
@@ -46,6 +52,7 @@ const assignments: Assignment[] = [
   },
   {
     id: "state",
+    model: "gpt-5.6-sol",
     instructions:
       "Analyze only the session-state evidence.",
     evidence:
@@ -54,12 +61,16 @@ const assignments: Assignment[] = [
 ];
 
 export async function ask(
-  role: { id: string; instructions: string },
+  role: {
+    id: string;
+    model: Assignment["model"];
+    instructions: string;
+  },
   prompt: string,
   signal: AbortSignal,
 ) {
   const model = new ChatOpenAI({
-    model: "gpt-5.6-luna",
+    model: role.model,
     maxRetries: 0,
   });
   const { text } = await model.invoke(
@@ -84,6 +95,14 @@ export function investigation(
         reducer: (a, b) => [...a, ...b],
       },
     ),
+    placement: z
+      .array(
+        z.object({
+          worker: z.string(),
+          model: z.string(),
+        }),
+      )
+      .default(() => []),
     report: z.string().default(""),
   });
   const inspect =
@@ -107,6 +126,7 @@ export function investigation(
       const report = await call(
         {
           id: "incident-lead",
+          model: "gpt-5.6-sol",
           instructions:
             "Keep independent causes distinct, name missing evidence, and recommend the first reversible mitigation.",
         },
@@ -116,7 +136,13 @@ export function investigation(
         }),
         signal,
       );
-      return { report };
+      return {
+        placement: assignments.map(({ id, model }) => ({
+          worker: id,
+          model,
+        })),
+        report,
+      };
     })
     .addEdge(START, "network")
     .addEdge(START, "application")

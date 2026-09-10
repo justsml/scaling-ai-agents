@@ -4,14 +4,14 @@ import { describe, test, expect } from "bun:test";
 import { runCouncil, type Ask } from "../src/snippets/17-business-advice";
 
 describe("business advice council", () => {
-  test("all three advisors start before the chair runs", async () => {
+  test("synthesize joins all advisors and rechecks provenance", async () => {
     const started: string[] = [];
     let release!: () => void;
     const barrier = new Promise<void>((resolve) => {
       release = resolve;
     });
     const call: Ask = async (role, prompt) => {
-      if (role.id === "chair") {
+      if (role.id === "chair-synthesize") {
         expect(started.length).toBe(3);
         const input = JSON.parse(prompt);
         expect(input.brief).toBe("Build or buy?");
@@ -20,7 +20,11 @@ describe("business advice council", () => {
           "pennypincher",
           "visionary",
         ]);
-        return "Conditional decision memo";
+        return JSON.stringify({
+          baseId: "operator",
+          compatibleSourceIds: ["visionary"],
+          advice: "Conditional decision memo",
+        });
       }
       expect(prompt).toBe("Build or buy?");
       started.push(role.id);
@@ -29,8 +33,37 @@ describe("business advice council", () => {
       return `${role.id} proposal`;
     };
     const result = await runCouncil("  Build or buy?  ", AbortSignal.timeout(3000), call);
+    if (result.mode !== "synthesize") throw new Error("expected synthesis");
     expect(result.advice).toBe("Conditional decision memo");
     expect(result.proposals.length).toBe(3);
+    expect(result.recheck).toEqual({ passed: true, scope: "structure-and-provenance" });
+  });
+
+  test("select returns the chosen proposal unchanged", async () => {
+    const exact = "  Keep these bytes and spacing.  ";
+    const result = await runCouncil(
+      "Build or buy?",
+      AbortSignal.timeout(3000),
+      async (role) =>
+        role.id === "chair-select"
+          ? "operator"
+          : role.id === "operator"
+            ? exact
+            : `${role.id} proposal`,
+      "select",
+    );
+    expect(result.selectedId).toBe("operator");
+    expect(result.advice).toBe(exact);
+  });
+
+  test("rejects a synthesis with invented provenance", async () => {
+    await expect(
+      runCouncil("Build or buy?", AbortSignal.timeout(3000), async (role) =>
+        role.id === "chair-synthesize"
+          ? JSON.stringify({ baseId: "invented", compatibleSourceIds: [], advice: "Looks good" })
+          : `${role.id} proposal`,
+      ),
+    ).rejects.toThrow("unknown baseId");
   });
 
   test("rejects an empty brief without calling anything", async () => {
@@ -51,7 +84,7 @@ describe("business advice council", () => {
       return "Proposal";
     };
     await expect(runCouncil("Pricing decision", AbortSignal.timeout(3000), call)).rejects.toThrow();
-    expect(called).not.toContain("chair");
+    expect(called.some((id) => id.startsWith("chair-"))).toBe(false);
   });
 
   test("an expired signal prevents dispatch", async () => {
@@ -74,6 +107,6 @@ describe("business advice council", () => {
       return "Late proposal";
     };
     await expect(runCouncil("Expansion decision", controller.signal, call)).rejects.toThrow();
-    expect(called).not.toContain("chair");
+    expect(called.some((id) => id.startsWith("chair-"))).toBe(false);
   });
 });

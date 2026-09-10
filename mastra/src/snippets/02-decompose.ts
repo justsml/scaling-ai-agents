@@ -1,8 +1,8 @@
 /**
- * 02 — Decompose (Mastra)
+ * 02 — Decompose and place (Mastra)
  *
- * Three investigators inspect separate evidence, then
- * one incident lead combines their findings.
+ * Place three evidence assignments on explicit model lanes,
+ * run them together, then synthesize their findings.
  *
  *   bun run snippet:02
  *
@@ -19,6 +19,10 @@ const incident =
   "WebSocket sessions intermittently close with code 1006 after a deploy.";
 type Assignment = {
   id: string;
+  model:
+    | "openai/gpt-5.6-luna"
+    | "openai/gpt-5.6-terra"
+    | "openai/gpt-5.6-sol";
   instructions: string;
   evidence: string;
 };
@@ -26,12 +30,14 @@ type Finding = { id: string; text: string };
 const assignments: Assignment[] = [
   {
     id: "network",
+    model: "openai/gpt-5.6-luna",
     instructions: "Analyze only the network evidence.",
     evidence:
       "Proxy idle timeout is 60s; clients send heartbeats every 75s.",
   },
   {
     id: "application",
+    model: "openai/gpt-5.6-terra",
     instructions:
       "Analyze only the application evidence.",
     evidence:
@@ -39,6 +45,7 @@ const assignments: Assignment[] = [
   },
   {
     id: "state",
+    model: "openai/gpt-5.6-sol",
     instructions:
       "Analyze only the session-state evidence.",
     evidence:
@@ -47,14 +54,18 @@ const assignments: Assignment[] = [
 ];
 
 export async function ask(
-  role: { id: string; instructions: string },
+  role: {
+    id: string;
+    model: Assignment["model"];
+    instructions: string;
+  },
   prompt: string,
   signal: AbortSignal,
 ) {
   const agent = new Agent({
     id: role.id,
     name: role.id,
-    model: "openai/gpt-5.6-luna",
+    model: role.model,
     instructions: role.instructions,
     defaultOptions: { maxSteps: 1 },
   });
@@ -92,6 +103,12 @@ export function investigation(
       findings: z.array(finding),
     }),
     outputSchema: z.object({
+      placement: z.array(
+        z.object({
+          worker: z.string(),
+          model: z.string(),
+        }),
+      ),
       findings: z.array(finding),
       report: z.string(),
     }),
@@ -99,6 +116,7 @@ export function investigation(
       const answer = await call(
         {
           id: "incident-lead",
+          model: "openai/gpt-5.6-sol",
           instructions:
             "Keep independent causes distinct, name missing evidence, and recommend the first reversible mitigation.",
         },
@@ -109,6 +127,10 @@ export function investigation(
         signal,
       );
       return {
+        placement: assignments.map(({ id, model }) => ({
+          worker: id,
+          model,
+        })),
         findings: inputData.findings,
         report: answer,
       };

@@ -1,11 +1,11 @@
 /**
- * 06 — Remote agent over A2A (Mastra)
+ * Advanced — Remote agent over A2A (Mastra)
  *
  * Start a second Mastra process, discover its public
  * agent card, stream one task, assemble its artifact,
  * then read the task record back.
  *
- *   bun run snippet:06
+ *   bun run advanced:remote
  *
  * One paid remote call. Needs OPENAI_API_KEY.
  */

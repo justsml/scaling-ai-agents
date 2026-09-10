@@ -1,8 +1,8 @@
 /**
- * Run the standalone 00–07 examples in order.
+ * Run the standalone examples in teaching order.
  *
  *   bun run all
- *   bun run all -- 01 03
+ *   bun run all -- 02 03
  *
  * Each example is a child process, so one failure does
  * not hide the remaining examples. See each snippet's
@@ -10,14 +10,11 @@
  * 08 and 09 use the evaluation harness instead.
  */
 const snippets = [
-  "00-router.ts",
-  "01-compete.ts",
   "02-decompose.ts",
   "03-constrain.ts",
-  "04-distribute.ts",
   "05-compile.ts",
-  "06-remote-a2a.ts",
   "07-batching.ts",
+  "17-business-advice.ts",
 ];
 const selected = process.argv
   .slice(2)

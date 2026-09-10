@@ -1,9 +1,10 @@
 /**
  * 11 — Durable admission
  *
- * A SQLite ledger admits work before dispatch. It
- * reserves budget once, survives restarts, and keeps
- * uncertain provider attempts from being retried.
+ * A SQLite ledger admits work and compute before
+ * dispatch. It reserves budget once, survives restarts,
+ * and keeps uncertain provider attempts from being
+ * retried or leaked.
  *
  *   bun run snippet:11
  *
@@ -31,8 +32,125 @@ type Attempt = {
   expires: number;
   epoch: number;
 };
+export interface ComputeRequest {
+  shape: string;
+  class: string;
+  count: number;
+  durationSeconds: number;
+  region: string;
+  egress: readonly string[];
+  costCapCents: number;
+}
+export const computeRequest: ComputeRequest = {
+  shape: "provider-wait",
+  class: "sandbox-small",
+  count: 8,
+  durationSeconds: 360,
+  region: "us-east",
+  egress: ["provider.example", "storage.example"],
+  costCapCents: 150,
+};
+export type ComputeLease = {
+  id: string;
+  job: string;
+  billedTo: string;
+  state: string;
+  class: string;
+  count: number;
+  region: string;
+  egress: string[];
+  expiresAt: number;
+  held: number;
+  spent: number;
+  providerId: string | null;
+  teardownRequired: boolean;
+};
 const PRICE = 10;
 const MAX_ATTEMPTS = 2;
+const COMPUTE_CATALOG = {
+  "sandbox-small": {
+    shape: "provider-wait",
+    regions: ["us-east"],
+    maxDurationSeconds: 360,
+    egress: [
+      "provider.example",
+      "storage.example",
+      "callbacks.example",
+    ],
+    centsPerWorkerMinute: 2,
+  },
+} as const;
+
+function validateCompute(
+  request: ComputeRequest,
+  region: string,
+  deadline: number,
+  now: number,
+  maxCount: number,
+) {
+  if (!Object.hasOwn(COMPUTE_CATALOG, request.class))
+    throw new Error("unknown-compute-class");
+  const entry =
+    COMPUTE_CATALOG[
+      request.class as keyof typeof COMPUTE_CATALOG
+    ];
+  if (
+    !Number.isSafeInteger(request.count) ||
+    request.count < 1 ||
+    request.count > maxCount ||
+    !Number.isSafeInteger(request.durationSeconds) ||
+    request.durationSeconds < 1 ||
+    request.durationSeconds >
+      entry.maxDurationSeconds ||
+    !Number.isSafeInteger(request.costCapCents) ||
+    request.costCapCents < 0
+  )
+    throw new Error("invalid-compute-size-or-cap");
+  if (
+    request.shape !== entry.shape ||
+    request.region !== region ||
+    !(entry.regions as readonly string[]).includes(
+      request.region,
+    )
+  )
+    throw new Error("shape-or-residency-denied");
+  if (
+    !Array.isArray(request.egress) ||
+    request.egress.some(
+      (host) =>
+        !(entry.egress as readonly string[]).includes(
+          host,
+        ),
+    )
+  )
+    throw new Error("egress-denied");
+  const expiresAt =
+    now + request.durationSeconds * 1000;
+  if (
+    !Number.isSafeInteger(now) ||
+    expiresAt > deadline
+  )
+    throw new Error("job-deadline");
+  const reserveCents =
+    request.count *
+    Math.ceil(request.durationSeconds / 60) *
+    entry.centsPerWorkerMinute;
+  if (reserveCents > request.costCapCents)
+    throw new Error("compute-budget");
+  return {
+    expiresAt,
+    reserveCents,
+    input: {
+      shape: request.shape,
+      class: request.class,
+      count: request.count,
+      durationSeconds: request.durationSeconds,
+      region: request.region,
+      egress: [...new Set(request.egress)].sort(),
+      costCapCents: request.costCapCents,
+    },
+  };
+}
 
 export class Admission {
   private db: Database;
@@ -52,6 +170,13 @@ export class Admission {
       CREATE TABLE IF NOT EXISTS attempts (
         id TEXT PRIMARY KEY, item TEXT NOT NULL, state TEXT NOT NULL, providerId TEXT,
         expires INTEGER NOT NULL, epoch INTEGER NOT NULL, dispatched INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS compute_leases (
+        id TEXT PRIMARY KEY, job TEXT NOT NULL, request TEXT NOT NULL,
+        requestJson TEXT NOT NULL, state TEXT NOT NULL, class TEXT NOT NULL,
+        count INTEGER NOT NULL, region TEXT NOT NULL, egress TEXT NOT NULL,
+        expiresAt INTEGER NOT NULL, held INTEGER NOT NULL, spent INTEGER NOT NULL,
+        providerId TEXT, teardownRequired INTEGER NOT NULL,
+        UNIQUE(job, request));
       CREATE TABLE IF NOT EXISTS outbox (item TEXT PRIMARY KEY, delivered INTEGER NOT NULL DEFAULT 0);`);
   }
   close() {
@@ -78,11 +203,14 @@ export class Admission {
     const totals = this.db
       .query<
         { held: number; spent: number },
-        [string]
+        [string, string, string, string]
       >(`
-      SELECT COALESCE(SUM(i.held),0) held, COALESCE(SUM(i.spent),0) spent
-      FROM items i JOIN jobs j ON j.id=i.job WHERE j.tenant=?`)
-      .get(tenant)!;
+      SELECT
+        COALESCE((SELECT SUM(i.held) FROM items i JOIN jobs j ON j.id=i.job WHERE j.tenant=?),0)
+          + COALESCE((SELECT SUM(c.held) FROM compute_leases c JOIN jobs j ON j.id=c.job WHERE j.tenant=?),0) held,
+        COALESCE((SELECT SUM(i.spent) FROM items i JOIN jobs j ON j.id=i.job WHERE j.tenant=?),0)
+          + COALESCE((SELECT SUM(c.spent) FROM compute_leases c JOIN jobs j ON j.id=c.job WHERE j.tenant=?),0) spent`)
+      .get(tenant, tenant, tenant, tenant)!;
     return {
       ...totals,
       available:
@@ -187,6 +315,166 @@ export class Admission {
         "SELECT * FROM items WHERE job=? ORDER BY id",
       )
       .all(jobId);
+  }
+
+  // The agent proposes a shape; authenticated identity,
+  // residency, entitlement and job deadline remain
+  // server-owned. Validation and reservation happen in
+  // the same immediate transaction.
+  reserveCompute(
+    authenticatedTenant: string,
+    jobId: string,
+    requestId: string,
+    request: ComputeRequest,
+  ): ComputeLease {
+    if (!requestId)
+      throw new Error("missing compute request ID");
+    return this.db
+      .transaction(() => {
+        const job = this.db
+          .query<
+            { tenant: string; deadline: number },
+            [string]
+          >(
+            "SELECT tenant,deadline FROM jobs WHERE id=?",
+          )
+          .get(jobId);
+        if (!job || job.tenant !== authenticatedTenant)
+          throw new Error("unknown job");
+        const normalized = validateCompute(
+          request,
+          "us-east",
+          job.deadline,
+          this.now(),
+          8,
+        );
+        const requestJson = JSON.stringify(
+          normalized.input,
+        );
+        const prior = this.db
+          .query<
+            {
+              id: string;
+              requestJson: string;
+            },
+            [string, string]
+          >(
+            "SELECT id,requestJson FROM compute_leases WHERE job=? AND request=?",
+          )
+          .get(jobId, requestId);
+        if (prior) {
+          if (prior.requestJson !== requestJson)
+            throw new Error("idempotency conflict");
+          return this.computeLease(prior.id);
+        }
+        if (
+          normalized.reserveCents >
+          this.snapshot(authenticatedTenant).available
+        )
+          throw new Error("compute-budget");
+        const id = `${jobId}/compute/${requestId}`;
+        this.db
+          .query(`INSERT INTO compute_leases
+            VALUES (?,?,?,?,'reserved',?,?,?,?,?,?,0,NULL,1)`)
+          .run(
+            id,
+            jobId,
+            requestId,
+            requestJson,
+            request.class,
+            request.count,
+            request.region,
+            JSON.stringify(normalized.input.egress),
+            normalized.expiresAt,
+            normalized.reserveCents,
+          );
+        return this.computeLease(id);
+      })
+      .immediate();
+  }
+
+  computeLease(id: string): ComputeLease {
+    const row = this.db
+      .query<
+        Omit<
+          ComputeLease,
+          "egress" | "teardownRequired"
+        > & {
+          egress: string;
+          teardownRequired: number;
+        },
+        [string]
+      >(
+        `SELECT c.id,c.job,j.tenant billedTo,c.state,c.class,c.count,c.region,
+          c.egress,c.expiresAt,c.held,c.spent,c.providerId,c.teardownRequired
+          FROM compute_leases c JOIN jobs j ON j.id=c.job WHERE c.id=?`,
+      )
+      .get(id);
+    if (!row) throw new Error("unknown compute lease");
+    return {
+      ...row,
+      egress: JSON.parse(row.egress),
+      teardownRequired: row.teardownRequired === 1,
+    };
+  }
+
+  provisionCompute(id: string, providerId: string) {
+    if (!providerId)
+      throw new Error("missing provider ID");
+    this.db
+      .transaction(() => {
+        const lease = this.computeLease(id);
+        if (
+          lease.state !== "reserved" ||
+          this.now() >= lease.expiresAt
+        )
+          throw new Error(
+            "compute lease not provisionable",
+          );
+        this.db
+          .query(
+            "UPDATE compute_leases SET state='provisioned',providerId=? WHERE id=?",
+          )
+          .run(providerId, id);
+      })
+      .immediate();
+  }
+
+  // Only trusted provider teardown/billing evidence can
+  // clear the obligation and convert the hold to spend.
+  confirmComputeTeardown(
+    id: string,
+    actualCostCents: number,
+  ) {
+    if (
+      !Number.isSafeInteger(actualCostCents) ||
+      actualCostCents < 0
+    )
+      throw new Error("invalid compute charge");
+    this.db
+      .transaction(() => {
+        const lease = this.computeLease(id);
+        if (lease.state === "reconciled") {
+          if (lease.spent !== actualCostCents)
+            throw new Error(
+              "conflicting compute charge",
+            );
+          return;
+        }
+        if (
+          lease.state !== "provisioned" ||
+          actualCostCents > lease.held
+        )
+          throw new Error(
+            "compute charge outside reservation",
+          );
+        this.db
+          .query(`UPDATE compute_leases
+            SET state='reconciled',held=0,spent=?,teardownRequired=0
+            WHERE id=?`)
+          .run(actualCostCents, id);
+      })
+      .immediate();
   }
 
   // One fixed provider pool: 5 unresolved external
@@ -472,6 +760,19 @@ export function demo() {
     // Simulated lookup by saved attempt idempotency key
     // confirms external completion.
     store.reconcile(lost.id, "completed");
+    const lease = store.reserveCompute(
+      "customer-4471",
+      callers[0]!.jobId!,
+      "worker-pool-1",
+      computeRequest,
+    );
+    console.log("compute reserved", lease);
+    store.provisionCompute(
+      lease.id,
+      "provider-lease-1",
+    );
+    // Simulated provider billing and teardown evidence.
+    store.confirmComputeTeardown(lease.id, 80);
     for (const notification of store.notifications())
       store.notificationDelivered(notification.item);
     console.log(

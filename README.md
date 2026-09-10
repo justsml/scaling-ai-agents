@@ -43,11 +43,9 @@ Run these from `examples/` with `bun run snippet:NN`. Every title links directly
 | # | Example | What to look for |
 | --- | --- | --- |
 | 10 | [Scoped repair](examples/src/10-scoped-repair.ts) | Discover a tool before using it; preserve postal-code meaning; quarantine ambiguity; promote within a bounded canary. |
-| 11 | [Durable admission](examples/src/11-durable-admission.ts) | Atomic reservations, tenant isolation, request deduplication, restart recovery, unknown outcomes, and a notification outbox. |
-| 12 | [Compute requests](examples/src/12-compute-request.ts) | Resolve a job's compute request against a fixed catalog, budget, region and egress policy. Returns a quote. |
+| 11 | [Durable admission](examples/src/11-durable-admission.ts) | Resolve compute policy, reserve it atomically, isolate tenants, recover after restart, retain unknown outcomes, and deliver through an outbox. |
 | 13 | [Execution memory](examples/src/13-execution-memory.ts) | Distinguish generated, executed, verified and unknown work; retain correction evidence without granting new authority. |
-| 14 | [Council of Guards](examples/src/14-council-of-guards.ts) | Inspect judge disagreement and missing evidence. Unanimous approval cannot rescue a failed deterministic gate. |
-| 15 | [Evaluator validity](examples/src/15-evaluator-validity.ts) | Expose misleading agreement, unjudged retrieval results, small-sample assumptions and review queue delay. |
+| 14 | [Council reliability](examples/src/14-council-of-guards.ts) | Keep deterministic gates above judge votes, then audit calibration, sampling, judgment coverage, disagreement, and review pressure. |
 | 16 | [Bounded fan-out](examples/src/16-fanout-node.ts) | Run a bounded batch, gate every draft independently, isolate failed branches, and select at most one. |
 
 [Contract example guide](examples/README.md) · [Offline tests](examples/test/)
@@ -58,18 +56,14 @@ The same numbered example solves the same kind of problem in each stack. Click a
 
 | # | Pattern | What it demonstrates | AI SDK | LangGraph | Mastra |
 | --- | --- | --- | --- | --- | --- |
-| 00 | Router | Choose lookup, generation, parallel work or human review. | [Code](ai-sdk/src/snippets/00-router.ts) | [Code](langchain/src/snippets/00-router.ts) | [Code](mastra/src/snippets/00-router.ts) |
-| 01 | Compete | Generate three complete alternatives in parallel; let a fourth call choose one. | [Code](ai-sdk/src/snippets/01-compete.ts) | [Code](langchain/src/snippets/01-compete.ts) | [Code](mastra/src/snippets/01-compete.ts) |
-| 02 | Decompose | Split an investigation into tasks, then merge the evidence. | [Code](ai-sdk/src/snippets/02-decompose.ts) | [Code](langchain/src/snippets/02-decompose.ts) | [Code](mastra/src/snippets/02-decompose.ts) |
+| 02 | Decompose and place | Split an investigation across explicit model lanes, then merge the independently owned evidence. | [Code](ai-sdk/src/snippets/02-decompose.ts) | [Code](langchain/src/snippets/02-decompose.ts) | [Code](mastra/src/snippets/02-decompose.ts) |
 | 03 | Constrain | Admit only two useful jobs and give both the same deadline. | [Code](ai-sdk/src/snippets/03-constrain.ts) | [Code](langchain/src/snippets/03-constrain.ts) | [Code](mastra/src/snippets/03-constrain.ts) |
-| 04 | Distribute | Route three independent jobs to explicit model lanes and run them concurrently. | [Code](ai-sdk/src/snippets/04-distribute.ts) | [Code](langchain/src/snippets/04-distribute.ts) | [Code](mastra/src/snippets/04-distribute.ts) |
 | 05 | Compile | Replay a certified artifact for a matching input, with zero model calls. | [Code](ai-sdk/src/snippets/05-compile.ts) | [Code](langchain/src/snippets/05-compile.ts) | [Code](mastra/src/snippets/05-compile.ts) |
-| 06 | Remote work | Send a task across an agent/protocol boundary. | [Code](ai-sdk/src/snippets/06-remote-a2a.ts) | [Code](langchain/src/snippets/06-remote.ts) | [Code](mastra/src/snippets/06-remote-a2a.ts) |
 | 07 | Batching | Compare model-planned parallel tool calls with application-planned bounded work. | [Code](ai-sdk/src/snippets/07-batching.ts) | [Code](langchain/src/snippets/07-batching.ts) | [Code](mastra/src/snippets/07-batching.ts) |
 | 08 | Pokédex investigation | Discover tools, page and search records, then cite the evidence. | [Code](ai-sdk/src/snippets/08-pokedex.ts) | [Code](langchain/src/snippets/08-pokedex.ts) | [Code](mastra/src/snippets/08-pokedex.ts) |
 | 09 | Model routing | Compare one model router with deterministic rules off and on. | [Code](ai-sdk/src/snippets/09-model-router.ts) | [Code](langchain/src/snippets/09-model-router.ts) | [Code](mastra/src/snippets/09-model-router.ts) |
 | 16 | Bounded fan-out | Encapsulate parallel drafts in one workflow component. | [Code](ai-sdk/src/snippets/16-fanout-node.ts) | [Code](langchain/src/snippets/16-fanout-node.ts) | [Code](mastra/src/snippets/16-fanout-node.ts) |
-| 17 | Business advice | Three advisors answer the same brief in parallel; a chair picks one as the base and grafts compatible ideas from the others. | [Code](ai-sdk/src/snippets/17-business-advice.ts) | [Code](langchain/src/snippets/17-business-advice.ts) | [Code](mastra/src/snippets/17-business-advice.ts) |
+| 17 | Select or synthesize | Three advisors answer in parallel; a chair either returns one unchanged or creates a synthesis whose source structure is rechecked. | [Code](ai-sdk/src/snippets/17-business-advice.ts) | [Code](langchain/src/snippets/17-business-advice.ts) | [Code](mastra/src/snippets/17-business-advice.ts) |
 
 `05` and `16` run offline in all three stacks after installing their dependencies. Other snippets may call providers, require credentials or need a running remote service. Check the package guide before running them:
 
@@ -86,17 +80,18 @@ bun run snippet:05
 
 AI SDK uses a bounded set of promises and offers a one-shot `generateText` adapter. LangGraph uses a `Send` subgraph and a reducer. Mastra uses `.foreach()` with an explicit concurrency limit. Each self-contained snippet gathers its batch before selecting a passing artifact. See [framework patterns and the eval contract](docs/fanout-node.md).
 
-For a live tournament, configure `OPENAI_API_KEY` using the chosen package's `.env.example`, then run from that package:
+For a live council, configure `OPENAI_API_KEY` using the chosen package's `.env.example`, then run from that package:
 
 ```sh
-bun run snippet:01 -- "your problem"
+bun run snippet:17 -- --mode select "your problem"
+bun run snippet:17 -- --mode synthesize "your problem"
 ```
 
-Live calls spend provider credits. Each snippet's opening comment says how many calls it makes and which credentials it needs. `bun run all` runs 00–07 sequentially; individual snippets are the clearest starting point.
+Live calls spend provider credits. Each snippet's opening comment says how many calls it makes and which credentials it needs. `bun run all` runs the main standalone examples in teaching order; individual snippets are the clearest starting point.
 
 ## What the examples have in common
 
-The original five axes still organize the framework examples: **compete** on complete answers, **decompose** independent tasks, **constrain** work, **distribute** execution, and **compile** repeated work into reusable artifacts.
+The examples keep distinct decisions visible: **decompose and place** independent work, **constrain** it before dispatch, **select or synthesize** alternatives, and **compile** repeated work into reusable artifacts.
 
 The surrounding job contract matters just as much. Independent checks decide eligibility before preferences rank candidates. Tool execution checks authority. Admission owns reservations. An unknown provider outcome stays unknown until reconciled. A synthesized artifact needs fresh checks, and machine-generated alternatives collapse to at most one selected artifact before human review.
 
@@ -119,6 +114,8 @@ Each framework also has its own tests and type check. Its full test command may 
 
 - [Pokédex evaluation](docs/pokedex-evaluation.md) explains investigation completion, citations and comparable evidence. The [conformance harness](harness/) drives stack agents and records results.
 - [Model-routing contract](shared/MODEL-ROUTER.md) and [routing research](docs/research/llm-routing-patterns.md) explain the routing examples.
+- [Capstone composition map](docs/capstone.md) replaces the former oversized router example with the boundaries it attempted to combine.
+- [Remote-agent protocol appendix](docs/advanced-remote-agents.md) keeps A2A and Agent Protocol examples available without putting their setup in the introductory sequence.
 - [Architecture review](docs/talk-architecture-review-2026-09-06.md) records the talk clarifications, implementation boundaries and validation. Historical `PLAN.md` files describe earlier proposals; package READMEs and code describe what runs now.
 
 ## Talks behind the code

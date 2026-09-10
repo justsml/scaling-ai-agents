@@ -16,11 +16,9 @@ This review covers the current canonical outlines, changed implementation contra
 | Argument | Implementation |
 | --- | --- |
 | Keep only the job's needed read-to-action paths live | `10` grants a fixed read-and-propose tool set. `run-fixtures` requires logged discovery before invocation. Every input has a disposition. |
-| Admission and unknown work survive callers and workers | `11` has SQLite transactions, tenant/request deduplication, dispatch intent, provider reconciliation, retained unknown reservations and a separate notification outbox. |
-| Compute is requested through policy | `12` resolves a fixed execution catalog and binds billing identity from trusted context. It is a quote, not provisioning. |
+| Admission and unknown work survive callers and workers | `11` has SQLite transactions, tenant/request deduplication, atomic compute resolution and reservation, restart-safe provisioning, teardown obligations, provider reconciliation, retained unknown reservations and a separate notification outbox. |
 | Memory records what happened | `13` distinguishes generated, executed, verified and unknown; observations retain context versions and correction references. |
-| Judges expose disagreement | `14` separates verdict splits, reason overlap, missing votes and costs. Gate failures reject regardless of agreement. |
-| Evaluate the measuring instrument | `15` demonstrates misleading agreement, incomplete retrieval judgments, explicit sampling assumptions and review queue delay. |
+| Judges expose disagreement and evaluator limits | `14` separates verdict splits, reason overlap, missing votes and costs. Gate failures reject regardless of agreement, while calibration, sampling, judgment coverage and queue evidence determine whether the council itself is ready. |
 | Cheap generation is local, reversible and has a next stage | `16` defaults fan-out to one and demonstrates race, synthesis, rank and inspection. Framework variants use native orchestration and return one selected artifact. |
 
 The new judgment passage permits many machine-generated drafts while limiting what reaches a human. `16` distinguishes candidate review capacity from the human slot for the selected result. Product engineering also asks for an owner of recurring compute spend and a hypothesis with an exposure count and stop rule. Its generated-interface/channel passages are predictions, not requirements to add more agents to these demos.

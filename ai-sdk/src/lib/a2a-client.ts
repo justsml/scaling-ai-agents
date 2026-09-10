@@ -1,7 +1,7 @@
 // A hand-rolled A2A (Agent2Agent) JSON-RPC client. The
 // AI SDK has no A2A primitive (see ai-sdk/README.md
 // "known gaps"), so this implements the subset of the
-// spec that 04-distribute.ts and 06-remote-a2a.ts need:
+// spec that the advanced remote A2A example needs:
 // message/send, message/stream (SSE), tasks/get,
 // tasks/cancel, plus fetching the agent card. Kept
 // small and tested together with the 06 server, which
