@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Admission, computeRequest } from "../src/11-durable-admission";
+import { Admission, computeRequest } from "../src/08-durable-admission";
 const cleanups: Array<() => void> = [];
 afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
@@ -44,7 +44,7 @@ test("four callers share one job; another request cannot spend its reservation",
 });
 test("concurrent processes cannot reserve the same remaining budget", async () => {
   const s = setup();
-  const module = new URL("../src/11-durable-admission.ts", import.meta.url).pathname;
+  const module = new URL("../src/08-durable-admission.ts", import.meta.url).pathname;
   const processes = Array.from({ length: 4 }, (_, i) =>
     Bun.spawn(
       [

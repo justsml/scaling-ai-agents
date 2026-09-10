@@ -2,19 +2,19 @@
  * Run the standalone examples in teaching order.
  *
  *   bun run all
- *   bun run all -- 02 03
+ *   bun run all -- 01 02
  *
  * Each example is a child process, so one failure does
  * not hide the remaining examples. See each snippet's
  * opening comment for calls and credentials. Examples
- * 08 and 09 use the evaluation harness instead.
+ * 05 and 06 use the evaluation harness instead.
  */
 const snippets = [
-  "02-decompose.ts",
-  "03-constrain.ts",
-  "05-compile.ts",
-  "07-batching.ts",
-  "17-business-advice.ts",
+  "01-decompose.ts",
+  "02-constrain.ts",
+  "03-compile.ts",
+  "04-batching.ts",
+  "12-business-advice.ts",
 ];
 const selected = process.argv
   .slice(2)

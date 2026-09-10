@@ -184,7 +184,7 @@ test("completion rejects citations to failed gateway calls", async () => {
 });
 
 test("CLI entrypoint validates stdin before starting any model call", async () => {
-  const child = Bun.spawn(["bun", "run", "src/snippets/08-pokedex.ts"], {
+  const child = Bun.spawn(["bun", "run", "src/snippets/05-pokedex.ts"], {
     cwd: new URL("../", import.meta.url).pathname,
     stdin: "pipe",
     stdout: "pipe",

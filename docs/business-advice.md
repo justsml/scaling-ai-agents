@@ -1,13 +1,13 @@
 # Business advice council
 
-Run `bun run snippet:17 -- --mode select "Your business decision and context"` or
-`bun run snippet:17 -- --mode synthesize "Your business decision and context"` from
+Run `bun run snippet:12 -- --mode select "Your business decision and context"` or
+`bun run snippet:12 -- --mode synthesize "Your business decision and context"` from
 `ai-sdk/`, `langchain/`, or `mastra/`. Without a brief, it uses a small SaaS investment decision.
 Set `OPENAI_API_KEY` first. Each successful run makes four paid model calls.
 
 Each framework's snippet is one self-contained file: the brief, the four role
 prompts, the model id, the agent construction and the orchestration all sit in
-`src/snippets/17-business-advice.ts`. There is no shared profiles module and no
+`src/snippets/12-business-advice.ts`. There is no shared profiles module and no
 env-var indirection.
 
 | Role | Decision it can change |

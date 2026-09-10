@@ -4,7 +4,7 @@ import {
   matchesRegisteredInput,
   routeCompiled,
   runCompiledSequence,
-} from "../src/snippets/05-compile";
+} from "../src/snippets/03-compile";
 const source = await readFile(new URL("../src/fixtures/readiness.ts", import.meta.url), "utf8");
 test("exact input matches; changed bytes must be independently certified", async () => {
   expect(matchesRegisteredInput(source)).toBe(true);

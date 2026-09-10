@@ -1,5 +1,5 @@
 // The deterministic classifier used by the routing policy examples.
-// (and by 05-compile.ts, which reuses it to decide when
+// (and by 03-compile.ts, which reuses it to decide when
 // the compiled tool short-circuits the routine path).
 // Deliberately simple keyword rules, not a model call:
 // a router that needs an LLM to decide "lookup vs

@@ -5,7 +5,7 @@ import {
   MappingRegistry,
   renameCandidate,
   RepairJobs,
-} from "../src/10-scoped-repair";
+} from "../src/07-scoped-repair";
 test("discovery and invocation reject tools outside the server job", () => {
   const jobs = new RepairJobs(() => 0);
   const contract = jobs.create("job", 100);

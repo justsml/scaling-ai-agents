@@ -11,7 +11,7 @@ import {
   zeroFailureBound,
   type Evidence,
   type Vote,
-} from "../src/14-council-of-guards";
+} from "../src/10-council-of-guards";
 const source = "candidate-1";
 const evidence: Evidence = {
   artifactHash: artifactHash(source),

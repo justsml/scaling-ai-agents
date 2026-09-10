@@ -1,7 +1,7 @@
 // The council with `ask` injected. The empty-response guard
 // lives inside the real `ask`, so it is not covered here.
 import { describe, test, expect } from "bun:test";
-import { runCouncil, type Ask } from "../src/snippets/17-business-advice";
+import { runCouncil, type Ask } from "../src/snippets/12-business-advice";
 
 describe("business advice council", () => {
   test("synthesize joins all advisors and rechecks provenance", async () => {

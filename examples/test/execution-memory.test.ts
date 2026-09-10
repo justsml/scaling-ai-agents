@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { ReportingRunner, UnknownOutcome } from "../src/13-execution-memory";
+import { ReportingRunner, UnknownOutcome } from "../src/09-execution-memory";
 const ctx = { tenant: "acme", project: "billing", schema: "v8", toolVersion: "v1" };
 const plan = { tenant: "acme", since: "2026-09-01" };
 const adapter = { authorized: true, execute: () => 125, verify: (n: number) => n === 125 };

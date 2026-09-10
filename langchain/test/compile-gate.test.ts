@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { certifyCompiledPatch } from "../src/snippets/05-compile.ts";
+import { certifyCompiledPatch } from "../src/snippets/03-compile.ts";
 import { COMPILED_PATCH } from "../src/compiled/readiness-fix.ts";
 
 test("compiled serving gate rejects a broken artifact", async () => {
@@ -15,7 +15,7 @@ test("compiled serving gate accepts the reference and rejects cancellation", asy
 });
 
 test("cached lookup still invokes certification, while changed source misses", async () => {
-  const { buildCompileGraph } = await import("../src/snippets/05-compile.ts");
+  const { buildCompileGraph } = await import("../src/snippets/03-compile.ts");
   const { TARGET_SOURCE } = await import("../src/compiled/readiness-fix.ts");
   let checks = 0;
   const graph = buildCompileGraph(async () => {

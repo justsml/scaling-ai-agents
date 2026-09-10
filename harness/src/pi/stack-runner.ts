@@ -133,7 +133,7 @@ export class StackRunner {
   }
 
   #command(stack: StackName): { cwd: string; entrypoint: string } {
-    return { cwd: resolve(this.repoRoot, stack), entrypoint: "src/snippets/08-pokedex.ts" };
+    return { cwd: resolve(this.repoRoot, stack), entrypoint: "src/snippets/05-pokedex.ts" };
   }
 
   async #readEvidence(stream: AsyncIterable<Uint8Array>): Promise<{

@@ -1,5 +1,5 @@
 {
-  "_note": "Fixture registry for the offline Compile replay. This points to the shipped reference artifact; no live tournament provenance is asserted. 05 rechecks the independent fixture contract before use. A source hash identifies input bytes, not semantic equivalence or promotion authority.",
+  "_note": "Fixture registry for the offline Compile replay. This points to the shipped reference artifact; no live tournament provenance is asserted. 03 rechecks the independent fixture contract before use. A source hash identifies input bytes, not semantic equivalence or promotion authority.",
   "7a9c74b5b19ad2206b9fb7646b925b511ac589ff0b82c3bd07184c7da1ce40b2": {
     "tool": "compiledReadiness",
     "compiledPath": "src/compiled/readiness.ts",

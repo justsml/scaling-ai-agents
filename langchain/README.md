@@ -13,35 +13,35 @@ bun install
 bun run check
 bun test
 
-bun run snippet:05                     # offline
-bun run snippet:17 -- --mode select "your question"      # live: four calls
-bun run snippet:17 -- --mode synthesize "your question"  # live: four calls
+bun run snippet:03                     # offline
+bun run snippet:12 -- --mode select "your question"      # live: four calls
+bun run snippet:12 -- --mode synthesize "your question"  # live: four calls
 ```
 
 `OPENAI_API_KEY` is required for live examples. Each snippet's opening comment gives
-its call count and any extra setup. `08` expects a conformance-harness request on stdin.
+its call count and any extra setup. `05` expects a conformance-harness request on stdin.
 
 `bun run all` runs the main standalone examples in teaching order. To run a subset:
 
 ```sh
-bun run all -- 02 03 05
+bun run all -- 01 02 03
 ```
 
-Examples 08 and 09 are intentionally run directly: 08 needs JSON stdin and a local
-Pokédex gateway; 09 evaluates the full router fixture set.
+Examples 05 and 06 are intentionally run directly: 05 needs JSON stdin and a local
+Pokédex gateway; 06 evaluates the full router fixture set.
 
 ## Example guide
 
 | # | Pattern | What this file shows |
 | --- | --- | --- |
-| 02 | Decompose and place | Three explicitly placed evidence branches join at one incident lead. |
-| 03 | Constrain | Admit two jobs, skip one, share one abort signal. |
-| 05 | Compile | Cached exact lookup followed by uncached certification; zero model calls. |
-| 07 | Batching | Parallel tool calls plus `Runnable.batch({ maxConcurrency })`. |
-| 08 | Pokédex | Four local tools with session-owned limits, cursors and citations. |
-| 09 | Model routing | The same fixture set with deterministic rules off and on. |
-| 16 | Bounded fan-out | A `Send` map/reduce gathers drafts and selects at most one. |
-| 17 | Select or synthesize | Three advisor branches join; return one unchanged or recheck a structured synthesis. |
+| 01 | Decompose and place | Three explicitly placed evidence branches join at one incident lead. |
+| 02 | Constrain | Admit two jobs, skip one, share one abort signal. |
+| 03 | Compile | Cached exact lookup followed by uncached certification; zero model calls. |
+| 04 | Batching | Parallel tool calls plus `Runnable.batch({ maxConcurrency })`. |
+| 05 | Pokédex | Four local tools with session-owned limits, cursors and citations. |
+| 06 | Model routing | The same fixture set with deterministic rules off and on. |
+| 11 | Bounded fan-out | A `Send` map/reduce gathers drafts and selects at most one. |
+| 12 | Select or synthesize | Three advisor branches join; return one unchanged or recheck a structured synthesis. |
 
 ## LangGraph-specific boundaries
 
@@ -50,7 +50,7 @@ then uses `RemoteGraph`, the supported local Agent Protocol route. The A2A clien
 `src/lib/a2a.ts` remains useful for a deployment that actually serves A2A.
 
 `Runnable.batch()` is client-side concurrency, not OpenAI's offline `/v1/batches` API.
-Example 07 uses a shared semaphore for parallel tool calls and `maxConcurrency` for its
+Example 04 uses a shared semaphore for parallel tool calls and `maxConcurrency` for its
 independent model inputs.
 
 ## Offline evidence
@@ -59,7 +59,7 @@ independent model inputs.
 advice orchestration without proving live-provider quality. Passing these tests does not
 establish durable billing, authorization, isolation or production model behavior.
 
-`AGENT_FANOUT=3 bun run snippet:16` runs a `Send` map/reduce subgraph with an append
+`AGENT_FANOUT=3 bun run snippet:11` runs a `Send` map/reduce subgraph with an append
 reducer and `maxConcurrency: 3`. The default is `AGENT_FANOUT=1`. A failed branch becomes
 `null`, so selection still sees surviving drafts. See [the fan-out note](../docs/fanout-node.md).
 

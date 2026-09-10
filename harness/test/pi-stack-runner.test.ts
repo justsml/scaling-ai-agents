@@ -27,7 +27,7 @@ describe("Stack subprocess runner", () => {
     const spawner = new RecordingSpawner(process);
     const runner = new StackRunner("/repo", { spawner, bunExecutable: "bun-test" });
     const result = await runner.run("ai-sdk", request);
-    expect(spawner.argv).toEqual(["bun-test", "run", "src/snippets/08-pokedex.ts"]);
+    expect(spawner.argv).toEqual(["bun-test", "run", "src/snippets/05-pokedex.ts"]);
     expect(spawner.options?.cwd).toBe("/repo/ai-sdk");
     expect(process.input).toBe(`${JSON.stringify(request)}\n`);
     expect(result.protocolError).toBeUndefined();

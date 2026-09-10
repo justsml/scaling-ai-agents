@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { fixtureGenerate, runFanoutNode } from "../src/snippets/16-fanout-node.js";
+import { fixtureGenerate, runFanoutNode } from "../src/snippets/11-fanout-node.js";
 
 test("native fan-out joins every branch and gates the winner", async () => {
   const result = await runFanoutNode(fixtureGenerate, 3, AbortSignal.timeout(5000));

@@ -6,7 +6,7 @@ import {
   loadPokedexToolContract,
   type InvestigationRequest,
 } from "../src/lib/pokedex";
-import { createPokedexTools } from "../src/snippets/08-pokedex";
+import { createPokedexTools } from "../src/snippets/05-pokedex";
 import { readFile } from "node:fs/promises";
 
 const servers: ReturnType<typeof Bun.serve>[] = [];

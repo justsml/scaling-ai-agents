@@ -81,7 +81,7 @@ Start with Python because it can reuse the runtime work needed for CrewAI and be
 
 The current conformance harness is not runtime-neutral:
 
-- [`harness/src/pi/stack-runner.ts`](../../harness/src/pi/stack-runner.ts) derives the working directory from the stack name and always launches `bun run src/snippets/08-pokedex.ts`.
+- [`harness/src/pi/stack-runner.ts`](../../harness/src/pi/stack-runner.ts) derives the working directory from the stack name and always launches `bun run src/snippets/05-pokedex.ts`.
 - Its health contract reports `bunAvailable`, rather than a generic runtime probe.
 - `STACKS` and `StackName` are declared separately in [`harness/src/pi/types.ts`](../../harness/src/pi/types.ts) and [`harness/src/eval/types.ts`](../../harness/src/eval/types.ts).
 - [`harness/src/eval/live.ts`](../../harness/src/eval/live.ts) has an npm-only `FRAMEWORK_PACKAGES` map and reads versions from `node_modules`.

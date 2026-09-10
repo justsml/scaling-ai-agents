@@ -12,14 +12,14 @@
     "test": "bun test test/",
     "all": "bun run src/scripts/all.ts",
     "advanced:remote": "bun run src/advanced/remote.ts",
-    "snippet:02": "bun run src/snippets/02-decompose.ts",
-    "snippet:03": "bun run src/snippets/03-constrain.ts",
-    "snippet:05": "bun run src/snippets/05-compile.ts",
-    "snippet:07": "bun run src/snippets/07-batching.ts",
-    "snippet:08": "bun run src/snippets/08-pokedex.ts",
-    "snippet:09": "bun run src/snippets/09-model-router.ts",
-    "snippet:16": "bun src/snippets/16-fanout-node.ts",
-    "snippet:17": "bun run src/snippets/17-business-advice.ts"
+    "snippet:01": "bun run src/snippets/01-decompose.ts",
+    "snippet:02": "bun run src/snippets/02-constrain.ts",
+    "snippet:03": "bun run src/snippets/03-compile.ts",
+    "snippet:04": "bun run src/snippets/04-batching.ts",
+    "snippet:05": "bun run src/snippets/05-pokedex.ts",
+    "snippet:06": "bun run src/snippets/06-model-router.ts",
+    "snippet:11": "bun src/snippets/11-fanout-node.ts",
+    "snippet:12": "bun run src/snippets/12-business-advice.ts"
   },
   "dependencies": {
     "@langchain/core": "latest",

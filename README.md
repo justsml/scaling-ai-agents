@@ -13,7 +13,7 @@ With [Bun](https://bun.sh/) installed:
 ```sh
 git clone https://github.com/justsml/scaling-ai-agents.git
 cd scaling-ai-agents/examples
-AGENT_FANOUT=3 bun run snippet:16
+AGENT_FANOUT=3 bun run snippet:11
 ```
 
 No dependency install is needed for this example. Three fixed drafts run as one bounded batch. Each passes through an independent lifecycle gate before ranking, and an isolated branch failure does not erase the surviving drafts.
@@ -21,7 +21,7 @@ No dependency install is needed for this example. Three fixed drafts run as one 
 Try the single-attempt baseline:
 
 ```sh
-AGENT_FANOUT=1 bun run snippet:16
+AGENT_FANOUT=1 bun run snippet:11
 ```
 
 That draft fails the gate. Returning no accepted answer is a valid outcome. These are scripted teaching cases, so the difference does not establish that three model calls outperform one.
@@ -29,12 +29,14 @@ That draft fails the gate. Returning no accepted answer is a valid outcome. Thes
 Next, run a job that survives a worker restart:
 
 ```sh
-bun run snippet:11
+bun run snippet:08
 ```
 
 Four callers share one job. A lost provider response keeps its reservation until reconciliation. Retrying a notification never regenerates the work. The demo creates and removes its own temporary SQLite database.
 
 ## Example index
+
+Examples `01`–`12` form one continuous sequence. `01`–`06` and `12` compare frameworks, `07`–`10` are framework-neutral contracts, and `11` has both a plain offline implementation and native framework versions.
 
 ### Contracts and failure cases: all offline
 
@@ -42,11 +44,11 @@ Run these from `examples/` with `bun run snippet:NN`. Every title links directly
 
 | # | Example | What to look for |
 | --- | --- | --- |
-| 10 | [Scoped repair](examples/src/10-scoped-repair.ts) | Discover a tool before using it; preserve postal-code meaning; quarantine ambiguity; promote within a bounded canary. |
-| 11 | [Durable admission](examples/src/11-durable-admission.ts) | Resolve compute policy, reserve it atomically, isolate tenants, recover after restart, retain unknown outcomes, and deliver through an outbox. |
-| 13 | [Execution memory](examples/src/13-execution-memory.ts) | Distinguish generated, executed, verified and unknown work; retain correction evidence without granting new authority. |
-| 14 | [Council reliability](examples/src/14-council-of-guards.ts) | Keep deterministic gates above judge votes, then audit calibration, sampling, judgment coverage, disagreement, and review pressure. |
-| 16 | [Bounded fan-out](examples/src/16-fanout-node.ts) | Run a bounded batch, gate every draft independently, isolate failed branches, and select at most one. |
+| 07 | [Scoped repair](examples/src/07-scoped-repair.ts) | Discover a tool before using it; preserve postal-code meaning; quarantine ambiguity; promote within a bounded canary. |
+| 08 | [Durable admission](examples/src/08-durable-admission.ts) | Resolve compute policy, reserve it atomically, isolate tenants, recover after restart, retain unknown outcomes, and deliver through an outbox. |
+| 09 | [Execution memory](examples/src/09-execution-memory.ts) | Distinguish generated, executed, verified and unknown work; retain correction evidence without granting new authority. |
+| 10 | [Council reliability](examples/src/10-council-of-guards.ts) | Keep deterministic gates above judge votes, then audit calibration, sampling, judgment coverage, disagreement, and review pressure. |
+| 11 | [Bounded fan-out](examples/src/11-fanout-node.ts) | Run a bounded batch, gate every draft independently, isolate failed branches, and select at most one. |
 
 [Contract example guide](examples/README.md) · [Offline tests](examples/test/)
 
@@ -56,16 +58,16 @@ The same numbered example solves the same kind of problem in each stack. Click a
 
 | # | Pattern | What it demonstrates | AI SDK | LangGraph | Mastra |
 | --- | --- | --- | --- | --- | --- |
-| 02 | Decompose and place | Split an investigation across explicit model lanes, then merge the independently owned evidence. | [Code](ai-sdk/src/snippets/02-decompose.ts) | [Code](langchain/src/snippets/02-decompose.ts) | [Code](mastra/src/snippets/02-decompose.ts) |
-| 03 | Constrain | Admit only two useful jobs and give both the same deadline. | [Code](ai-sdk/src/snippets/03-constrain.ts) | [Code](langchain/src/snippets/03-constrain.ts) | [Code](mastra/src/snippets/03-constrain.ts) |
-| 05 | Compile | Replay a certified artifact for a matching input, with zero model calls. | [Code](ai-sdk/src/snippets/05-compile.ts) | [Code](langchain/src/snippets/05-compile.ts) | [Code](mastra/src/snippets/05-compile.ts) |
-| 07 | Batching | Compare model-planned parallel tool calls with application-planned bounded work. | [Code](ai-sdk/src/snippets/07-batching.ts) | [Code](langchain/src/snippets/07-batching.ts) | [Code](mastra/src/snippets/07-batching.ts) |
-| 08 | Pokédex investigation | Discover tools, page and search records, then cite the evidence. | [Code](ai-sdk/src/snippets/08-pokedex.ts) | [Code](langchain/src/snippets/08-pokedex.ts) | [Code](mastra/src/snippets/08-pokedex.ts) |
-| 09 | Model routing | Compare one model router with deterministic rules off and on. | [Code](ai-sdk/src/snippets/09-model-router.ts) | [Code](langchain/src/snippets/09-model-router.ts) | [Code](mastra/src/snippets/09-model-router.ts) |
-| 16 | Bounded fan-out | Encapsulate parallel drafts in one workflow component. | [Code](ai-sdk/src/snippets/16-fanout-node.ts) | [Code](langchain/src/snippets/16-fanout-node.ts) | [Code](mastra/src/snippets/16-fanout-node.ts) |
-| 17 | Select or synthesize | Three advisors answer in parallel; a chair either returns one unchanged or creates a synthesis whose source structure is rechecked. | [Code](ai-sdk/src/snippets/17-business-advice.ts) | [Code](langchain/src/snippets/17-business-advice.ts) | [Code](mastra/src/snippets/17-business-advice.ts) |
+| 01 | Decompose and place | Split an investigation across explicit model lanes, then merge the independently owned evidence. | [Code](ai-sdk/src/snippets/01-decompose.ts) | [Code](langchain/src/snippets/01-decompose.ts) | [Code](mastra/src/snippets/01-decompose.ts) |
+| 02 | Constrain | Admit only two useful jobs and give both the same deadline. | [Code](ai-sdk/src/snippets/02-constrain.ts) | [Code](langchain/src/snippets/02-constrain.ts) | [Code](mastra/src/snippets/02-constrain.ts) |
+| 03 | Compile | Replay a certified artifact for a matching input, with zero model calls. | [Code](ai-sdk/src/snippets/03-compile.ts) | [Code](langchain/src/snippets/03-compile.ts) | [Code](mastra/src/snippets/03-compile.ts) |
+| 04 | Batching | Compare model-planned parallel tool calls with application-planned bounded work. | [Code](ai-sdk/src/snippets/04-batching.ts) | [Code](langchain/src/snippets/04-batching.ts) | [Code](mastra/src/snippets/04-batching.ts) |
+| 05 | Pokédex investigation | Discover tools, page and search records, then cite the evidence. | [Code](ai-sdk/src/snippets/05-pokedex.ts) | [Code](langchain/src/snippets/05-pokedex.ts) | [Code](mastra/src/snippets/05-pokedex.ts) |
+| 06 | Model routing | Compare one model router with deterministic rules off and on. | [Code](ai-sdk/src/snippets/06-model-router.ts) | [Code](langchain/src/snippets/06-model-router.ts) | [Code](mastra/src/snippets/06-model-router.ts) |
+| 11 | Bounded fan-out | Encapsulate parallel drafts in one workflow component. | [Code](ai-sdk/src/snippets/11-fanout-node.ts) | [Code](langchain/src/snippets/11-fanout-node.ts) | [Code](mastra/src/snippets/11-fanout-node.ts) |
+| 12 | Select or synthesize | Three advisors answer in parallel; a chair either returns one unchanged or creates a synthesis whose source structure is rechecked. | [Code](ai-sdk/src/snippets/12-business-advice.ts) | [Code](langchain/src/snippets/12-business-advice.ts) | [Code](mastra/src/snippets/12-business-advice.ts) |
 
-`05` and `16` run offline in all three stacks after installing their dependencies. Other snippets may call providers, require credentials or need a running remote service. Check the package guide before running them:
+`03` and `11` run offline in all three stacks after installing their dependencies. Other snippets may call providers or require credentials. Check the package guide before running them:
 
 [AI SDK setup](ai-sdk/README.md) · [LangChain + LangGraph setup](langchain/README.md) · [Mastra setup](mastra/README.md)
 
@@ -74,8 +76,8 @@ To compare the offline fan-out implementations, choose one directory from the re
 ```sh
 cd ai-sdk                       # or langchain, or mastra
 bun install
-AGENT_FANOUT=3 bun run snippet:16
-bun run snippet:05
+AGENT_FANOUT=3 bun run snippet:11
+bun run snippet:03
 ```
 
 AI SDK uses a bounded set of promises and offers a one-shot `generateText` adapter. LangGraph uses a `Send` subgraph and a reducer. Mastra uses `.foreach()` with an explicit concurrency limit. Each self-contained snippet gathers its batch before selecting a passing artifact. See [framework patterns and the eval contract](docs/fanout-node.md).
@@ -83,8 +85,8 @@ AI SDK uses a bounded set of promises and offers a one-shot `generateText` adapt
 For a live council, configure `OPENAI_API_KEY` using the chosen package's `.env.example`, then run from that package:
 
 ```sh
-bun run snippet:17 -- --mode select "your problem"
-bun run snippet:17 -- --mode synthesize "your problem"
+bun run snippet:12 -- --mode select "your problem"
+bun run snippet:12 -- --mode synthesize "your problem"
 ```
 
 Live calls spend provider credits. Each snippet's opening comment says how many calls it makes and which credentials it needs. `bun run all` runs the main standalone examples in teaching order; individual snippets are the clearest starting point.

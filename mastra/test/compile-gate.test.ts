@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { certifyCompiledPatch, serveCompiled } from "../src/lib/compiled.js";
 import { readinessChallenge } from "../src/lib/readiness-challenge.js";
-import { compiledWorkflow } from "../src/snippets/05-compile.js";
+import { compiledWorkflow } from "../src/snippets/03-compile.js";
 test("a failed or cancelled certification refuses the patch", async () => {
   const buggy = await readinessChallenge.load("buggy");
   await expect(certifyCompiledPatch(buggy.source)).rejects.toThrow("refused");

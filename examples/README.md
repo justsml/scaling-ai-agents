@@ -7,11 +7,11 @@ Offline, executable examples of the boundaries around a generated agent. These u
 ```bash
 cd examples
 bun install
+bun run snippet:07
+bun run snippet:08
+bun run snippet:09
 bun run snippet:10
-bun run snippet:11
-bun run snippet:13
-bun run snippet:14
-AGENT_FANOUT=3 bun run snippet:16
+AGENT_FANOUT=3 bun run snippet:11
 bun run test
 bun run check
 ```
@@ -20,15 +20,15 @@ No install is needed to run the snippets themselves with Bun. The development de
 
 | Example | What to watch | Checks |
 | --- | --- | --- |
-| [10: scoped repair](src/10-scoped-repair.ts) | A rename proposal passes fixed semantic fixtures; email is denied; an unknown status is quarantined; promotion has a 100-record canary | Tool discovery and invocation, deadline, attempt cap, forged scores, leading zeroes, stale parent, canary exhaustion, rollback |
-| [11: durable admission](src/11-durable-admission.ts) | Four callers get one job; requested compute is resolved and reserved atomically; a lost response remains unresolved after restart | Competing OS processes, tenant accounting, compute policy, idempotent leases, stale workers, unknown charges, teardown, retry cap, outbox deduplication |
-| [13: execution memory](src/13-execution-memory.ts) | A missing tenant predicate is recorded and corrected; execution and result verification remain separate | Tenant/project/version isolation, denied execution, wrong totals, unknown responses, durable intent, correction references |
-| [14: council reliability](src/14-council-of-guards.ts) | Three judges disagree, every original design still fails a gate, and evaluator evidence determines whether the council is ready | Missing judges, model identity, reason disagreement, fresh evidence, calibration, IID assumptions, judgment coverage, and review queues |
-| [16: bounded fan-out](src/16-fanout-node.ts) | Generate a bounded set concurrently and select only a draft that passes the lifecycle gate | Fan-out bounds, invalid high scorer, failed-branch isolation |
+| [07: scoped repair](src/07-scoped-repair.ts) | A rename proposal passes fixed semantic fixtures; email is denied; an unknown status is quarantined; promotion has a 100-record canary | Tool discovery and invocation, deadline, attempt cap, forged scores, leading zeroes, stale parent, canary exhaustion, rollback |
+| [08: durable admission](src/08-durable-admission.ts) | Four callers get one job; requested compute is resolved and reserved atomically; a lost response remains unresolved after restart | Competing OS processes, tenant accounting, compute policy, idempotent leases, stale workers, unknown charges, teardown, retry cap, outbox deduplication |
+| [09: execution memory](src/09-execution-memory.ts) | A missing tenant predicate is recorded and corrected; execution and result verification remain separate | Tenant/project/version isolation, denied execution, wrong totals, unknown responses, durable intent, correction references |
+| [10: council reliability](src/10-council-of-guards.ts) | Three judges disagree, every original design still fails a gate, and evaluator evidence determines whether the council is ready | Missing judges, model identity, reason disagreement, fresh evidence, calibration, IID assumptions, judgment coverage, and review queues |
+| [11: bounded fan-out](src/11-fanout-node.ts) | Generate a bounded set concurrently and select only a draft that passes the lifecycle gate | Fan-out bounds, invalid high scorer, failed-branch isolation |
 
-Example 10 accepts a tiny mapping grammar instead of executing generated code. Only `postal_code` to `postalCode` by string copy is allowed under the fixture contract. Expected outputs belong to the validator. All input records receive an accepted or quarantined disposition. The proposing job cannot promote its own artifact; the demo calls promotion separately as the trusted owner.
+Example 07 accepts a tiny mapping grammar instead of executing generated code. Only `postal_code` to `postalCode` by string copy is allowed under the fixture contract. Expected outputs belong to the validator. All input records receive an accepted or quarantined disposition. The proposing job cannot promote its own artifact; the demo calls promotion separately as the trusted owner.
 
-Example 11 uses integer cents and reserves two ten-cent attempts per item. Its printed ledger follows the talk:
+Example 08 uses integer cents and reserves two ten-cent attempts per item. Its printed ledger follows the talk:
 
 | State | Settled | Held | Available |
 | --- | ---: | ---: | ---: |
@@ -40,13 +40,13 @@ A provider slot represents outstanding remote work. Abandoning a local worker le
 
 Transactions use Bun's [SQLite immediate transactions](https://bun.com/docs/runtime/sqlite#transactions). The tests exercise a shared database across separate Bun processes. Production authentication and remote provider behavior are outside this example.
 
-Example 11 also resolves compute against a server-owned catalog and identity. The quote and job reservation are written in one immediate transaction, so concurrent callers cannot spend the same available budget. Provisioning is restart-safe and records an explicit teardown obligation. Worker expiry still does not settle unknown provider charges; only provider-confirmed reconciliation does that. The fixture catalog permits only `sandbox-small` in `us-east` with named egress hosts.
+Example 08 also resolves compute against a server-owned catalog and identity. The quote and job reservation are written in one immediate transaction, so concurrent callers cannot spend the same available budget. Provisioning is restart-safe and records an explicit teardown obligation. Worker expiry still does not settle unknown provider charges; only provider-confirmed reconciliation does that. The fixture catalog permits only `sandbox-small` in `us-east` with named egress hosts.
 
 See the [architecture review](../docs/talk-architecture-review-2026-09-06.md) for source talks, integration points, evaluation criteria and the limits of these demonstrations.
 
 ## Execution evidence and evaluation
 
-Example 13 implements the smaller memory pattern added to the adaptive talk. The
+Example 09 implements the smaller memory pattern added to the adaptive talk. The
 [copyable prompt](src/fixtures/execution-memory-instructions.txt) comes from the handout;
 it complements the runner checks and grants no execution permissions. The
 runner writes append-only observations to SQLite and logs dispatch intent before
@@ -65,7 +65,7 @@ success, denied authority and a lost response. Compare recurring mistakes, false
 corrections, verified results and unresolved outcomes, plus lookup/logging cost and
 elapsed time. Keep the checks identical in both arms.
 
-Example 14 consumes stipulated council outputs and gate evidence. Majority disagreement
+Example 10 consumes stipulated council outputs and gate evidence. Majority disagreement
 is the minority share of known verdicts. Reason overlap is pairwise Jaccard overlap
 of fixed rubric issue IDs, not textual similarity of private reasoning. Both-empty
 reason sets provide no evidence of agreement. Missing results, unknown charges,
@@ -84,7 +84,7 @@ IID sampling; that flag records an assumption and cannot establish it. Queue wai
 time excludes hands-on service time. These are teaching fixtures, not population
 estimates from the repository's unit tests.
 
-## 16: one bounded fan-out node
+## 11: one bounded fan-out node
 
 `AGENT_FANOUT=1` runs the baseline; `3` adds contrasting fixed drafts. The first draft omits a deadline and gets rejected despite having the highest preference score. One failed branch becomes `null` without erasing the surviving drafts. This is a four-word lifecycle fixture, not an evaluator for architecture prose.
 

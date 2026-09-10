@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { fanoutCount, fixtureGenerate, passes, runFanoutNode } from "../src/16-fanout-node";
+import { fanoutCount, fixtureGenerate, passes, runFanoutNode } from "../src/11-fanout-node";
 
 test("fan-out is bounded and selects only a passing draft", async () => {
   expect(fanoutCount("3")).toBe(3);

@@ -3,8 +3,8 @@
 Run in any framework directory:
 
 ```sh
-AGENT_FANOUT=1 bun run snippet:16
-AGENT_FANOUT=3 bun run snippet:16
+AGENT_FANOUT=1 bun run snippet:11
+AGENT_FANOUT=3 bun run snippet:11
 ```
 
 The default is one. Invalid values fail before dispatch. The CLI always uses fixed outputs and makes no provider calls, even when credentials are present.
@@ -19,7 +19,7 @@ The fixed task returns four lifecycle requirement words. Draft zero omits `deadl
 
 Mastra's `.foreach()` is a barrier. LangGraph likewise gathers the superstep before downstream selection. These examples therefore implement batch ranking, not first-result racing. API references: [AI SDK generateText](https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text), [LangGraph graph API](https://docs.langchain.com/oss/javascript/langgraph/graph-api), and [Mastra control flow](https://mastra.ai/docs/workflows/control-flow).
 
-Each numbered snippet now contains its fixture, gate, fan-out and selection in one file. `examples/11` owns the separate lesson about durable admission and uncertain provider outcomes.
+Each numbered snippet now contains its fixture, gate, fan-out and selection in one file. `examples/08` owns the separate lesson about durable admission and uncertain provider outcomes.
 
 ## Eval contract
 

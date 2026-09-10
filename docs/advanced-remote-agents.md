@@ -14,4 +14,4 @@ The implementations deliberately expose different framework boundaries:
 - **LangGraph:** an A2A probe followed by the supported local Agent Protocol `RemoteGraph` route.
 - **Mastra:** A2A discovery, streamed artifact assembly, and task lookup through a second process.
 
-All three examples use in-memory task state. A successful run demonstrates the protocol seam, not restart durability, durable billing, or production authorization. For ordinary in-process concurrency, begin with example `16`; for durable admission and unknown remote outcomes, use example `11`.
+All three examples use in-memory task state. A successful run demonstrates the protocol seam, not restart durability, durable billing, or production authorization. For ordinary in-process concurrency, begin with example `11`; for durable admission and unknown remote outcomes, use example `08`.

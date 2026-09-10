@@ -5,11 +5,11 @@
   "scripts": {
     "test": "bun test test",
     "check": "tsc --noEmit",
-    "snippet:10": "bun src/10-scoped-repair.ts",
-    "snippet:11": "bun src/11-durable-admission.ts",
-    "snippet:13": "bun src/13-execution-memory.ts",
-    "snippet:14": "bun src/14-council-of-guards.ts",
-    "snippet:16": "bun src/16-fanout-node.ts"
+    "snippet:07": "bun src/07-scoped-repair.ts",
+    "snippet:08": "bun src/08-durable-admission.ts",
+    "snippet:09": "bun src/09-execution-memory.ts",
+    "snippet:10": "bun src/10-council-of-guards.ts",
+    "snippet:11": "bun src/11-fanout-node.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.3.0",
