@@ -11,6 +11,8 @@ bun run snippet:07
 bun run snippet:08
 bun run snippet:09
 bun run snippet:10
+bun run capstone
+bun run evaluate:repair
 AGENT_FANOUT=3 bun run snippet:11
 bun run test
 bun run check
@@ -91,3 +93,5 @@ estimates from the repository's unit tests.
 The example bounds fan-out at nine and collapses the joined batch to at most one passing artifact. It does not reserve provider funds or tune its own policy from measured outcomes. [Each framework implements the same batch node](../docs/fanout-node.md).
 
 The scoped-repair example now starts without `run-fixtures`. Execution fails until tool discovery records a policy-approved grant. Discovery and invocation both check the job deadline and call cap; the quality floor keeps every input record accounted for.
+
+[Run the capstone](../docs/capstone.md) to compare naive and corrected policies across nested work, admission, throttling, restart and notification retries. [The repair evaluation](../docs/scoped-repair-evaluation.md) publishes paired fixture results and the assumptions behind its recovery-time comparison.

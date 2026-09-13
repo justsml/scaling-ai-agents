@@ -82,6 +82,8 @@ bun run snippet:03
 
 AI SDK uses a bounded set of promises and offers a one-shot `generateText` adapter. LangGraph uses a `Send` subgraph and a reducer. Mastra uses `.foreach()` with an explicit concurrency limit. Each self-contained snippet gathers its batch before selecting a passing artifact. See [framework patterns and the eval contract](docs/fanout-node.md).
 
+The default council is the economical all-Luna variant. Pass `--chair-model MODEL` to configure only the chair. The [placement comparison](docs/business-advice.md#paired-placement-comparison) records quality-review inputs, usage and latency; live results remain unmeasured.
+
 For a live council, configure `OPENAI_API_KEY` using the chosen package's `.env.example`, then run from that package:
 
 ```sh
@@ -114,9 +116,10 @@ bun run check
 
 Each framework also has its own tests and type check. Its full test command may include live smoke tests; use the package guide to choose the checks you need.
 
+- [Scoped-repair measurement](docs/scoped-repair-evaluation.md) compares repair with alert-and-wait on identical fixtures, with explicit virtual-time assumptions.
 - [Pokédex evaluation](docs/pokedex-evaluation.md) explains investigation completion, citations and comparable evidence. The [conformance harness](harness/) drives stack agents and records results.
 - [Model-routing contract](shared/MODEL-ROUTER.md) and [routing research](docs/research/llm-routing-patterns.md) explain the routing examples.
-- [Capstone composition map](docs/capstone.md) replaces the former oversized router example with the boundaries it attempted to combine.
+- [Runnable offline capstone](docs/capstone.md) compares naive and corrected admission, restart, throttling and notification policies. Run `bun run capstone` from `examples/`.
 - [Remote-agent protocol appendix](docs/advanced-remote-agents.md) keeps A2A and Agent Protocol examples available without putting their setup in the introductory sequence.
 - [Architecture review](docs/talk-architecture-review-2026-09-06.md) records the talk clarifications, implementation boundaries and validation. Historical `PLAN.md` files describe earlier proposals; package READMEs and code describe what runs now.
 

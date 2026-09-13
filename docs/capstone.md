@@ -1,8 +1,28 @@
-# Capstone: compose the narrow contracts
+# Runnable offline capstone
 
-The repository no longer has one oversized router example. A production request crosses several independently testable boundaries, and the smaller examples make those boundaries easier to inspect.
+From `examples/`, run `bun run capstone`. No credentials or dependency install are needed. The exercise creates and removes a temporary SQLite database and prints both policies as JSON. Run `bun test ./test/capstone.test.ts` for its regression checks.
 
-## One request through the system
+The [runner](../examples/src/capstone.ts) expands one request into two branches of five records. The corrected branches share example 08's `Admission` ledger and a $1.50 entitlement. The first branch also reserves two compute workers for one minute ($0.04 fixture quote) using the existing compute API. This leaves room for seven records with two $0.10 attempts reserved per record. Three identities are explicitly refused.
+
+Both policies encounter the same scripted services: five provider starts per logical second, one charged failure, a lost generation response after remote completion, a worker restart, and a lost notification acknowledgment after delivery. Corrected recovery reopens SQLite and looks up the saved attempt key; notification delivery retries the outbox without generation. Compute teardown stops the fixture resource by its persisted provider ID, then passes the resulting charge to the existing reconciliation API. Both policies provision the same fixed one-minute rental; the remote service tracks whether it remains active after the exercise.
+
+The naive policy copies the entitlement into each child branch, retries unknown work with a fresh key, and regenerates after a failed notification acknowledgment. It does not persist a compute teardown obligation. This intentionally faulty baseline shows the consequences of those decisions; it is not a benchmark of a framework or model.
+
+| Scripted result | Naive | Corrected |
+| --- | ---: | ---: |
+| Accepted / refused records | 10 / 0 | 7 / 3 |
+| Peak committed fixture cents, including compute | 204 | 144 |
+| Actual fixture cents charged | 134 | 84 |
+| Generation attempts | 13 | 8 |
+| Duplicate completions | 2 | 0 |
+| Provider rate rejections | 2 | 0 |
+| Local admission delays | 0 | 1 |
+| Unique notifications / delivery attempts | 10 / 11 | 7 / 8 |
+| Compute teardown still required | yes | no |
+
+Naive admission overcommits the $1.50 cap, although this particular fault trace does not actually overspend it. The corrected policy completes fewer records because it reserves the worst-case retry allowance before starting. Refused work requires a new request after capacity becomes available. Logical time advances when throttled; it is not measured wall-clock performance. Branch expansion and dispatch use a deterministic schedule, not an OS concurrency or distributed-systems load test. All service outcomes and prices are fixtures; model calls are zero.
+
+## Further composition: one request through the system
 
 1. **Route by policy.** Example `06` compares model routing with deterministic rules disabled and enabled. Routing chooses a lane; it does not authorize spending or tools.
 2. **Admit bounded work.** Example `02` sets the call count and one shared deadline before dispatch.
