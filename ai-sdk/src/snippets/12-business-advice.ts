@@ -24,7 +24,12 @@ your lens. Use only facts in the brief; invent no
 numbers. Name the risk and one reversible experiment.
 Under 150 words.`;
 
-type Role = { id: string; instructions: string };
+type Role = {
+  id: string;
+  instructions: string;
+  model?: string;
+};
+export const advisorModel = "gpt-5.6-luna";
 export type Proposal = { id: string; text: string };
 export type CouncilMode = "select" | "synthesize";
 
@@ -59,19 +64,24 @@ export async function ask(
   role: Role,
   prompt: string,
   signal: AbortSignal,
+  recordUsage?: (usage: {
+    inputTokens?: number;
+    outputTokens?: number;
+  }) => void,
 ) {
   signal.throwIfAborted();
   const agent = new ToolLoopAgent({
     id: role.id,
     instructions: role.instructions,
-    model: openai("gpt-5.6-luna"),
+    model: openai(role.model ?? advisorModel),
     stopWhen: stepCountIs(1),
     maxRetries: 0,
   });
-  const { text } = await agent.generate({
+  const { text, totalUsage } = await agent.generate({
     prompt,
     abortSignal: signal,
   });
+  recordUsage?.(totalUsage);
   signal.throwIfAborted();
   if (!text.trim()) throw new Error(`${role.id} empty`);
   return text;
@@ -151,7 +161,10 @@ export async function runCouncil(
   signal = AbortSignal.timeout(90_000),
   call: Ask = ask,
   mode: CouncilMode = "synthesize",
+  chairModel = advisorModel,
 ) {
+  if (!chairModel.trim())
+    throw new Error("Chair model is empty");
   const text = input.trim();
   if (!text) throw new Error("Brief is empty");
   signal.throwIfAborted();
@@ -162,7 +175,7 @@ export async function runCouncil(
     })),
   );
   const chairOutput = await call(
-    chairs[mode],
+    { ...chairs[mode], model: chairModel },
     JSON.stringify({ brief: text, proposals }),
     signal,
   );
@@ -173,6 +186,10 @@ export async function runCouncil(
     );
     return {
       mode,
+      models: {
+        advisor: advisorModel,
+        chair: chairModel,
+      },
       proposals,
       selectedId,
       advice: proposals.find(
@@ -182,6 +199,10 @@ export async function runCouncil(
   }
   return {
     mode,
+    models: {
+      advisor: advisorModel,
+      chair: chairModel,
+    },
     proposals,
     ...recheckSynthesis(chairOutput, proposals),
   };
@@ -191,6 +212,18 @@ if (import.meta.main) {
   const args = process.argv
     .slice(2)
     .filter((arg) => arg !== "--");
+  const chairIndex = args.indexOf("--chair-model");
+  const chairModel =
+    chairIndex === -1
+      ? advisorModel
+      : args.splice(chairIndex, 2)[1];
+  if (
+    !chairModel?.trim() ||
+    chairModel.startsWith("--")
+  )
+    throw new Error(
+      "--chair-model requires an OpenAI model id",
+    );
   const modeIndex = args.indexOf("--mode");
   const mode =
     modeIndex === -1
@@ -207,6 +240,7 @@ if (import.meta.main) {
         undefined,
         undefined,
         mode,
+        chairModel,
       ),
       null,
       2,

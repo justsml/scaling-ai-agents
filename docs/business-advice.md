@@ -7,8 +7,7 @@ Set `OPENAI_API_KEY` first. Each successful run makes four paid model calls.
 
 Each framework's snippet is one self-contained file: the brief, the four role
 prompts, the model id, the agent construction and the orchestration all sit in
-`src/snippets/12-business-advice.ts`. There is no shared profiles module and no
-env-var indirection.
+`src/snippets/12-business-advice.ts`. There is no shared profiles module.
 
 | Role | Decision it can change |
 | --- | --- |
@@ -17,7 +16,11 @@ env-var indirection.
 | Product Visionary | Who to serve, what to offer, how to test demand. |
 | Chair | Either which proposal to return unchanged, or which proposal is the base and which compatible ideas are incorporated. |
 
-All four roles run on `gpt-5.6-luna`. The three advisor personas are adapted from
+The **economical variant** is the default: all four roles run on `gpt-5.6-luna`.
+To configure only the chair, pass `--chair-model YOUR_OPENAI_MODEL_ID`; the three
+advisors remain on Luna. Programmatic callers pass the chair id as the fifth
+argument to `runCouncil`. Outputs record both model placements. This is a
+configuration option, with no claim that another chair produces stronger synthesis. The three advisor personas are adapted from
 [`council-of-dans`](https://github.com/justsml/ai-skillz/blob/main/skills/council-of-dans/SKILL.md),
 shortened to a sentence or two each so the orchestration stays readable.
 
@@ -82,3 +85,37 @@ Use the first recorded live run as the baseline. Rerun the same cases after chan
 prompt; accept only if every quality criterion remains at least 4 and no grounding failure
 appears. Report latency and total cost alongside quality. No live baseline is claimed by
 the offline tests.
+
+## Paired placement comparison
+
+From `ai-sdk/`, run `bun src/evals/council-placement.ts > council-scripted.json`.
+This offline exercise runs both placements on the same three briefs, repeated three
+times with alternating order. Its structural checks and latency measure scripted
+orchestration only. They do not measure model quality, provider latency, or savings.
+All token counts, semantic scores, and charges remain `null` when unavailable.
+
+After selecting a budget and chair, run
+`bun src/evals/council-placement.ts --live --chair-model YOUR_OPENAI_MODEL_ID > council-live.json`.
+This makes up to 72 paid calls across 18 councils. It records each call's model,
+input/output tokens when returned, errors, latency, full proposals and synthesis.
+Raw per-call outputs remain available even when synthesis parsing or rechecks fail.
+Failed calls can still bill; reconcile provider charges into `providerCostUsd`
+using billing records rather than treating missing tokens as zero. The harness
+uses AI SDK; matching placement tests cover LangGraph and Mastra independently.
+
+Blind the placement labels and score both outputs on the quality rubric above;
+write the five criterion scores and grounding failures into `semanticQuality`.
+Compare paired scores, total reconciled charges and median total latency by
+placement, retaining failed runs and reporting their count. Repeated identical
+briefs hold tasks fixed; generated advisor proposals can differ, so this measures
+the complete policy rather than an isolated chair effect. For an isolated chair
+study, replay the same saved proposals to both chairs.
+
+| Evidence | All-Luna | Configured chair |
+| --- | --- | --- |
+| Offline placement/structural checks | Tested | Tested with an injected model id |
+| Live semantic quality | Unmeasured | Unmeasured |
+| Provider cost | Unmeasured | Unmeasured |
+| Provider latency | Unmeasured | Unmeasured |
+
+No live comparison has been run and no stronger-synthesis claim is supported.

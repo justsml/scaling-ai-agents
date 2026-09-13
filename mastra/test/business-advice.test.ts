@@ -110,3 +110,26 @@ describe("business advice council", () => {
     expect(called.some((id) => id.startsWith("chair-"))).toBe(false);
   });
 });
+
+for (const chair of [undefined, "configured-chair"]) {
+  test(`chair placement ${chair ?? "economical default"}`, async () => {
+    const calls: { id: string; model?: string }[] = [];
+    const result = await runCouncil(
+      "Decision",
+      AbortSignal.timeout(3000),
+      async (role) => {
+        calls.push(role);
+        return role.id === "chair-select" ? "operator" : "Proposal";
+      },
+      "select",
+      chair,
+    );
+    expect(
+      calls
+        .filter((role) => !role.id.startsWith("chair-"))
+        .every((role) => role.model === undefined),
+    ).toBe(true);
+    expect(calls.find((role) => role.id === "chair-select")?.model).toBe(chair ?? "gpt-5.6-luna");
+    expect(result.models).toEqual({ advisor: "gpt-5.6-luna", chair: chair ?? "gpt-5.6-luna" });
+  });
+}
