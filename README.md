@@ -126,6 +126,6 @@ Each framework also has its own tests and type check. Its full test command may 
 
 - [Dynamic Scaling of Agentic Workloads](https://danlevy.net/talks/dynamic-scaling.html): bounded attempts, placement, recovery and the Council of Guards.
 - [Adaptive, agentic apps](https://danlevy.net/talks/adaptive-systems.html): scoped jobs, tool discovery, repair evidence and execution memory.
-- [Code Is Cheap. Judgment Is Expensive.](https://danlevy.net/talks/judgment.html): protect review capacity and measure time to acceptance.
+- [Turn Your Thinkin’ Tokens Up to 11](https://danlevy.net/talks/judgment.html): treat customer attention and relearning as costs of change; use customer evidence to decide what to ship and in what sequence.
 
 [Read the talk sources](https://github.com/justsml/dans-blog/tree/main/artifacts/speaking-portfolio-expanded)
