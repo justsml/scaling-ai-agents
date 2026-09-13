@@ -1,0 +1,226 @@
+{
+  "evidence": "scripted virtual-time simulation; not model performance",
+  "modelCalls": 0,
+  "assumptions": {
+    "scopedReadyMs": 2000,
+    "operatorReadyMs": 8000,
+    "processingMs": 100,
+    "horizonMs": 6000
+  },
+  "policies": [
+    {
+      "policy": "scoped-repair",
+      "recoveryMs": 2100,
+      "processedByHorizon": 6,
+      "acceptedByHorizon": 3,
+      "quarantinedByHorizon": 3,
+      "falseRepairsByHorizon": 0,
+      "totalProcessed": 8,
+      "totalAccepted": 4,
+      "totalFalseRepairs": 0,
+      "totalIncorrectDispositions": 0,
+      "completedMs": 7100,
+      "records": [
+        {
+          "id": "leading-zero",
+          "completedMs": 2100,
+          "actual": {
+            "kind": "accepted",
+            "value": {
+              "country": "US",
+              "postalCode": "02108"
+            }
+          },
+          "correct": true,
+          "falseRepair": false
+        },
+        {
+          "id": "alphanumeric",
+          "completedMs": 2200,
+          "actual": {
+            "kind": "accepted",
+            "value": {
+              "country": "CA",
+              "postalCode": "K1A 0B1"
+            }
+          },
+          "correct": true,
+          "falseRepair": false
+        },
+        {
+          "id": "numeric",
+          "completedMs": 2300,
+          "actual": {
+            "kind": "quarantined",
+            "reason": "postal-code-must-be-a-string"
+          },
+          "correct": true,
+          "falseRepair": false
+        },
+        {
+          "id": "uk",
+          "completedMs": 3100,
+          "actual": {
+            "kind": "accepted",
+            "value": {
+              "country": "GB",
+              "postalCode": "SW1A 1AA"
+            }
+          },
+          "correct": true,
+          "falseRepair": false
+        },
+        {
+          "id": "conflict",
+          "completedMs": 4100,
+          "actual": {
+            "kind": "quarantined",
+            "reason": "conflicting-postal-fields"
+          },
+          "correct": true,
+          "falseRepair": false
+        },
+        {
+          "id": "ambiguous",
+          "completedMs": 5100,
+          "actual": {
+            "kind": "quarantined",
+            "reason": "ambiguous-semantics"
+          },
+          "correct": true,
+          "falseRepair": false
+        },
+        {
+          "id": "german",
+          "completedMs": 6100,
+          "actual": {
+            "kind": "accepted",
+            "value": {
+              "country": "DE",
+              "postalCode": "01067"
+            }
+          },
+          "correct": true,
+          "falseRepair": false
+        },
+        {
+          "id": "missing",
+          "completedMs": 7100,
+          "actual": {
+            "kind": "quarantined",
+            "reason": "missing-country"
+          },
+          "correct": true,
+          "falseRepair": false
+        }
+      ]
+    },
+    {
+      "policy": "alert-and-wait",
+      "recoveryMs": 8100,
+      "processedByHorizon": 0,
+      "acceptedByHorizon": 0,
+      "quarantinedByHorizon": 0,
+      "falseRepairsByHorizon": 0,
+      "totalProcessed": 8,
+      "totalAccepted": 4,
+      "totalFalseRepairs": 0,
+      "totalIncorrectDispositions": 0,
+      "completedMs": 8800,
+      "records": [
+        {
+          "id": "leading-zero",
+          "completedMs": 8100,
+          "actual": {
+            "kind": "accepted",
+            "value": {
+              "country": "US",
+              "postalCode": "02108"
+            }
+          },
+          "correct": true,
+          "falseRepair": false
+        },
+        {
+          "id": "alphanumeric",
+          "completedMs": 8200,
+          "actual": {
+            "kind": "accepted",
+            "value": {
+              "country": "CA",
+              "postalCode": "K1A 0B1"
+            }
+          },
+          "correct": true,
+          "falseRepair": false
+        },
+        {
+          "id": "numeric",
+          "completedMs": 8300,
+          "actual": {
+            "kind": "quarantined",
+            "reason": "postal-code-must-be-a-string"
+          },
+          "correct": true,
+          "falseRepair": false
+        },
+        {
+          "id": "uk",
+          "completedMs": 8400,
+          "actual": {
+            "kind": "accepted",
+            "value": {
+              "country": "GB",
+              "postalCode": "SW1A 1AA"
+            }
+          },
+          "correct": true,
+          "falseRepair": false
+        },
+        {
+          "id": "conflict",
+          "completedMs": 8500,
+          "actual": {
+            "kind": "quarantined",
+            "reason": "conflicting-postal-fields"
+          },
+          "correct": true,
+          "falseRepair": false
+        },
+        {
+          "id": "ambiguous",
+          "completedMs": 8600,
+          "actual": {
+            "kind": "quarantined",
+            "reason": "ambiguous-semantics"
+          },
+          "correct": true,
+          "falseRepair": false
+        },
+        {
+          "id": "german",
+          "completedMs": 8700,
+          "actual": {
+            "kind": "accepted",
+            "value": {
+              "country": "DE",
+              "postalCode": "01067"
+            }
+          },
+          "correct": true,
+          "falseRepair": false
+        },
+        {
+          "id": "missing",
+          "completedMs": 8800,
+          "actual": {
+            "kind": "quarantined",
+            "reason": "missing-country"
+          },
+          "correct": true,
+          "falseRepair": false
+        }
+      ]
+    }
+  ]
+}
