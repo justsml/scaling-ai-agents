@@ -329,9 +329,9 @@ Keep expected claims and acceptable evidence paths in `pokedex-expected.json`. D
 Run cheap checks after every commit and full checks at phase boundaries.
 
 ```bash
-cd mastra && bun run check && bun test
-cd ai-sdk && bun run check && bun test
-cd langchain && bun run check && bun test
+cd mastra && bun run check && bun run test
+cd ai-sdk && bun run check && bun run test
+cd langchain && bun run check && bun run test
 cd harness && bun run check && bun test
 docker compose -f harness/compose.yaml config
 ```

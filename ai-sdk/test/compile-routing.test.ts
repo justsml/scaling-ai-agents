@@ -11,6 +11,7 @@ test("exact input matches; changed bytes must be independently certified", async
   expect(await routeCompiled(`${source}\n// changed`, true, 100)).toMatchObject({
     path: "miss",
     modelCalls: 0,
+    nextAction: "certify a candidate against fixed tests: docs/readiness-certification.md",
   });
 });
 test("a matching hash cannot bypass a failed contract", async () => {

@@ -1,11 +1,11 @@
 // Runs a candidate patch to readiness.ts against the
 // fixed fixture test file in an isolated child process
-// (`bun test`). This is the deterministic judge for
-// Compete: every candidate is graded the same way, in a
+// (`bun test`). This is the deterministic readiness
+// check: every candidate is graded the same way, in a
 // temp directory nothing else touches, with a hard
 // wall-clock timeout so a candidate that reintroduces
 // the "retry forever" bug cannot hang the whole
-// tournament.
+// check.
 import {
   mkdtemp,
   writeFile,

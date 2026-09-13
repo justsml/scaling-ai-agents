@@ -56,6 +56,21 @@ describe("business advice council", () => {
     expect(result.advice).toBe(exact);
   });
 
+  test.each([
+    "pennypincher is unsafe; operator wins.",
+    "operator because it is the best proposal",
+    "invented",
+  ])("select rejects prose or unknown identifiers: %s", async (chairOutput) => {
+    await expect(
+      runCouncil(
+        "Build or buy?",
+        AbortSignal.timeout(3000),
+        async (role) => (role.id === "chair-select" ? chairOutput : `${role.id} proposal`),
+        "select",
+      ),
+    ).rejects.toThrow("chair selected unknown advisor");
+  });
+
   test("rejects a synthesis with invented provenance", async () => {
     await expect(
       runCouncil("Build or buy?", AbortSignal.timeout(3000), async (role) =>

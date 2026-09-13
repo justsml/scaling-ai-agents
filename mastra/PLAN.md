@@ -54,7 +54,7 @@ mastra/
 ## Verification
 
 - `bun run check` clean.
-- `bun test` covers ledger math, sandbox pass/fail parsing on the buggy fixture (expect 2 pass, 3 fail), router classification of all six requests, judge tie-break order.
+- `bun run test` covers ledger math, sandbox pass/fail parsing on the buggy fixture (expect 2 pass, 3 fail), router classification of all six requests, judge tie-break order.
 - `bun run all` completes with the OpenAI key; every snippet prints its table; total spend printed at the end.
 - Studio shows one trace per snippet with per-worker spans carrying `profile`, `costUsd`, `latencyMs`, `outcome`, `whyItExisted`.
 

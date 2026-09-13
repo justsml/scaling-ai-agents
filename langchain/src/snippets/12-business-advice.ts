@@ -231,33 +231,6 @@ export async function runCouncil(
   };
 }
 
-/** Compatibility entrypoint used by snippet 00's novel route. */
-export async function runTournament(options: {
-  request: string;
-  [key: string]: unknown;
-}) {
-  const result = await runCouncil(
-    options.request,
-    undefined,
-    undefined,
-    "select",
-  );
-  const winner = result.proposals.find(
-    (proposal) => proposal.id === result.selectedId,
-  );
-  return {
-    candidates: result.proposals.map((proposal) => ({
-      id: proposal.id,
-      answer: proposal.text,
-    })),
-    skipped: [],
-    winner: winner
-      ? { profile: winner.id, answer: winner.text }
-      : null,
-    stopReason: "all advisors completed",
-  };
-}
-
 if (import.meta.main) {
   const args = process.argv
     .slice(2)

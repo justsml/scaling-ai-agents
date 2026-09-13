@@ -11,7 +11,7 @@ so you can read the mechanism in one file.
 ```sh
 bun install
 bun run check
-bun test
+bun run test
 
 bun run snippet:03                     # offline
 bun run snippet:12 -- --mode select "your question"      # live: four calls
@@ -54,7 +54,7 @@ Pokédex gateway; 06 evaluates the full router fixture set.
   ordinary client-side concurrency; the two mechanisms are not interchangeable.
 ## Offline evidence
 
-`bun test` covers the A2A seam, Pokédex evidence handling, router policy, compile replay,
+`bun run test` covers the A2A seam, Pokédex evidence handling, router policy, compile replay,
 fan-out and advice orchestration without proving live-provider quality. Passing these
 tests does not establish durable billing, authorization, isolation or production model
 behavior.
@@ -66,3 +66,5 @@ attempt does not erase another attempt's output. See [the fan-out note](../docs/
 For the cross-framework contracts, see [the worked example](../shared/TASK.md),
 [Pokédex evaluation](../docs/pokedex-evaluation.md), and the
 [model-routing contract](../shared/MODEL-ROUTER.md).
+
+`bun run test` runs only `./test`. To run the deliberately broken readiness challenge separately, use `bun run test:challenge`; expect two passing tests, three failing tests, and a nonzero exit status. Keep that fixture broken so candidate certification has a negative control.

@@ -3,6 +3,7 @@
  *
  * An exact input can replay a shipped, independently
  * tested artifact. Changed input is a cache miss.
+ * See docs/readiness-certification.md for candidate checks.
  *
  *   bun run snippet:03
  *
@@ -64,7 +65,7 @@ export async function routeCompiled(
       path: "miss",
       modelCalls: 0,
       nextAction:
-        "request independent review via snippet 12 select mode",
+        "certify a candidate against fixed tests: docs/readiness-certification.md",
     };
   }
   if (!certified)

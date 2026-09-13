@@ -11,7 +11,7 @@ the framework mechanism is visible in one file.
 ```sh
 bun install
 bun run check
-bun test
+bun run test
 
 bun run snippet:03                     # offline
 bun run snippet:12 -- --mode select "your question"      # live: four calls
@@ -55,7 +55,7 @@ application-planned workflow fan-out.
 
 ## Offline evidence
 
-`bun test` covers the Pokédex evidence seam, router policy, compile replay, fan-out and
+`bun run test` covers the Pokédex evidence seam, router policy, compile replay, fan-out and
 advice orchestration without proving live-provider quality. Passing these tests does not
 establish durable billing, authorization, isolation or production model behavior.
 
@@ -67,3 +67,5 @@ a failed branch becomes `null`, leaving the other drafts available. See
 For the cross-framework contracts, see [the worked example](../shared/TASK.md),
 [Pokédex evaluation](../docs/pokedex-evaluation.md), and the
 [model-routing contract](../shared/MODEL-ROUTER.md).
+
+`bun run test` runs only `./test`. To run the deliberately broken readiness challenge separately, use `bun run test:challenge`; expect two passing tests, three failing tests, and a nonzero exit status. Keep that fixture broken so candidate certification has a negative control.

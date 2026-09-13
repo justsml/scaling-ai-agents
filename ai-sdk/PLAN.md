@@ -33,7 +33,7 @@ Same shape as the Mastra plan: `src/fixtures/` (copied), `src/lib/` (ledger, san
 
 ## Verification
 
-- `bun run check`, `bun test` (ledger, sandbox, router, judge order, a2a client against the local `06` server started in `beforeAll`).
+- `bun run check`, `bun run test` (ledger, sandbox, router, judge order, a2a client against the local `06` server started in `beforeAll`).
 - `bun run all` with `OPENAI_API_KEY`; total spend printed. Snippets needing gateway or OPA print `skipped: <reason>` and exit 0.
 - Console span exporter output shows one `ai.generateText` span per worker with `profile`, `costUsd`, `latencyMs`, `outcome`, `whyItExisted` in metadata.
 

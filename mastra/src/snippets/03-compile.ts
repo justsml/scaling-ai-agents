@@ -3,6 +3,7 @@
  *
  * An exact input can replay a shipped, independently
  * tested artifact through a native tool step.
+ * See docs/readiness-certification.md for candidate checks.
  *
  *   bun run snippet:03
  *

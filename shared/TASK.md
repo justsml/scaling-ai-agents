@@ -15,12 +15,13 @@ A repository has a small TypeScript module, `readiness.ts`, and a test file. The
 
 The buggy module retries `denied` forever and has no deadline. Tests live in
 `shared/fixtures/readiness.test.ts`; they support the offline Compile examples and
-deeper library tests. The deliberately small Compete snippets compare proposals but do
-not claim those proposals were executed or certified.
+deeper library tests. Example `12` compares advice proposals; its structural checks
+do not execute or certify readiness code. Use the
+[readiness certification procedure](../docs/readiness-certification.md) for candidate code.
 
 ## What each axis does with it
 
-**Compete.** Three competitors propose complete fixes for the same readiness problem in parallel. A fourth call sees all three answers and chooses one winner. The snippet keeps the problem, roles, calls and join together so the fan-out is easy to compare across frameworks.
+**Select or synthesize (`12`).** Three advisors propose answers in parallel. A chair either selects one unchanged or synthesizes a new answer whose source structure is checked. These are advice proposals, not certified readiness artifacts.
 
 **Decompose.** A separate incident, "intermittent WebSocket disconnects", is investigated by three workers, each with one evidence source. A fourth call combines their findings into a diagnosis and first safe mitigation.
 
@@ -28,9 +29,9 @@ not claim those proposals were executed or certified.
 
 **Distribute.** Three independent jobs are assigned to explicit Luna, Terra and Sol model lanes, then started together. The example teaches placement and concurrent dispatch; it does not claim provider failover, residency enforcement or remote execution.
 
-**Compile.** An exact known input replays a shipped artifact with zero model calls. Changed input misses. Where the stack exposes certification, the replay is checked again rather than trusting a cache entry.
+**Compile.** An exact known input replays a shipped artifact with zero model calls. Changed input misses. Each stack runs the fixed tests again before serving the artifact rather than trusting a cache entry. A miss requires the separate certification procedure above; advice selection cannot fill it.
 
-**Router (before the axes).** A small deterministic classifier chooses lookup, generation, parallel work or human review before expensive work begins.
+**Composition.** The former oversized router was removed. The [capstone map](../docs/capstone.md) describes how the narrow examples can be composed; it is not an implemented end-to-end certification pipeline.
 
 **Remote.** Put one worker behind a process and protocol boundary. AI SDK hand-rolls the small A2A subset it needs; Mastra uses its A2A client/server support; LangGraph probes A2A availability and uses `RemoteGraph` against the local Agent Protocol server.
 
@@ -57,9 +58,9 @@ The five axes remain the comparison exercise. The newer talks add the controls
 around them: generated jobs with minimum tools, independent semantic validation,
 shared admission, durable unresolved outcomes, and catalog-bounded compute requests.
 See [the review](../docs/talk-architecture-review-2026-09-06.md) and
-[offline examples 10–15](../examples/README.md).
+[offline contract examples](../examples/README.md).
 
-The `05` demos are offline certified replay paths with explicit misses; they do not
+The `03` demos are offline certified replay paths with explicit misses; they do not
 pretend that an explanatory model call produced or certified a new artifact. A match
 must still pass independent checks before serving, and does not authorize deployment.
 
@@ -68,6 +69,6 @@ disagreement, and checks on the evaluator itself. Memory can inform a new propos
 it cannot establish execution, semantic correctness or authority. Multiple judges
 can direct review; their agreement cannot override a failed deterministic gate.
 
-The newest generation example is `16` in all three stacks. Each snippet keeps its
+The bounded generation example is `11` in all three stacks. Each snippet keeps its
 small fixture, gate and selection next to the framework-native fan-out. Generation
 collapses to at most one selected artifact. `AGENT_FANOUT=1` is the baseline.

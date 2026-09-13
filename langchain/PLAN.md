@@ -25,7 +25,7 @@ Same shape: `src/fixtures/` (copied), `src/lib/` (ledger, sandbox, judge, profil
 
 **04 Distribute.** `lib/pool.ts` filters providers by `region` and `dataClass` and returns a model built with `initChatModel`; `modelFallbackMiddleware` (verify name on the middleware page) or `model.withFallbacks([...])` for the fallback chain; the `restricted` + `eu` request must land on the local slot or stop with a reason. One competitor is remote: `RemoteGraph` from `@langchain/langgraph/remote` pointed at the `06` server, so the remote worker is just another node in the 01 graph; and, separately, the hand-rolled A2A JSON-RPC client in `lib/a2a-client.ts` calling the Agent Server `/a2a/{assistant_id}` route to show protocol-level access. Print per-worker provider and reason.
 
-**05 Compile.** Winner becomes a plain function and a `tool()` with the fixture tests as contract, in `src/compiled/`. The router graph gets a `compiledLookup` node first with `cachePolicy` (node caching from the graph-api page) keyed on the input hash, so a repeat request never reaches a model. Negative case included. Regression: a `bun test` that runs the compiled tool against the fixtures.
+**05 Compile.** Winner becomes a plain function and a `tool()` with the fixture tests as contract, in `src/compiled/`. The router graph gets a `compiledLookup` node first with `cachePolicy` (node caching from the graph-api page) keyed on the input hash, so a repeat request never reaches a model. Negative case included. Regression: a `bun run test` that runs the compiled tool against the fixtures.
 
 **06 Remote worker.** `langgraph.json` registering `competitor-remote` and `researcher` graphs; `bunx @langchain/langgraph-cli dev --port 2024` started as a child process by the snippet. Verify during implementation whether the local dev server exposes `/a2a/{assistant_id}`; if it does, exercise `message/send`, `message/stream`, `tasks/get`, `tasks/cancel` through the client and print the agent card; if it does not, use the Agent Protocol routes (`/runs/stream`, `/threads`) through `@langchain/langgraph-sdk` and state plainly that A2A needs a LangSmith deployment. This snippet is what `04` and the Deep Agents async-subagent variant in `02` connect to.
 
@@ -33,7 +33,7 @@ Same shape: `src/fixtures/` (copied), `src/lib/` (ledger, sandbox, judge, profil
 
 ## Verification
 
-- `bun run check`, `bun test` (ledger reducer, sandbox, router, judge order, collision reducer throws, compiled tool passes fixtures).
+- `bun run check`, `bun run test` (ledger reducer, sandbox, router, judge order, collision reducer throws, compiled tool passes fixtures).
 - `bun run all` with `OPENAI_API_KEY`; total spend printed. Snippets needing the dev server start and stop it themselves; snippets needing LangSmith or `deepagents` extras print `skipped: <reason>` and exit 0.
 - Trace tree (LangSmith or local handler) shows one run per `attempt` with the five standard metadata keys.
 

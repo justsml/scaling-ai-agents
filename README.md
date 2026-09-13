@@ -97,7 +97,7 @@ The examples keep distinct decisions visible: **decompose and place** independen
 
 The surrounding job contract matters just as much. Independent checks decide eligibility before preferences rank candidates. Tool execution checks authority. Admission owns reservations. An unknown provider outcome stays unknown until reconciled. A synthesized artifact needs fresh checks, and machine-generated alternatives collapse to at most one selected artifact before human review.
 
-The [readiness challenge](shared/TASK.md) supplies buggy source, fixed tests, a rubric and a reference artifact. The three framework packages keep their own implementations and copies of the shared inputs. You can study or run one without importing another. The [domain vocabulary](CONTEXT.md) distinguishes reference artifacts, certified artifacts and conformance evidence.
+The [readiness challenge](shared/TASK.md) supplies buggy source, fixed tests, a rubric and a reference artifact. The three framework packages keep their own implementations and copies of the shared inputs. You can study or run one without importing another. The [domain vocabulary](CONTEXT.md) distinguishes reference artifacts, certified artifacts and conformance evidence. The [readiness certification procedure](docs/readiness-certification.md) runs a candidate against the fixed tests. Example `12` compares advice proposals and checks their source structure; it does not certify executable readiness code. Compile misses require separate candidate checks and registration; neither snippet automatically performs that handoff.
 
 These are teaching implementations, not production authorization, billing or isolation systems. Passing the included tests proves their stated cases, not general model quality. The [fan-out eval contract](docs/fanout-node.md#eval-contract) spells out what a live comparison must measure across quality, total cost, accepted-result latency and recovery.
 
@@ -108,7 +108,7 @@ Run the complete offline contract suite:
 ```sh
 cd examples                    # from the repository root
 bun install
-bun test test
+bun run test
 bun run check
 ```
 

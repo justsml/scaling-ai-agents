@@ -20,7 +20,8 @@
     "snippet:05": "bun run src/snippets/05-pokedex.ts",
     "snippet:06": "bun run src/snippets/06-model-router.ts",
     "snippet:11": "bun src/snippets/11-fanout-node.ts",
-    "snippet:12": "bun run src/snippets/12-business-advice.ts"
+    "snippet:12": "bun run src/snippets/12-business-advice.ts",
+    "test:challenge": "bun test --timeout 2000 ./src/fixtures/readiness.test.ts"
   },
   "dependencies": {
     "@mastra/client-js": "latest",

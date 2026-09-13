@@ -6,7 +6,7 @@
   "scripts": {
     "setup": "bun install && bun run src/lib/setup.ts",
     "check": "tsc --noEmit -p tsconfig.json",
-    "test": "bun test --timeout 20000 test/",
+    "test": "bun test --timeout 20000 ./test",
     "advanced:remote": "bun run src/advanced/remote-a2a.ts",
     "snippet:01": "bun run src/snippets/01-decompose.ts",
     "snippet:02": "bun run src/snippets/02-constrain.ts",
@@ -16,7 +16,8 @@
     "snippet:06": "bun run src/snippets/06-model-router.ts",
     "all": "bun run src/run-all.ts",
     "snippet:11": "bun src/snippets/11-fanout-node.ts",
-    "snippet:12": "bun run src/snippets/12-business-advice.ts"
+    "snippet:12": "bun run src/snippets/12-business-advice.ts",
+    "test:challenge": "bun test --timeout 2000 ./src/fixtures/readiness.test.ts"
   },
   "dependencies": {
     "ai": "^7.0.93",

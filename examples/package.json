@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "bun test test",
+    "test": "bun test ./test",
     "check": "tsc --noEmit",
     "snippet:07": "bun src/07-scoped-repair.ts",
     "snippet:08": "bun src/08-durable-admission.ts",

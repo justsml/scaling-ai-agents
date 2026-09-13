@@ -3,7 +3,8 @@
  *
  * An exact input can replay a shipped, independently
  * tested artifact. The lookup may cache; certification
- * always runs again.
+ * always runs again. For a new candidate or a miss,
+ * see docs/readiness-certification.md at the repo root.
  *
  *   bun run snippet:03
  *

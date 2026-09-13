@@ -6,6 +6,12 @@
  * model must never route a destructive request around
  * human review.
  *
+ * This classifies requests; it does not execute the
+ * selected specialist or enforce a spending cap or
+ * caller deadline. Decision metrics are observed usage
+ * estimates for successful router calls, not a complete
+ * billing ledger (failed attempts may still be billed).
+ *
  *   bun run snippet:06
  *
  * Up to two paid calls per fixture case. Needs
