@@ -52,11 +52,11 @@ const timeline: Array<{
   atMs: number;
 }> = [];
 const started = Date.now();
-const threeAtATime = new Semaphore(3);
+const probeConcurrency = new Semaphore(3);
 
 const probe = tool(
   ({ service }) =>
-    threeAtATime.run(async () => {
+    probeConcurrency.run(async () => {
       timeline.push({
         service,
         event: "start",

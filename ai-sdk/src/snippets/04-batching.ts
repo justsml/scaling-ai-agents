@@ -36,14 +36,14 @@ const timeline: Array<{
   event: "start" | "finish";
   atMs: number;
 }> = [];
-const threeAtATime = pLimit(3);
+const probeConcurrency = pLimit(3);
 
 const probeService = tool({
   description:
     "Probe one service. Call once for every service.",
   inputSchema: z.object({ service: z.enum(services) }),
   execute: ({ service }) =>
-    threeAtATime(async () => {
+    probeConcurrency(async () => {
       timeline.push({
         service,
         event: "start",
@@ -83,12 +83,12 @@ console.log("parallel tool calls", {
   timeline,
 });
 
-const twoAtATime = pLimit(2);
+const requestConcurrency = pLimit(2);
 let active = 0;
 let peak = 0;
 await Promise.all(
   requests.map((request) =>
-    twoAtATime(async () => {
+    requestConcurrency(async () => {
       active++;
       peak = Math.max(peak, active);
       await Bun.sleep(80);
