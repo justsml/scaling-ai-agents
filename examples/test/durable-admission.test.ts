@@ -42,36 +42,50 @@ test("four callers share one job; another request cannot spend its reservation",
   expect(s.db.admit("tenant", "different", 1, 600_000).accepted).toHaveLength(0);
   expect(() => s.db.admit("tenant", "same", 9, 600_000)).toThrow("idempotency conflict");
 });
-test("concurrent processes cannot reserve the same remaining budget", async () => {
-  const s = setup();
-  const module = new URL("../src/08-durable-admission.ts", import.meta.url).pathname;
-  const processes = Array.from({ length: 4 }, (_, i) =>
-    Bun.spawn(
-      [
-        process.execPath,
-        "-e",
-        `import { Admission } from ${JSON.stringify(module)}; const db = new Admission(process.argv[1], () => 0); console.log(JSON.stringify(db.admit('tenant', process.argv[2], 10, 600000))); db.close();`,
-        s.path,
-        `caller-${i}`,
-      ],
-      { stdout: "pipe", stderr: "pipe" },
-    ),
-  );
-  const rows = await Promise.all(
-    processes.map(async (p) => {
-      const [out, err, code] = await Promise.all([
-        new Response(p.stdout).text(),
-        new Response(p.stderr).text(),
-        p.exited,
-      ]);
-      expect(err).toBe("");
-      expect(code).toBe(0);
-      return JSON.parse(out) as { accepted: string[] };
-    }),
-  );
-  expect(rows.reduce((sum, row) => sum + row.accepted.length, 0)).toBe(10);
-  expect(s.db.snapshot("tenant").held).toBe(200);
-});
+test.each([150, 200])(
+  "concurrent processes cannot reserve the same remaining budget (%i cents)",
+  async (cap) => {
+    const s = setup(cap);
+    const module = new URL("../src/08-durable-admission.ts", import.meta.url).pathname;
+    const processes = Array.from({ length: 4 }, (_, i) =>
+      Bun.spawn(
+        [
+          process.execPath,
+          "-e",
+          `import { Admission } from ${JSON.stringify(module)}; const db = new Admission(process.argv[1], () => 0); console.log(JSON.stringify(db.admit('tenant', process.argv[2], 10, 600000))); db.close();`,
+          s.path,
+          `caller-${i}`,
+        ],
+        { stdout: "pipe", stderr: "pipe" },
+      ),
+    );
+    const rows = await Promise.all(
+      processes.map(async (p) => {
+        const [out, err, code] = await Promise.all([
+          new Response(p.stdout).text(),
+          new Response(p.stderr).text(),
+          p.exited,
+        ]);
+        expect(err).toBe("");
+        expect(code).toBe(0);
+        return JSON.parse(out) as {
+          accepted: string[];
+          acceptedIdentities: string[];
+          refused: string[];
+        };
+      }),
+    );
+    const capacity = Math.floor(cap / 20);
+    expect(rows.reduce((sum, row) => sum + row.accepted.length, 0)).toBe(capacity);
+    for (const row of rows) {
+      expect(row.acceptedIdentities).toHaveLength(row.accepted.length);
+      expect([...row.acceptedIdentities, ...row.refused]).toEqual(
+        Array.from({ length: 10 }, (_, i) => String(i)),
+      );
+    }
+    expect(s.db.snapshot("tenant").held).toBe(capacity * 20);
+  },
+);
 test("tenant request identities and balances are separate", () => {
   const { db } = setup();
   db.provision("other", 200);
@@ -245,3 +259,61 @@ test("job deadline constrains compute and teardown cannot exceed its hold", () =
   s.db.provisionCompute(lease.id, "provider-lease");
   expect(() => s.db.confirmComputeTeardown(lease.id, 97)).toThrow("outside reservation");
 });
+
+test("talk fixture partially admits seven named records under $1.50", () => {
+  const s = setup(150);
+  const identities = Array.from({ length: 10 }, (_, i) => `record-${i + 1}`);
+  const decision = s.db.admit("tenant", "talk", identities, 600_000);
+  expect(decision.acceptedIdentities).toEqual(identities.slice(0, 7));
+  expect(decision.refused).toEqual(identities.slice(7));
+  expect(decision.reason).toBe("partial");
+  expect(s.db.items(decision.jobId).map((i) => i.id)).toEqual(decision.accepted);
+  expect(s.db.snapshot("tenant")).toEqual({ held: 140, spent: 0, available: 10, cap: 150 });
+  // Releasing allowance cannot silently promote refused work on replay.
+  const attempt = s.db.dispatch(decision.accepted[0]!);
+  s.db.reconcile(attempt.id, "completed");
+  expect(s.open().admit("tenant", "talk", identities, 600_000)).toEqual({
+    ...decision,
+    deduplicated: true,
+  });
+  expect(() => s.db.admit("tenant", "talk", [...identities].reverse(), 600_000)).toThrow(
+    "idempotency conflict",
+  );
+});
+
+test("fully refused decisions persist after budget becomes available", () => {
+  const s = setup(20);
+  const first = s.db.admit("tenant", "first", ["a"], 600_000);
+  const refused = s.db.admit("tenant", "second", ["b"], 600_000);
+  expect(refused.refused).toEqual(["b"]);
+  expect(refused.accepted).toEqual([]);
+  s.tick(600_000);
+  s.db.expireQueued();
+  expect(s.db.snapshot("tenant").available).toBe(20);
+  expect(s.open().admit("tenant", "second", ["b"], 600_000)).toEqual({
+    ...refused,
+    deduplicated: true,
+  });
+  expect(first.accepted).toHaveLength(1);
+});
+
+test("deadline refusals retain all identities and reject changed retry input", () => {
+  const s = setup();
+  s.tick(100);
+  const result = s.db.admit("tenant", "late", ["a", "b"], 100);
+  expect(result).toMatchObject({ accepted: [], refused: ["a", "b"], reason: "deadline" });
+  expect(s.open().admit("tenant", "late", ["a", "b"], 100)).toEqual({
+    ...result,
+    deduplicated: true,
+  });
+  expect(() => s.db.admit("tenant", "late", ["a", "c"], 100)).toThrow("idempotency conflict");
+});
+
+test.each([{ identities: ["duplicate", "duplicate"] }, { identities: [""] }, { identities: [] }])(
+  "invalid identities reserve nothing: %j",
+  ({ identities }) => {
+    const { db } = setup();
+    expect(() => db.admit("tenant", "invalid", identities, 100)).toThrow("invalid batch");
+    expect(db.snapshot("tenant").held).toBe(0);
+  },
+);

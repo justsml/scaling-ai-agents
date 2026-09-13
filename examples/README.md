@@ -21,20 +21,20 @@ No install is needed to run the snippets themselves with Bun. The development de
 | Example | What to watch | Checks |
 | --- | --- | --- |
 | [07: scoped repair](src/07-scoped-repair.ts) | A rename proposal passes fixed semantic fixtures; email is denied; an unknown status is quarantined; promotion has a 100-record canary | Tool discovery and invocation, deadline, attempt cap, forged scores, leading zeroes, stale parent, canary exhaustion, rollback |
-| [08: durable admission](src/08-durable-admission.ts) | Four callers get one job; requested compute is resolved and reserved atomically; a lost response remains unresolved after restart | Competing OS processes, tenant accounting, compute policy, idempotent leases, stale workers, unknown charges, teardown, retry cap, outbox deduplication |
+| [08: durable admission](src/08-durable-admission.ts) | Four callers get one job with seven accepted and three refused identities; requested compute is resolved and reserved atomically; a lost response remains unresolved after restart | Competing OS processes, tenant accounting, compute policy, idempotent leases, stale workers, unknown charges, teardown, retry cap, outbox deduplication |
 | [09: execution memory](src/09-execution-memory.ts) | A missing tenant predicate is recorded and corrected; execution and result verification remain separate | Tenant/project/version isolation, denied execution, wrong totals, unknown responses, durable intent, correction references |
 | [10: council reliability](src/10-council-of-guards.ts) | Three judges disagree, every original design still fails a gate, and evaluator evidence determines whether the council is ready | Missing judges, model identity, reason disagreement, fresh evidence, calibration, IID assumptions, judgment coverage, and review queues |
 | [11: bounded fan-out](src/11-fanout-node.ts) | Generate a bounded set concurrently and select only a draft that passes the lifecycle gate | Fan-out bounds, invalid high scorer, failed-branch isolation |
 
 Example 07 accepts a tiny mapping grammar instead of executing generated code. Only `postal_code` to `postalCode` by string copy is allowed under the fixture contract. Expected outputs belong to the validator. All input records receive an accepted or quarantined disposition. The proposing job cannot promote its own artifact; the demo calls promotion separately as the trusted owner.
 
-Example 08 uses integer cents and reserves two ten-cent attempts per item. Its printed ledger follows the talk:
+Example 08 uses integer cents and reserves two ten-cent attempts per item. Its $1.50 entitlement admits seven of ten offered records and reports all accepted/refused identities. Replaying a request preserves the original decision, even after funds are released; refused records require a new request ID. Its printed generation ledger follows the talk:
 
 | State | Settled | Held | Available |
 | --- | ---: | ---: | ---: |
-| Ten items admitted | 0 | 200 | 0 |
-| Nine complete; final response unknown | 90 | 20 | 90 |
-| Final completion reconciled | 100 | 0 | 100 |
+| Seven of ten offered items admitted | 0 | 140 | 10 |
+| Six complete; final response unknown | 60 | 20 | 70 |
+| Final completion reconciled | 70 | 0 | 80 |
 
 A provider slot represents outstanding remote work. Abandoning a local worker leaves that slot and its money held. The persisted intent contains the stable attempt key even when the provider response was lost before its job ID could be recorded. Only confirmed failure can create a retry. Completing an item and creating its notification record happen in one transaction; notification delivery never dispatches generation.
 

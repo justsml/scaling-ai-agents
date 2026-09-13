@@ -16,6 +16,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+export type AdmissionDecision = {
+  jobId: string;
+  accepted: string[];
+  acceptedIdentities: string[];
+  refused: string[];
+  reason: string;
+  deduplicated: boolean;
+};
+
 type Item = {
   id: string;
   job: string;
@@ -164,6 +173,8 @@ export class Admission {
       CREATE TABLE IF NOT EXISTS jobs (
         id TEXT PRIMARY KEY, tenant TEXT NOT NULL, request TEXT NOT NULL,
         count INTEGER NOT NULL, deadline INTEGER NOT NULL, UNIQUE(tenant, request));
+      CREATE TABLE IF NOT EXISTS admission_decisions (
+        job TEXT PRIMARY KEY, identities TEXT NOT NULL, decision TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS items (
         id TEXT PRIMARY KEY, job TEXT NOT NULL, state TEXT NOT NULL,
         held INTEGER NOT NULL, spent INTEGER NOT NULL, deadline INTEGER NOT NULL);
@@ -224,76 +235,140 @@ export class Admission {
   admit(
     authenticatedTenant: string,
     request: string,
-    count: number,
+    input: number | readonly string[],
     deadline: number,
-  ) {
+  ): AdmissionDecision {
     if (
       !request ||
-      !Number.isSafeInteger(count) ||
-      count < 1 ||
-      count > 10 ||
+      (typeof input !== "number" &&
+        !Array.isArray(input)) ||
+      (typeof input === "number" &&
+        (!Number.isSafeInteger(input) ||
+          input < 1 ||
+          input > 10)) ||
       !Number.isSafeInteger(deadline)
     )
       throw new Error("invalid batch");
+    const identities =
+      typeof input === "number"
+        ? Array.from({ length: input }, (_, index) =>
+            String(index),
+          )
+        : [...input];
+    if (
+      identities.length < 1 ||
+      identities.length > 10 ||
+      identities.some(
+        (id) => typeof id !== "string" || !id.trim(),
+      ) ||
+      new Set(identities).size !== identities.length
+    )
+      throw new Error("invalid batch identities");
+    // Input order defines priority. Retrying a refused identity
+    // requires a new request ID, even if budget later frees up.
+    const requestJson = JSON.stringify(identities);
     return this.db
       .transaction(() => {
+        const available = this.snapshot(
+          authenticatedTenant,
+        ).available;
         const prior = this.db
           .query<
             {
               id: string;
               count: number;
               deadline: number;
+              identities: string | null;
+              decision: string | null;
             },
             [string, string]
-          >(
-            "SELECT id,count,deadline FROM jobs WHERE tenant=? AND request=?",
-          )
+          >(`
+        SELECT j.id,j.count,j.deadline,d.identities,d.decision
+        FROM jobs j LEFT JOIN admission_decisions d ON d.job=j.id
+        WHERE j.tenant=? AND j.request=?
+      `)
           .get(authenticatedTenant, request);
         if (prior) {
+          const original =
+            prior.identities ??
+            JSON.stringify(
+              Array.from(
+                { length: prior.count },
+                (_, index) => String(index),
+              ),
+            );
           if (
-            prior.count !== count ||
+            original !== requestJson ||
             prior.deadline !== deadline
           )
             throw new Error("idempotency conflict");
-          return {
-            jobId: prior.id,
-            accepted: this.items(prior.id).map(
-              (i) => i.id,
-            ),
-            reason: "deduplicated",
-          };
+          // Compatibility with ledgers from the all-or-nothing example.
+          const decision: AdmissionDecision =
+            prior.decision
+              ? JSON.parse(prior.decision)
+              : {
+                  jobId: prior.id,
+                  accepted: this.items(prior.id).map(
+                    (i) => i.id,
+                  ),
+                  acceptedIdentities: identities,
+                  refused: [],
+                  reason: "admitted",
+                  deduplicated: false,
+                };
+          return { ...decision, deduplicated: true };
         }
-        if (this.now() >= deadline)
-          return {
-            jobId: null,
-            accepted: [],
-            reason: "deadline",
-          };
-        if (
-          this.snapshot(authenticatedTenant).available <
-          count * MAX_ATTEMPTS * PRICE
-        ) {
-          return {
-            jobId: null,
-            accepted: [],
-            reason: "budget-reserved-or-spent",
-          };
-        }
+        const expired = this.now() >= deadline;
+        const count = expired
+          ? 0
+          : Math.min(
+              identities.length,
+              Math.max(
+                0,
+                Math.floor(
+                  available / (MAX_ATTEMPTS * PRICE),
+                ),
+              ),
+            );
         const jobId = randomUUID();
+        const decision: AdmissionDecision = {
+          jobId,
+          accepted: identities
+            .slice(0, count)
+            .map((_, index) => `${jobId}/${index}`),
+          acceptedIdentities: identities.slice(
+            0,
+            count,
+          ),
+          refused: identities.slice(count),
+          reason: expired
+            ? "deadline"
+            : count === 0
+              ? "budget-reserved-or-spent"
+              : count < identities.length
+                ? "partial"
+                : "admitted",
+          deduplicated: false,
+        };
         this.db
           .query("INSERT INTO jobs VALUES (?,?,?,?,?)")
           .run(
             jobId,
             authenticatedTenant,
             request,
-            count,
+            identities.length,
             deadline,
           );
-        const accepted = Array.from(
-          { length: count },
-          (_, index) => `${jobId}/${index}`,
-        );
-        for (const id of accepted)
+        this.db
+          .query(
+            "INSERT INTO admission_decisions VALUES (?,?,?)",
+          )
+          .run(
+            jobId,
+            requestJson,
+            JSON.stringify(decision),
+          );
+        for (const id of decision.accepted)
           this.db
             .query(
               "INSERT INTO items VALUES (?,?,'queued',?,0,?)",
@@ -304,7 +379,7 @@ export class Admission {
               PRICE * MAX_ATTEMPTS,
               deadline,
             );
-        return { jobId, accepted, reason: "admitted" };
+        return decision;
       })
       .immediate();
   }
@@ -703,12 +778,15 @@ export function demo() {
   let clock = 0;
   let store = new Admission(path, () => clock);
   try {
-    store.provision("customer-4471", 200);
+    store.provision("customer-4471", 150);
     const callers = Array.from({ length: 4 }, () =>
       store.admit(
         "customer-4471",
         "batch-1042",
-        10,
+        Array.from(
+          { length: 10 },
+          (_, i) => `record-${i + 1}`,
+        ),
         600_000,
       ),
     );
@@ -716,7 +794,8 @@ export function demo() {
       "four callers",
       callers.map((c) => ({
         jobId: c.jobId,
-        accepted: c.accepted.length,
+        accepted: c.acceptedIdentities,
+        refused: c.refused,
         reason: c.reason,
       })),
     );
@@ -735,7 +814,7 @@ export function demo() {
     );
     for (const item of callers[0]!.accepted.slice(
       0,
-      9,
+      6,
     )) {
       const a = store.dispatch(item);
       store.acknowledge(
@@ -747,7 +826,7 @@ export function demo() {
       clock += 1000;
     }
     const lost = store.dispatch(
-      callers[0]!.accepted[9]!,
+      callers[0]!.accepted[6]!,
     );
     store.abandon(lost.id);
     store.close();
@@ -764,7 +843,7 @@ export function demo() {
       "customer-4471",
       callers[0]!.jobId!,
       "worker-pool-1",
-      computeRequest,
+      { ...computeRequest, count: 4 },
     );
     console.log("compute reserved", lease);
     store.provisionCompute(
@@ -772,7 +851,7 @@ export function demo() {
       "provider-lease-1",
     );
     // Simulated provider billing and teardown evidence.
-    store.confirmComputeTeardown(lease.id, 80);
+    store.confirmComputeTeardown(lease.id, 40);
     for (const notification of store.notifications())
       store.notificationDelivered(notification.item);
     console.log(
