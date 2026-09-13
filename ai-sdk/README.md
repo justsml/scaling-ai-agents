@@ -23,6 +23,13 @@ its call count and any extra setup. `05` expects a conformance-harness request o
 `04` can optionally use the provider Batch API when `AI_GATEWAY_API_KEY` and
 `@ai-sdk/gateway` are available.
 
+The provider-batch demo prints its accepted batch reference immediately and limits local
+waiting to 30 seconds. Save that JSON. To resume polling and result retrieval, set
+`BATCH_REFERENCE` to the saved JSON and run `bun run snippet:04` again. Resume mode skips
+the local paid agent example and submits no new batch. A local timeout or provider error
+does not cancel remote work. If submission failed before returning a reference, inspect
+provider records before retrying because the batch may already have been accepted.
+
 `bun run all` runs the main standalone examples in teaching order. To run a subset:
 
 ```sh

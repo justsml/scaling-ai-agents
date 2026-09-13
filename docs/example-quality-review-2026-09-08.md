@@ -18,7 +18,15 @@ The findings below describe the September 8 snapshot; its snippet names and line
 
 Validation for this fix pass: `bun test ./test` passed in all four packages (AI SDK 67, LangChain 93, Mastra 87, shared examples 50; **297 total**), and all four `bun run check` commands passed. Each certification guide command accepted its shipped reference with five passing tests and rejected the buggy fixture with a nonzero exit status. Changed TypeScript files passed formatting checks. Loopback-server tests required permission to bind local ports. No live model calls were made.
 
-Medium findings and talk-alignment recommendations remain outside this High-priority fix pass. The original review and its validation results are retained below.
+The original review and its validation results are retained below. Talk-alignment recommendations remain separate from these correctness fixes.
+
+## Medium-priority resolutions — 13 September 2026
+
+- **Medium 4:** The old AI SDK router and its routine/consequential execution paths were removed during consolidation. [Current model routing](../ai-sdk/src/snippets/06-model-router.ts) only classifies requests; it accepts no spending cap or caller deadline and does not execute a selected specialist. Its header now distinguishes observed successful-call estimates from complete billing evidence, including potentially billed failed attempts. The scoped routing suite passed all 22 tests.
+- **Medium 5:** [Provider batching](../ai-sdk/src/lib/provider-batch.ts) separates import errors from submission, polling and result errors, preserving the original diagnosis, accepted batch reference and partial results. A shared 30-second local deadline bounds submission, polling and retrieval without cancelling the remote batch. [Example 04](../ai-sdk/src/snippets/04-batching.ts) prints the accepted reference immediately and supports `BATCH_REFERENCE` resume without submitting another batch or repeating its local paid examples. Unknown submissions require provider reconciliation before retry. Thirteen offline regression tests cover these boundaries, including stalled operations, synchronous errors and late acknowledgments; no live provider batch was submitted.
+- **Medium 6:** All four example packages now scope their test scripts to `./test`; quick starts use `bun run test`. Each framework exposes the deliberately broken readiness fixture through `bun run test:challenge`. All three challenge commands were verified to report two passes, three failures and exit status 1. The fixture remains a negative control and is excluded from the normal package suite.
+
+Final package-script validation: `bun run test` passed in AI SDK (80), LangChain (93), Mastra (87) and shared examples (50), **310 tests total**. AI SDK typechecking passed after the implementation changes; the other packages' earlier typechecks remain applicable because their subsequent changes only affect test commands and documentation. The batching tests use injected operations and establish local control flow, not live provider behavior.
 
 ## Standards: correctness, clarity and promises to readers
 
